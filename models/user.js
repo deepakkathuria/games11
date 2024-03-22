@@ -16,7 +16,12 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true, // Optional for users who want to provide an email
     unique: true
-  }
+  },
+//   otp: {
+//     type: DataTypes.NUMBER,
+//     allowNull: true, // Optional for users who want to provide an email
+//     unique: true
+//   }
 });
 
 module.exports = User;

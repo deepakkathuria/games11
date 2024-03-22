@@ -3,19 +3,20 @@ const config = require("./db.config.js");
 require("dotenv").config();
 
 const sequelize = new Sequelize(config.DB, config.USER, config.PASSWORD, {
-  host: config.HOST,
-  dialect: config.dialect,
-  port: config.PORT,
-  operatorsAliases: 0,
-  logging: false,
-  define: {
-    freezeTableName: true,
-    timestamps: true,
-    createdAt: "creationDate",
-    updatedAt: "updateDate",
-  },
-  pool: config.pool,
-});
+    host: config.HOST,
+    dialect: config.dialect,
+    port: config.PORT,
+    operatorsAliases: 0,
+    logging: console.log, // Enable logging
+    define: {
+      freezeTableName: true,
+      timestamps: true,
+      createdAt: "creationDate",
+      updatedAt: "updateDate",
+    },
+    pool: config.pool,
+  });
+  
 
 const checkDatabaseConnection = async () => {
   try {
