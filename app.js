@@ -310,3 +310,51 @@ app.get("/api/matches", async (req, res) => {
     res.status(500).json({ message: "Error fetching data" });
   }
 });
+
+
+
+
+
+// -----------------------dream team match id comes from frontend will show playing 11 sing entitiy-------------------------------------------------------------
+
+
+app.get('/fetchDreamTeam', async (req, res) => {
+  const { matchId } = req.query; // Extract matchId from query parameters
+
+  try {
+    const matchDetailUrl = `https://rest.entitysport.com/v2/matches/${matchId}/newpoint2?token=73d62591af4b3ccb51986ff5f8af5676`;
+    const matchDetailResponse = await axios.get(matchDetailUrl);
+    const matchDetails = matchDetailResponse.data.response;
+
+    const { teama, teamb } = matchDetails.points;
+    const dreamTeamPlayers = [];
+
+    // Function to extract player details
+    const extractPlayerDetails = (team, teamName) => {
+      if (team && Array.isArray(team.playing11)) {
+        for (const player of team.playing11) {
+          dreamTeamPlayers.push({
+            name: player.name,
+            rating: player.rating,
+            points: player.point,
+            role: player.role,
+            teamName: teamName
+          });
+        }
+      }
+    };
+
+    extractPlayerDetails(teama, matchDetails.teama.name);
+    extractPlayerDetails(teamb, matchDetails.teamb.name);
+
+    // Sort players and designate captain and vice-captain
+    dreamTeamPlayers.sort((a, b) => b.points - a.points);
+    if (dreamTeamPlayers.length > 0) dreamTeamPlayers[0].designation = 'Captain';
+    if (dreamTeamPlayers.length > 1) dreamTeamPlayers[1].designation = 'Vice-Captain';
+
+    res.json({ success: true, dreamTeam: dreamTeamPlayers });
+  } catch (error) {
+    console.error('Error fetching dream team details:', error);
+    res.status(500).json({ success: false, message: 'Error fetching dream team details' });
+  }
+});
