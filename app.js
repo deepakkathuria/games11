@@ -317,7 +317,6 @@ app.get("/api/matches", async (req, res) => {
 
 // -----------------------dream team match id comes from frontend will show playing 11 sing entitiy-------------------------------------------------------------
 
-
 app.get('/fetchDreamTeam', async (req, res) => {
   const { matchId } = req.query; // Extract matchId from query parameters
 
@@ -327,13 +326,13 @@ app.get('/fetchDreamTeam', async (req, res) => {
     const matchDetails = matchDetailResponse.data.response;
 
     const { teama, teamb } = matchDetails.points;
-    const dreamTeamPlayers = [];
+    const allPlayers = [];
 
     // Function to extract player details
     const extractPlayerDetails = (team, teamName) => {
       if (team && Array.isArray(team.playing11)) {
         for (const player of team.playing11) {
-          dreamTeamPlayers.push({
+          allPlayers.push({
             name: player.name,
             rating: player.rating,
             points: player.point,
@@ -344,15 +343,21 @@ app.get('/fetchDreamTeam', async (req, res) => {
       }
     };
 
+    // Extract player details for both teams
     extractPlayerDetails(teama, matchDetails.teama.name);
     extractPlayerDetails(teamb, matchDetails.teamb.name);
 
-    // Sort players and designate captain and vice-captain
-    dreamTeamPlayers.sort((a, b) => b.points - a.points);
-    if (dreamTeamPlayers.length > 0) dreamTeamPlayers[0].designation = 'Captain';
-    if (dreamTeamPlayers.length > 1) dreamTeamPlayers[1].designation = 'Vice-Captain';
+    // Sort players based on points
+    allPlayers.sort((a, b) => b.points - a.points);
 
-    res.json({ success: true, dreamTeam: dreamTeamPlayers });
+    // Select the top 11 players
+    const top11Players = allPlayers.slice(0, 11);
+
+    // Designate captain and vice-captain for the top 11 players
+    if (top11Players.length > 0) top11Players[0].designation = 'Captain';
+    if (top11Players.length > 1) top11Players[1].designation = 'Vice-Captain';
+
+    res.json({ success: true, dreamTeam: top11Players });
   } catch (error) {
     console.error('Error fetching dream team details:', error);
     res.status(500).json({ success: false, message: 'Error fetching dream team details' });
