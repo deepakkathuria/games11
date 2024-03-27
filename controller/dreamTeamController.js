@@ -1,45 +1,80 @@
-// utilities/calculateDreamTeam.js
 const axios = require('axios');
+const { Sequelize } = require('sequelize'); // Import Sequelize
+const { DreamTeam } = require('../models/dreamTeam');
 const { PlayerPerformance } = require('../models/playerPerformance');
-const {PlayerAppearances} = require('../models/playerAppearance');
+
+
+
+
+// ---------------------------------------FUNCTION TO CALCULATE DREAM TEAM APPERANCE MEANS DREAM TEAM TABLE INSERTION------------------------
+
+const calculateDreamTeamsForAllMatches = async () => {
+  try {
+    // Fetch all unique match IDs
+    const uniqueMatchIds = await PlayerPerformance.findAll({
+      attributes: ['match_id'],
+      group: 'match_id',
+      raw: true,
+    });
+
+    // Calculate the dream team for each unique match ID
+    for (const { match_id } of uniqueMatchIds) {
+      await calculateAndSaveDreamTeam(match_id);
+    }
+
+    console.log('Dream teams calculated for all matches.');
+  } catch (error) {
+    console.error('Failed to calculate dream teams:', error);
+  }
+};
 
 
 const calculateAndSaveDreamTeam = async (matchId) => {
-    const topPlayers = await PlayerPerformance.findAll({
-      where: { match_id: matchId },
-      order: [['points', 'DESC']],
-      limit: 11
-    });
-  
-    for (const player of topPlayers) {
-      const [appearance, created] = await PlayerAppearances.findOrCreate({
+  const topPlayers = await PlayerPerformance.findAll({
+    where: { match_id: matchId },
+    order: [['points', 'DESC']],
+    limit: 11
+  });
+
+  for (const player of topPlayers) {
+    let dreamTeamEntry = await DreamTeam.findOne({ where: { pid: player.pid } });
+
+    if (dreamTeamEntry) {
+      // Increment appearances by 1
+      dreamTeamEntry.appearances += 1;
+
+      // Ensure matchId is not already recorded, to prevent duplicates
+      const matchesArray = dreamTeamEntry.matches ? dreamTeamEntry.matches.split(',') : [];
+      if (!matchesArray.includes(matchId.toString())) {
+        matchesArray.push(matchId);
+        dreamTeamEntry.matches = matchesArray.join(',');
+      }
+
+      // Calculate average points
+      const totalPoints = await PlayerPerformance.findAll({
         where: { pid: player.pid },
-        defaults: { name: player.name, appearances: 1 }
+        attributes: [[Sequelize.fn('SUM', Sequelize.col('points')), 'totalPoints']],
+        raw: true,
       });
-  
-      if (!created) {
-        appearance.appearances += 1;
-        await appearance.save();
-      }
-    }
-  };
-
-const fetchMatchesAndCalculateDreamTeams = async () => {
-    try {
-      // Adjust date range and token as needed
-      const matchResponse = await axios.get(`https://rest.entitysport.com/v2/matches?date=2024-03-01_2024-03-18&paged=1&per_page=80&token=73d62591af4b3ccb51986ff5f8af5676`);
-      const matches = matchResponse.data.response.items;
+      const avgPoints = totalPoints[0].totalPoints / dreamTeamEntry.appearances;
       
-      // Loop through each match and calculate the dream team
-      for (const match of matches) {
-        await calculateAndSaveDreamTeam(match.match_id);
-      }
-  
-      console.log('Dream teams calculated and saved for all matches.');
-    } catch (error) {
-      console.error('Error fetching matches or calculating dream teams:', error);
+      // Update dreamTeamEntry with new average points
+      dreamTeamEntry.avgPoints = avgPoints;
+
+      await dreamTeamEntry.save();
+    } else {
+      // For a new entry, calculate initial average points which is just the player's points in this match
+      const avgPoints = player.points; // Since it's their first appearance, avg points = points in this match
+      
+      await DreamTeam.create({
+        pid: player.pid,
+        matches: `${matchId}`,
+        appearances: 1, // Initialize appearances to 1 since it's their first inclusion
+        avgPoints: avgPoints // Set average points for the player
+      });
     }
-  };
+  }
+};
 
 
 
@@ -47,13 +82,34 @@ const fetchMatchesAndCalculateDreamTeams = async () => {
 
 
 
-//   fetchMatchesAndCalculateDreamTeams();
+// ----------------------------MY DB APIS FUNCTION -----------------------------------------------------------
+//fetch data of player dream team appearnce using pid from dream team table which we have created 
+
+const CalculatePlayerDreamTeamAppearance = async (req, res) => {
+  try {
+    const playerId = req.params.playerId; // Assuming you're getting the player ID from the URL parameter
+
+    // Validate playerId
+    if (!playerId) {
+      return res.status(400).send({ message: "Player ID is required." });
+    }
+
+    const playerData = await DreamTeam.findOne({
+      where: { pid: playerId }
+    });
+
+    if (!playerData) {
+      return res.status(404).send({ message: "Player not found in Dream Team." });
+    }
+
+    // Send back the player's dream team data
+    res.status(200).json(playerData);
+  } catch (error) {
+    console.error("Failed to calculate player dream team appearance:", error);
+    res.status(500).send({ message: "An error occurred while processing your request." });
+  }
+};
 
 
 
-
-
-
-
-
-module.exports = {fetchMatchesAndCalculateDreamTeams};
+module.exports = { calculateDreamTeamsForAllMatches, CalculatePlayerDreamTeamAppearance };

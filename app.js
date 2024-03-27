@@ -8,13 +8,12 @@ const {
   fetchMatchesAndSave,
 } = require("./controller/playerPerformanceController"); // Adjust the path if necessary
 const {
-  fetchMatchesAndCalculateDreamTeams,
-} = require("./controller/dreamTeamController"); // Adjust the path
+  calculateDreamTeamsForAllMatches,CalculatePlayerDreamTeamAppearance
+} = require("./controller/dreamTeamController");
 
 // Import your models here to ensure they are registered
 require("./models/playerPerformance"); // Adjust the path as necessary
 require("./models/dreamTeam");
-require("./models/playerPerformance");
 
 const app = express();
 app.use(express.json());
@@ -24,6 +23,7 @@ app.use(authRoutes);
 
 const PORT = process.env.PORT || 3000;
 sequelize
+
   .sync({ force: false })
   .then(() => {
     console.log("Database & tables created!");
@@ -33,29 +33,16 @@ sequelize
     console.error("Failed to synchronize database:", error);
   });
 
-// -----------------------------------------save match with player rating ---------------------------------------------------------------
-app.get("/api/fetch-matches", async (req, res) => {
-  try {
-    await fetchMatchesAndSave();
-    res.status(200).send("Match details fetched and saved successfully.");
-  } catch (error) {
-    console.error("API Error:", error);
-    res.status(500).send("Error fetching and saving match details.");
-  }
-});
 
-app.get("/api/fetch-and-calculate-dream-teams", async (req, res) => {
-  console.log("API /api/fetch-and-calculate-dream-teams hit"); // Add this line
-  try {
-    await fetchMatchesAndCalculateDreamTeams();
-    res.status(200).send("Dream teams calculated and saved for all matches.");
-  } catch (error) {
-    console.error("API Error:", error);
-    res.status(500).send("Error fetching matches or calculating dream teams.");
-  }
-});
 
-// -------------------------------------calculate top plares on this venue-------------------------------------
+
+
+
+
+                //  ENTITY MANIPULATION AND TAKING ENTITY DATA FROM TWO THREEE API AND SHOW IT ACCODINGLY APIS
+  
+
+// -------------------------------------calculate top player on this venue-------------------------------------
 const API_KEY = "73d62591af4b3ccb51986ff5f8af5676";
 const BASE_URL = "https://rest.entitysport.com";
 
@@ -240,6 +227,7 @@ app.get("/api/player-stats", async (req, res) => {
   }
 });
 
+// TEAM HEAD TO HEAD WE ARE CALCULATING FROM ENTITY FIRST WE ARE FETCHING ALL MATCHIDS USING SERIES ID THEN CALCULATING TEAM STATS
 // -------------------------tema head to head---------------------------------------------------------------
 
 async function fetchTeams(seriesId) {
@@ -272,38 +260,40 @@ async function fetchMatches(seriesId) {
   return allMatches;
 }
 
-
 // Endpoint to Get Matches Between Two Teams
 app.get("/api/matches", async (req, res) => {
   try {
-    const { teamId1, teamId2,seriesId } = req.query;
+    const { teamId1, teamId2, seriesId } = req.query;
     if (!teamId1 || !teamId2) {
-      return res
-        .status(400)
-        .json({
-          message: "Both teamId1 and teamId2 query parameters are required",
-        });
+      return res.status(400).json({
+        message: "Both teamId1 and teamId2 query parameters are required",
+      });
     }
-    
 
     const teams = await fetchTeams(seriesId);
-    console.log(teams,"fdsjafj")
+    console.log(teams, "fdsjafj");
     const matches = await fetchMatches(seriesId);
 
-    const filteredMatches = matches.filter(match => {
-      const isMatch = (match.teama.team_id == teamId1 && match.teamb.team_id == teamId2) || 
-                      (match.teama.team_id == teamId2 && match.teamb.team_id == teamId1);
-      if (isMatch) {
-          console.log(`Match found: ${match.match_id}, Teams: ${match.teama.team_id} vs ${match.teamb.team_id}`);
-      }
-      return isMatch;
-  })
-  .map(match => ({
-      match_id: match.match_id,
-      title: match.title,
-      result: match.result,
-      winner: match.winning_team_id ? teams.get(parseInt(match.winning_team_id)) : 'No winner or draw',
-  }));
+    const filteredMatches = matches
+      .filter((match) => {
+        const isMatch =
+          (match.teama.team_id == teamId1 && match.teamb.team_id == teamId2) ||
+          (match.teama.team_id == teamId2 && match.teamb.team_id == teamId1);
+        if (isMatch) {
+          console.log(
+            `Match found: ${match.match_id}, Teams: ${match.teama.team_id} vs ${match.teamb.team_id}`
+          );
+        }
+        return isMatch;
+      })
+      .map((match) => ({
+        match_id: match.match_id,
+        title: match.title,
+        result: match.result,
+        winner: match.winning_team_id
+          ? teams.get(parseInt(match.winning_team_id))
+          : "No winner or draw",
+      }));
     res.json({ matches: filteredMatches });
   } catch (error) {
     console.error(error);
@@ -311,13 +301,10 @@ app.get("/api/matches", async (req, res) => {
   }
 });
 
+// DREAM TEAM PAGE GAURAV GIVING MATCH ID AND THEN WE WILL BE CALCULATING DREAM 11 ACCOORDING TO RATING OF PLAYER USING ENTITY
+// -----------------------dream team match id comes from frontend will show playing 11 entitiy-------------------------------------------------------------
 
-
-
-
-// -----------------------dream team match id comes from frontend will show playing 11 sing entitiy-------------------------------------------------------------
-
-app.get('/fetchDreamTeam', async (req, res) => {
+app.get("/fetchDreamTeam", async (req, res) => {
   const { matchId } = req.query; // Extract matchId from query parameters
 
   try {
@@ -337,7 +324,7 @@ app.get('/fetchDreamTeam', async (req, res) => {
             rating: player.rating,
             points: player.point,
             role: player.role,
-            teamName: teamName
+            teamName: teamName,
           });
         }
       }
@@ -354,12 +341,98 @@ app.get('/fetchDreamTeam', async (req, res) => {
     const top11Players = allPlayers.slice(0, 11);
 
     // Designate captain and vice-captain for the top 11 players
-    if (top11Players.length > 0) top11Players[0].designation = 'Captain';
-    if (top11Players.length > 1) top11Players[1].designation = 'Vice-Captain';
+    if (top11Players.length > 0) top11Players[0].designation = "Captain";
+    if (top11Players.length > 1) top11Players[1].designation = "Vice-Captain";
 
     res.json({ success: true, dreamTeam: top11Players });
   } catch (error) {
-    console.error('Error fetching dream team details:', error);
-    res.status(500).json({ success: false, message: 'Error fetching dream team details' });
+    console.error("Error fetching dream team details:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error fetching dream team details" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+                                              //  MY DB APIS GAMES11
+
+
+app.get('/mydb/dream-team/player/:playerId', CalculatePlayerDreamTeamAppearance);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
+
+// insert data api which will run locally as well to insert data  IN DREAMTEAM TABLE
+// ----------------------------dream team apprance  table calculate --------------------------------------
+
+app.get("/api/calculate-dream-teams", async (req, res) => {
+  try {
+    await calculateDreamTeamsForAllMatches();
+    return res
+      .status(200)
+      .json({ message: "Dream teams calculation initiated for all matches." });
+  } catch (error) {
+    console.error("Error calculating dream teams:", error);
+    return res
+      .status(500)
+      .json({
+        message: "Failed to calculate dream teams.",
+        error: error.message,
+      });
+  }
+});
+
+// insert data api which will run locally as well to insert data  in PLAYERPERFOMANCE NEW TABLE
+// -----------------------------------------save match with player rating ---------------------------------------------------------------
+app.get("/api/fetch-matches", async (req, res) => {
+  try {
+    await fetchMatchesAndSave();
+    res.status(200).send("Match details fetched and saved successfully.");
+  } catch (error) {
+    console.error("API Error:", error);
+    res.status(500).send("Error fetching and saving match details.");
   }
 });
