@@ -14,6 +14,7 @@ const {
 // Import your models here to ensure they are registered
 require("./models/playerPerformance"); // Adjust the path as necessary
 require("./models/dreamTeam");
+// require("./models/scorecard_IPL2023")
 
 const app = express();
 app.use(express.json());
@@ -50,6 +51,7 @@ app.get("/api/player-stats", async (req, res) => {
   try {
     // Fetch the initial match details
     const matchId = req.query.matchId;
+    console.log(matchId)
     const matchResponse = await axios.get(
       `${BASE_URL}/v2/matches/${matchId}/newpoint2?token=${API_KEY}`
     );

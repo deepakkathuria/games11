@@ -29,6 +29,54 @@ const calculateDreamTeamsForAllMatches = async () => {
 };
 
 
+// const calculateAndSaveDreamTeam = async (matchId) => {
+//   const topPlayers = await PlayerPerformance.findAll({
+//     where: { match_id: matchId },
+//     order: [['points', 'DESC']],
+//     limit: 11
+//   });
+
+//   for (const player of topPlayers) {
+//     let dreamTeamEntry = await DreamTeam.findOne({ where: { pid: player.pid } });
+
+//     if (dreamTeamEntry) {
+//       // Increment appearances by 1
+//       dreamTeamEntry.appearances += 1;
+
+//       // Ensure matchId is not already recorded, to prevent duplicates
+//       const matchesArray = dreamTeamEntry.matches ? dreamTeamEntry.matches.split(',') : [];
+//       if (!matchesArray.includes(matchId.toString())) {
+//         matchesArray.push(matchId);
+//         dreamTeamEntry.matches = matchesArray.join(',');
+//       }
+
+//       // Calculate average points
+//       const totalPoints = await PlayerPerformance.findAll({
+//         where: { pid: player.pid },
+//         attributes: [[Sequelize.fn('SUM', Sequelize.col('points')), 'totalPoints']],
+//         raw: true,
+//       });
+//       const avgPoints = totalPoints[0].totalPoints / dreamTeamEntry.appearances;
+      
+//       // Update dreamTeamEntry with new average points
+//       dreamTeamEntry.avgPoints = avgPoints;
+
+//       await dreamTeamEntry.save();
+//     } else {
+//       // For a new entry, calculate initial average points which is just the player's points in this match
+//       const avgPoints = player.points; // Since it's their first appearance, avg points = points in this match
+      
+//       await DreamTeam.create({
+//         pid: player.pid,
+//         matches: `${matchId}`,
+//         appearances: 1, // Initialize appearances to 1 since it's their first inclusion
+//         avgPoints: avgPoints // Set average points for the player
+//       });
+//     }
+//   }
+// };
+
+
 const calculateAndSaveDreamTeam = async (matchId) => {
   const topPlayers = await PlayerPerformance.findAll({
     where: { match_id: matchId },
@@ -36,45 +84,46 @@ const calculateAndSaveDreamTeam = async (matchId) => {
     limit: 11
   });
 
-  for (const player of topPlayers) {
+  for (let i = 0; i < topPlayers.length; i++) {
+    const player = topPlayers[i];
     let dreamTeamEntry = await DreamTeam.findOne({ where: { pid: player.pid } });
 
-    if (dreamTeamEntry) {
-      // Increment appearances by 1
+    if (!dreamTeamEntry) {
+      // If it's a new entry
+      await DreamTeam.create({
+        pid: player.pid,
+        matches: `${matchId}`,
+        appearances: 1,
+        avgPoints: player.points, // Initial average points
+        captainAppearances: i === 0 ? 1 : 0, // Captain if first in the list
+        viceCaptainAppearances: i === 1 ? 1 : 0, // Vice-captain if second
+      });
+    } else {
+      // Increment appearances
       dreamTeamEntry.appearances += 1;
+      if (i === 0) dreamTeamEntry.captainAppearances += 1; // Increment captain appearances if top player
+      if (i === 1) dreamTeamEntry.viceCaptainAppearances += 1; // Increment vice-captain appearances if second
 
-      // Ensure matchId is not already recorded, to prevent duplicates
+      // Existing logic to update matches and calculate average points...
       const matchesArray = dreamTeamEntry.matches ? dreamTeamEntry.matches.split(',') : [];
       if (!matchesArray.includes(matchId.toString())) {
         matchesArray.push(matchId);
         dreamTeamEntry.matches = matchesArray.join(',');
       }
 
-      // Calculate average points
       const totalPoints = await PlayerPerformance.findAll({
         where: { pid: player.pid },
         attributes: [[Sequelize.fn('SUM', Sequelize.col('points')), 'totalPoints']],
         raw: true,
       });
       const avgPoints = totalPoints[0].totalPoints / dreamTeamEntry.appearances;
-      
-      // Update dreamTeamEntry with new average points
       dreamTeamEntry.avgPoints = avgPoints;
 
       await dreamTeamEntry.save();
-    } else {
-      // For a new entry, calculate initial average points which is just the player's points in this match
-      const avgPoints = player.points; // Since it's their first appearance, avg points = points in this match
-      
-      await DreamTeam.create({
-        pid: player.pid,
-        matches: `${matchId}`,
-        appearances: 1, // Initialize appearances to 1 since it's their first inclusion
-        avgPoints: avgPoints // Set average points for the player
-      });
     }
   }
 };
+
 
 
 
