@@ -1,7 +1,7 @@
 const { Sequelize, DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const Scorecard_2023 = sequelize.define('Scorecard_IPL2023', {
+const Scorecard_2023 = sequelize.define('Scorecard_IPL2008', {
     id: { type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true },
     matchId: Sequelize.INTEGER,
     playerId: Sequelize.INTEGER,
