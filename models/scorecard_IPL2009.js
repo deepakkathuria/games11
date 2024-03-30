@@ -1,7 +1,7 @@
 const { Sequelize, DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const Scorecard_2023 = sequelize.define('Scorecard_IPL2009', {
+const Scorecard_2009 = sequelize.define('Scorecard_IPL2009', {
     id: { type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true },
     matchId: Sequelize.INTEGER,
     playerId: Sequelize.INTEGER,
@@ -26,4 +26,4 @@ const Scorecard_2023 = sequelize.define('Scorecard_IPL2009', {
 }, { timestamps: false });
 
 
-module.exports = {Scorecard_2023};
+module.exports = {Scorecard_2009};

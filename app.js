@@ -11,7 +11,13 @@ const {
   calculateDreamTeamsForAllMatches,CalculatePlayerDreamTeamAppearance
 } = require("./controller/dreamTeamController");
 
-// Import your models here to ensure they are registered
+const {
+  getPlayerStatsAgainstOpposition
+}
+ = require('./controller/teamplayeriplstatsController')
+
+
+ // Import your models here to ensure they are registered
 require("./models/playerPerformance"); // Adjust the path as necessary
 require("./models/dreamTeam");
 // require("./models/scorecard_IPL2023")
@@ -369,6 +375,23 @@ app.get("/fetchDreamTeam", async (req, res) => {
 
 
 app.get('/mydb/dream-team/player/:playerId', CalculatePlayerDreamTeamAppearance);
+
+
+app.get('/player-stats-ipl', async (req, res) => {
+  try {
+    const { playerId, oppositionTeamId } = req.query;
+    
+    if (!playerId || !oppositionTeamId) {
+      return res.status(400).send({ message: 'Player ID and Opposition Team ID are required.' });
+    }
+
+    const stats = await getPlayerStatsAgainstOpposition(playerId, oppositionTeamId);
+    res.json(stats);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Internal Server Error' });
+  }
+});
 
 
 

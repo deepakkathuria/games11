@@ -1,9 +1,6 @@
 const axios = require('axios');
 const { Sequelize } = require('sequelize'); // Import Sequelize
-const { Scorecard_2023 } = require('./models/scorecard_IPL2023');
-
-
-
+const { Scorecard_2008 } = require('./models/scorecard_IPL2008.js');
 
 
 
@@ -24,15 +21,41 @@ async function fetchAllMatchIds(baseUrl, token) {
     let matchIds = [];
     let currentPage = 1;
     let totalPages = 1;
-  
-    while (currentPage <= totalPages) {
-      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/127579/matches/?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`);
-      matchIds = matchIds.concat(response.data.response.items.map(item => item.match_id));
-      totalPages = response.data.response.total_pages;
-      currentPage++;
-    }
+    do {
+        try {
+            const response = await axios.get(`${baseUrl}/competitions/112657/matches/`, {
+                params: {
+                    token: token,
+                    per_page: 80,
+                    page: currentPage
+                }
+            });
+            matchIds = matchIds.concat(response.data.response.items.map(item => item.match_id));
+            totalPages = response.data.response.total_pages;
+            currentPage++;
+        } catch (error) {
+            console.error('Error fetching match IDs:', error);
+            break; // Exit loop in case of error
+        }
+    } while (currentPage <= totalPages);
     return matchIds;
-  }
+}
+
+
+
+// async function fetchAllMatchIds(baseUrl, token) {
+//     let matchIds = [];
+//     let currentPage = 1;
+//     let totalPages = 1;
+  
+//     while (currentPage <= totalPages) {
+//       const response = await axios.get(`https://rest.entitysport.com/v2/competitions/118273/matches/?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`);
+//       matchIds = matchIds.concat(response.data.response.items.map(item => item.match_id));
+//       totalPages = response.data.response.total_pages;
+//       currentPage++;
+//     }
+//     return matchIds;
+//   }
   
 //   // Insert match data into the database
 //   async function insertMatchData(matchData) {
@@ -45,7 +68,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 
 //         // Insert batsmen performances
 //         inning.batsmen.forEach(async (batsman) => {
-//             await Scorecard_2023.create({
+//             await Scorecard_2008.create({
 //                 matchId: matchId,
 //                 playerId: batsman.batsman_id,
 //                 teamId: battingTeamId,
@@ -69,7 +92,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 
 //         // Insert bowlers performances
 //         inning.bowlers.forEach(async (bowler) => {
-//             const existingRecord = await Scorecard_2023.findOne({ where: { matchId: matchId, playerId: bowler.bowler_id } });
+//             const existingRecord = await Scorecard_2008.findOne({ where: { matchId: matchId, playerId: bowler.bowler_id } });
 
 //             if (existingRecord) {
 //                 // Update existing record with bowling data
@@ -84,7 +107,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 //                 });
 //             } else {
 //                 // Create a new record for bowlers who did not bat
-//                 await Scorecard_2023.create({
+//                 await Scorecard_2008.create({
 //                     matchId: matchId,
 //                     playerId: bowler.bowler_id,
 //                     teamId: fieldingTeamId, // The bowler would be part of the fielding team
@@ -111,7 +134,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 
 //         // Insert fielders performances
 //         inning.fielder.forEach(async (fielder) => {
-//             const existingRecord = await Scorecard_2023.findOne({ where: { matchId: matchId, playerId: fielder.fielder_id } });
+//             const existingRecord = await Scorecard_2008.findOne({ where: { matchId: matchId, playerId: fielder.fielder_id } });
 
 //             if (existingRecord) {
 //                 // Update existing record with fielding data
@@ -121,7 +144,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 //                 });
 //             } else {
 //                 // Create a new record for fielders who did not bat or bowl
-//                 await Scorecard_2023.create({
+//                 await Scorecard_2008.create({
 //                     matchId: matchId,
 //                     playerId: fielder.fielder_id,
 //                     teamId: fieldingTeamId, // Assuming the fielding team ID is available
@@ -159,7 +182,7 @@ async function insertMatchData(matchData) {
   
     // Unified player data handling
     const handlePlayerData = async (playerId, teamId, data) => {
-      const existingRecord = await Scorecard_2023.findOne({
+      const existingRecord = await Scorecard_2008.findOne({
         where: { matchId: matchId, playerId: playerId }
       });
   
@@ -174,7 +197,7 @@ async function insertMatchData(matchData) {
         });
   } else {
         // Create a new record
-        await Scorecard_2023.create({
+        await Scorecard_2008.create({
           matchId: matchId,
           playerId: playerId,
           teamId: teamId,
@@ -280,6 +303,8 @@ insertMatchData(matchData).then(() => {
       for (const matchId of matchIds) {
         await fetchAndProcessMatchDetails(matchId, scorecardBaseUrl, token);
       }
+      console.log('All data inserted fully.'); // Confirmation message after all operations
+
     } catch (error) {
       console.error('An error occurred:', error);
     }
