@@ -1,6 +1,6 @@
 const axios = require('axios');
 const { Sequelize } = require('sequelize'); // Import Sequelize
-const { Scorecard_2008 } = require('./models/scorecard_IPL2008.js');
+const { Scorecard_2012 } = require('./models/scorecard_IPL2012.js');
 
 
 
@@ -23,7 +23,7 @@ async function fetchAllMatchIds(baseUrl, token) {
     let totalPages = 1;
     do {
         try {
-            const response = await axios.get(`${baseUrl}/competitions/112657/matches/`, {
+            const response = await axios.get(`${baseUrl}/competitions/112653/matches/`, {
                 params: {
                     token: token,
                     per_page: 80,
@@ -68,7 +68,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 
 //         // Insert batsmen performances
 //         inning.batsmen.forEach(async (batsman) => {
-//             await Scorecard_2008.create({
+//             await Scorecard_2012.create({
 //                 matchId: matchId,
 //                 playerId: batsman.batsman_id,
 //                 teamId: battingTeamId,
@@ -92,7 +92,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 
 //         // Insert bowlers performances
 //         inning.bowlers.forEach(async (bowler) => {
-//             const existingRecord = await Scorecard_2008.findOne({ where: { matchId: matchId, playerId: bowler.bowler_id } });
+//             const existingRecord = await Scorecard_2012.findOne({ where: { matchId: matchId, playerId: bowler.bowler_id } });
 
 //             if (existingRecord) {
 //                 // Update existing record with bowling data
@@ -107,7 +107,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 //                 });
 //             } else {
 //                 // Create a new record for bowlers who did not bat
-//                 await Scorecard_2008.create({
+//                 await Scorecard_2012.create({
 //                     matchId: matchId,
 //                     playerId: bowler.bowler_id,
 //                     teamId: fieldingTeamId, // The bowler would be part of the fielding team
@@ -134,7 +134,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 
 //         // Insert fielders performances
 //         inning.fielder.forEach(async (fielder) => {
-//             const existingRecord = await Scorecard_2008.findOne({ where: { matchId: matchId, playerId: fielder.fielder_id } });
+//             const existingRecord = await Scorecard_2012.findOne({ where: { matchId: matchId, playerId: fielder.fielder_id } });
 
 //             if (existingRecord) {
 //                 // Update existing record with fielding data
@@ -144,7 +144,7 @@ async function fetchAllMatchIds(baseUrl, token) {
 //                 });
 //             } else {
 //                 // Create a new record for fielders who did not bat or bowl
-//                 await Scorecard_2008.create({
+//                 await Scorecard_2012.create({
 //                     matchId: matchId,
 //                     playerId: fielder.fielder_id,
 //                     teamId: fieldingTeamId, // Assuming the fielding team ID is available
@@ -171,6 +171,12 @@ async function fetchAllMatchIds(baseUrl, token) {
 // }
 
 
+
+
+
+
+
+
 async function insertMatchData(matchData) {
     const matchId = matchData.match_id;
     const teamIds = matchData.innings.reduce((acc, inning) => {
@@ -182,7 +188,7 @@ async function insertMatchData(matchData) {
   
     // Unified player data handling
     const handlePlayerData = async (playerId, teamId, data) => {
-      const existingRecord = await Scorecard_2008.findOne({
+      const existingRecord = await Scorecard_2012.findOne({
         where: { matchId: matchId, playerId: playerId }
       });
   
@@ -197,7 +203,7 @@ async function insertMatchData(matchData) {
         });
   } else {
         // Create a new record
-        await Scorecard_2008.create({
+        await Scorecard_2012.create({
           matchId: matchId,
           playerId: playerId,
           teamId: teamId,
@@ -216,6 +222,7 @@ async function insertMatchData(matchData) {
   
       // Process batsmen
       for (const batsman of inning.batsmen) {
+        console.log(batsman.strike_rate,)
         await handlePlayerData(batsman.batsman_id, battingTeamId, {
           runs: batsman.runs,
           ballsFaced: batsman.balls_faced,
@@ -299,7 +306,7 @@ insertMatchData(matchData).then(() => {
     try {
       const matchIds = await fetchAllMatchIds(baseUrl, token);
       
-    // const matchIds = [60919,60922,60925,60980]
+    // const matchIds = [40602]
       for (const matchId of matchIds) {
         await fetchAndProcessMatchDetails(matchId, scorecardBaseUrl, token);
       }

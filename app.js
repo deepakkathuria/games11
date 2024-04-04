@@ -8,16 +8,15 @@ const {
   fetchMatchesAndSave,
 } = require("./controller/playerPerformanceController"); // Adjust the path if necessary
 const {
-  calculateDreamTeamsForAllMatches,CalculatePlayerDreamTeamAppearance
+  calculateDreamTeamsForAllMatches,
+  CalculatePlayerDreamTeamAppearance,
 } = require("./controller/dreamTeamController");
 
 const {
-  getPlayerStatsAgainstOpposition
-}
- = require('./controller/teamplayeriplstatsController')
+  getPlayerStatsAgainstOpposition,
+} = require("./controller/teamplayeriplstatsController");
 
-
- // Import your models here to ensure they are registered
+// Import your models here to ensure they are registered
 require("./models/playerPerformance"); // Adjust the path as necessary
 require("./models/dreamTeam");
 // require("./models/scorecard_IPL2023")
@@ -40,14 +39,7 @@ sequelize
     console.error("Failed to synchronize database:", error);
   });
 
-
-
-
-
-
-
-                //  ENTITY MANIPULATION AND TAKING ENTITY DATA FROM TWO THREEE API AND SHOW IT ACCODINGLY APIS
-  
+//  ENTITY MANIPULATION AND TAKING ENTITY DATA FROM TWO THREEE API AND SHOW IT ACCODINGLY APIS
 
 // -------------------------------------calculate top player on this venue-------------------------------------
 const API_KEY = "73d62591af4b3ccb51986ff5f8af5676";
@@ -57,7 +49,7 @@ app.get("/api/player-stats", async (req, res) => {
   try {
     // Fetch the initial match details
     const matchId = req.query.matchId;
-    console.log(matchId)
+    console.log(matchId);
     const matchResponse = await axios.get(
       `${BASE_URL}/v2/matches/${matchId}/newpoint2?token=${API_KEY}`
     );
@@ -74,7 +66,7 @@ app.get("/api/player-stats", async (req, res) => {
       return res
         .status(400)
         .send(
-          "Invalid match data format: playing11 is not an array or is undefined"
+          []
         );
     }
 
@@ -367,68 +359,195 @@ app.get("/fetchDreamTeam", async (req, res) => {
 
 
 
+// app.get('/match/:matchId/last-match-stats', async (req, res) => {
+//   try {
+//       const matchId = req.params.matchId;
+//       const playerIds = await fetchPlayerIdsFromMatch(matchId);
+//       const playersLastMatchStatsPromises = playerIds.map(playerId => fetchLastMatchStats(playerId));
+//       const playersLastMatchStats = await Promise.all(playersLastMatchStatsPromises);
 
-
-
-
-                                              //  MY DB APIS GAMES11
-
-
-app.get('/mydb/dream-team/player/:playerId', CalculatePlayerDreamTeamAppearance);
-
-
-app.get('/player-stats-ipl', async (req, res) => {
-  try {
-    const { playerId, oppositionTeamId } = req.query;
+//       console.log(playersLastMatchStats,"pstatatatatatatat")
     
-    if (!playerId || !oppositionTeamId) {
-      return res.status(400).send({ message: 'Player ID and Opposition Team ID are required.' });
-    }
 
-    const stats = await getPlayerStatsAgainstOpposition(playerId, oppositionTeamId);
-    res.json(stats);
+//       // Filter out any null results
+//       const filteredStats = playersLastMatchStats.filter(stats => stats !== null);
+
+//       // Now fetch points for each player in their last match
+//       const playerPointsPromises = filteredStats.map(playerStat =>
+//           fetchPlayerPointsInMatch(playerStat.lastMatch, playerStat.playerId));
+//       const playersPoints = await Promise.all(playerPointsPromises);
+  
+
+//       res.json(playersPoints);
+//   } catch (error) {
+//       console.error('Error fetching last match stats:', error);
+//       res.status(500).send('Internal Server Error');
+//   }
+// });
+
+app.get('/match/:matchId/last-match-stats', async (req, res) => {
+  try {
+      const matchId = req.params.matchId;
+      const playerIds = await fetchPlayerIdsFromMatch(matchId);
+
+      // Ensure playerIds array is filtered to remove any undefined or null entries
+      const filteredPlayerIds = playerIds.filter(playerId => playerId !== undefined);
+      console.log(filteredPlayerIds)
+
+
+      const playersLastMatchStatsPromises = filteredPlayerIds.map(playerId => fetchLastMatchStats(playerId));
+      const playersLastMatchStats = await Promise.all(playersLastMatchStatsPromises);
+      
+
+
+      // Filter out any null results
+      const filteredStats = playersLastMatchStats.filter(stats => stats !== null);
+      console.log(filteredStats,"sahfdhfasdfajdhasffdsajfda")
+
+      // Now fetch points for each player in their last match
+      const playerPointsPromises = filteredStats.map(playerStat =>
+          fetchPlayerPointsInMatch(playerStat?.lastMatch, playerStat?.playerId));
+      const playersPoints = await Promise.all(playerPointsPromises);
+
+      res.json(playersPoints);
   } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: 'Internal Server Error' });
+      console.error('Error fetching last match stats:', error);
+      res.status(500).send('Internal Server Error');
   }
 });
 
 
+async function fetchPlayerIdsFromMatch(matchId) {
+  const url = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
+  const response = await axios.get(url);
+  const data = response.data;
+
+  let playerIds = [];
+  if (data.status === 'ok') {
+      data.response.teama.squads.forEach(player => playerIds.push(player.player_id));
+      data.response.teamb.squads.forEach(player => playerIds.push(player.player_id));
+  }
+
+  return playerIds;
+}
+
+async function fetchLastMatchStats(playerId) {
+  const url = `https://rest.entitysport.com/v4/players/${playerId}/advancestats/?token=token=73d62591af4b3ccb51986ff5f8af5676`;
+  try {
+      const response = await axios.get(url);
+      const data = response.data;
+
+      if (data.status === 'ok' && data.response.last10_matches.batting.length > 0) {
+          return {
+              playerId: playerId,
+              lastMatch: data?.response?.last10_matches?.batting[0]?.match_id
+          };
+      }
+  } catch (error) {
+      console.error(`Error fetching stats for player ${playerId}:`, error);
+      return null; // In case of an error, return null and filter these out later
+  }
+}
+async function fetchPlayerPointsInMatch(matchId, playerId) {
+  // Early return with playerId and empty points array if inputs are invalid
+  if (!matchId || !playerId) {
+      console.log(`Invalid input - Match ID: ${matchId}, Player ID: ${playerId}`);
+      return { playerId, matchId, points: [] }; // Return empty points array to indicate no data
+  }
+
+  const url = `https://rest.entitysport.com/v2/matches/${matchId}/newpoint2?token=73d62591af4b3ccb51986ff5f8af5676`;
+  try {
+      const response = await axios.get(url);
+      const matchData = response.data;
+
+      // Initialize playerPoints to an empty array indicating no points found yet
+      let playerPoints = [];
+
+      // Check both teamA and teamB for the playerId and their points
+      ['teama', 'teamb'].forEach(teamKey => {
+          const team = matchData.response.points[teamKey];
+
+          // Check if team is not just a non-empty string but also has playing11 array
+          if (team && Array.isArray(team.playing11)) {
+              team.playing11.forEach(player => {
+                  if (player.pid === playerId) {
+                      playerPoints = [player.point]; // Wrap points in an array to maintain consistent return type
+                  }
+              });
+          }
+      });
+
+      return { playerId, matchId, points: playerPoints }; // Always return an array, even if it's empty
+  } catch (error) {
+      console.error(`Error fetching points for player ${playerId} in match ${matchId}:`, error);
+      return { playerId, matchId, points: [] }; // Return empty points array in case of an error
+  }
+}
+
+async function fetchPlayerIdsFromMatch(matchId) {
+  const url = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
+  const response = await axios.get(url);
+  const data = response.data;
+  
+  let playerIds = [];
+  if (data.status === 'ok') {
+      data.response.teama.squads.forEach(player => playerIds.push(player.player_id));
+      data.response.teamb.squads.forEach(player => playerIds.push(player.player_id));
+  }
+  
+  return playerIds;
+}
+
+async function fetchLastMatchStats(playerId) {
+  const url = `https://rest.entitysport.com/v4/players/${playerId}/advancestats/?token=73d62591af4b3ccb51986ff5f8af5676`;
+  try {
+      const response = await axios.get(url);
+      const data = response.data;
+      
+      if (data.status === 'ok' && data.response.last10_matches.batting.length > 0) {
+          return {
+              playerId: playerId,
+              lastMatch: data.response.last10_matches.batting[0].match_id
+          };
+      }
+  } catch (error) {
+      console.error(`Error fetching stats for player ${playerId}:`, error);
+      return null; // In case of an error, return null and filter these out later
+  }
+}
 
 
 
 
+//  MY DB APIS GAMES11
 
+app.get(
+  "/mydb/dream-team/player/:playerId",
+  CalculatePlayerDreamTeamAppearance
+);
 
+app.get("/player-stats-ipl", async (req, res) => {
+  try {
+    const { playerId, oppositionTeamId } = req.query;
 
+    if (!playerId || !oppositionTeamId) {
+      return res
+        .status(400)
+        .send({ message: "Player ID and Opposition Team ID are required." });
+    }
 
+    const stats = await getPlayerStatsAgainstOpposition(
+      playerId,
+      oppositionTeamId
+    );
+    res.json(stats);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
+//  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
 
 // insert data api which will run locally as well to insert data  IN DREAMTEAM TABLE
 // ----------------------------dream team apprance  table calculate --------------------------------------
@@ -441,12 +560,10 @@ app.get("/api/calculate-dream-teams", async (req, res) => {
       .json({ message: "Dream teams calculation initiated for all matches." });
   } catch (error) {
     console.error("Error calculating dream teams:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Failed to calculate dream teams.",
-        error: error.message,
-      });
+    return res.status(500).json({
+      message: "Failed to calculate dream teams.",
+      error: error.message,
+    });
   }
 });
 
