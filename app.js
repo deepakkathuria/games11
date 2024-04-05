@@ -392,21 +392,25 @@ app.get('/match/:matchId/last-match-stats', async (req, res) => {
 
       // Ensure playerIds array is filtered to remove any undefined or null entries
       const filteredPlayerIds = playerIds.filter(playerId => playerId !== undefined);
-      console.log(filteredPlayerIds)
-
+      console.log(filteredPlayerIds);
 
       const playersLastMatchStatsPromises = filteredPlayerIds.map(playerId => fetchLastMatchStats(playerId));
       const playersLastMatchStats = await Promise.all(playersLastMatchStatsPromises);
       
-
-
       // Filter out any null results
       const filteredStats = playersLastMatchStats.filter(stats => stats !== null);
-      console.log(filteredStats,"sahfdhfasdfajdhasffdsajfda")
+      console.log(filteredStats, "Filtered player stats");
 
-      // Now fetch points for each player in their last match
-      const playerPointsPromises = filteredStats.map(playerStat =>
-          fetchPlayerPointsInMatch(playerStat?.lastMatch, playerStat?.playerId));
+      // Fetch points for each player in their last matches
+      const playerPointsPromises = filteredStats.map(playerStat => {
+          // Ensure we are passing an array of match IDs to fetchPlayerPointsForMatches
+          if (playerStat?.lastMatchIds?.length) {
+              return fetchPlayerPointsForMatches(playerStat.lastMatchIds, playerStat.playerId);
+          } else {
+              // In case there are no last match IDs, return a default structure
+              return Promise.resolve({ playerId: playerStat.playerId, points: [] });
+          }
+      });
       const playersPoints = await Promise.all(playerPointsPromises);
 
       res.json(playersPoints);
@@ -415,6 +419,7 @@ app.get('/match/:matchId/last-match-stats', async (req, res) => {
       res.status(500).send('Internal Server Error');
   }
 });
+
 
 
 async function fetchPlayerIdsFromMatch(matchId) {
@@ -448,39 +453,60 @@ async function fetchLastMatchStats(playerId) {
       return null; // In case of an error, return null and filter these out later
   }
 }
-async function fetchPlayerPointsInMatch(matchId, playerId) {
-  // Early return with playerId and empty points array if inputs are invalid
-  if (!matchId || !playerId) {
-      console.log(`Invalid input - Match ID: ${matchId}, Player ID: ${playerId}`);
-      return { playerId, matchId, points: [] }; // Return empty points array to indicate no data
+async function fetchPlayerPointsForMatches(matchIds, playerId) {
+  // Check for valid inputs
+  if (!matchIds || !matchIds.length || !playerId) {
+      console.log(`Invalid input - Match IDs: ${matchIds}, Player ID: ${playerId}`);
+      return { playerId, points: [] }; // Return early with empty points array to indicate no data
   }
 
+  // Initialize an array to hold promises for each match ID's points fetch
+  const pointsPromises = matchIds.map(matchId => fetchPointsForSingleMatch(matchId, playerId));
+
+  try {
+      // Await all promises to resolve for points from each match
+      const pointsResults = await Promise.all(pointsPromises);
+
+      // Aggregate points from each match
+      const totalPoints = pointsResults.reduce((acc, result) => {
+          if (result && result.points) {
+              // Assuming points is an array of numbers
+              acc = acc.concat(result.points);
+          }
+          return acc;
+      }, []);
+
+      return { playerId, points: totalPoints };
+  } catch (error) {
+      console.error(`Error fetching points for player ${playerId} across matches:`, error);
+      return { playerId, points: [] }; // Return empty points array in case of an error
+  }
+}
+
+async function fetchPointsForSingleMatch(matchId, playerId) {
   const url = `https://rest.entitysport.com/v2/matches/${matchId}/newpoint2?token=73d62591af4b3ccb51986ff5f8af5676`;
+
   try {
       const response = await axios.get(url);
       const matchData = response.data;
 
-      // Initialize playerPoints to an empty array indicating no points found yet
       let playerPoints = [];
 
-      // Check both teamA and teamB for the playerId and their points
       ['teama', 'teamb'].forEach(teamKey => {
           const team = matchData.response.points[teamKey];
-
-          // Check if team is not just a non-empty string but also has playing11 array
           if (team && Array.isArray(team.playing11)) {
               team.playing11.forEach(player => {
                   if (player.pid === playerId) {
-                      playerPoints = [player.point]; // Wrap points in an array to maintain consistent return type
+                      playerPoints = [player.point]; // Assuming point is a number
                   }
               });
           }
       });
 
-      return { playerId, matchId, points: playerPoints }; // Always return an array, even if it's empty
+      return { matchId, points: playerPoints }; // Return points for this match
   } catch (error) {
       console.error(`Error fetching points for player ${playerId} in match ${matchId}:`, error);
-      return { playerId, matchId, points: [] }; // Return empty points array in case of an error
+      return { matchId, points: [] }; // Return empty array in case of an error
   }
 }
 
@@ -504,18 +530,31 @@ async function fetchLastMatchStats(playerId) {
       const response = await axios.get(url);
       const data = response.data;
       
-      if (data.status === 'ok' && data.response.last10_matches.batting.length > 0) {
+      if (data.status === 'ok') {
+          const battingStats = data.response.last10_matches.batting;
+          const bowlingStats = data.response.last10_matches.bowling;
+          let matchIds = [];
+
+          // Get the last batting match ID, if available
+          if (battingStats.length > 0) {
+              matchIds.push(battingStats[0].match_id);
+          }
+
+          // Get the last bowling match ID, if available and different from batting match ID
+          if (bowlingStats.length > 0 && !matchIds.includes(bowlingStats[0].match_id)) {
+              matchIds.push(bowlingStats[0].match_id);
+          }
+
           return {
               playerId: playerId,
-              lastMatch: data.response.last10_matches.batting[0].match_id
+              lastMatchIds: matchIds // This array can have one or two match IDs
           };
       }
   } catch (error) {
       console.error(`Error fetching stats for player ${playerId}:`, error);
-      return null; // In case of an error, return null and filter these out later
+      return null; // In case of an error, return null to indicate failure
   }
 }
-
 
 
 
