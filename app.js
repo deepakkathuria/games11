@@ -320,6 +320,7 @@ app.get("/fetchDreamTeam", async (req, res) => {
       if (team && Array.isArray(team.playing11)) {
         for (const player of team.playing11) {
           allPlayers.push({
+            pid:player.pid,
             name: player.name,
             rating: player.rating,
             points: player.point,
