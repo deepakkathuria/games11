@@ -12,7 +12,7 @@ const fetchMatchesAndSave = async () => {
   
   try {
     while (hasMorePages) {
-      const matchResponse = await axios.get(`https://rest.entitysport.com/v2/matches?date=2024-01-01_2024-03-26&paged=${currentPage}&per_page=80&token=73d62591af4b3ccb51986ff5f8af5676`);
+      const matchResponse = await axios.get(`https://rest.entitysport.com/v2/matches?date=2024-03-25_2024-04-15&paged=${currentPage}&per_page=80&token=73d62591af4b3ccb51986ff5f8af5676`);
       const matches = matchResponse.data.response.items;
       const totalPages = matchResponse.data.response.total_pages;
       const matchIds = matches.map(match => match.match_id);
