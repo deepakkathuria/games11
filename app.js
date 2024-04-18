@@ -41,17 +41,16 @@ sequelize
     console.error("Failed to synchronize database:", error);
   });
 
-  const pool = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
-
 
 app.use(express.json());
 
@@ -598,16 +597,17 @@ app.get("/player-stats-ipl", async (req, res) => {
   }
 });
 
-app.get('/team-matches/:teamId', async (req, res) => {
+app.get("/team-matches/:teamId", async (req, res) => {
   const { teamId } = req.params;
   try {
-      const [matches] = await pool.query(`
+    const [matches] = await pool.query(
+      `
           SELECT 
               m.id, 
               m.name, 
               m.date_start, 
               m.match_number,
-              m.match_status_note, 
+              m.status_note, 
               m.winning_team_id,
               CASE WHEN m.winning_team_id = ? THEN 'Win' ELSE 'Loss' END AS result,
               IF(m.team_1 = ?, t2.name, t1.name) AS opponent_name
@@ -617,39 +617,45 @@ app.get('/team-matches/:teamId', async (req, res) => {
           WHERE ? IN (m.team_1, m.team_2)
           ORDER BY m.date_start DESC
           LIMIT 5
-      `, [teamId, teamId, teamId]);
+      `,
+      [teamId, teamId, teamId]
+    );
 
-      res.json(matches);
+    res.json(matches);
   } catch (error) {
-      console.error("Failed to fetch matches:", error);
-      res.status(500).send("Failed to retrieve match data");
+    console.error("Failed to fetch matches:", error);
+    res.status(500).send("Failed to retrieve match data");
   }
 });
 
-
-app.get('/top-players/:teamId1/:teamId2', async (req, res) => {
+app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
   try {
-      const [players] = await pool.query(`
-          SELECT 
-              p.id AS player_id, 
-              p.first_name, 
-              p.last_name, 
-              COUNT(f.match_id) AS matches_played, 
-              SUM(f.points) AS total_fantasy_points,
-              f.team_id
-          FROM players p
-          JOIN fantasy_points_details f ON p.id = f.player_id
-          WHERE f.team_id IN (?, ?)
-          GROUP BY p.id, f.team_id
-          ORDER BY SUM(f.points) DESC
-          LIMIT 16
-      `, [teamId1, teamId2]);
-
-      res.json(players);
+    const [players] = await pool.query(
+      `
+    SELECT 
+        p.id AS player_id, 
+        p.first_name, 
+        p.last_name, 
+        p.short_name,
+        t.name AS team_name,            -- Added team name to the SELECT
+        COUNT(f.match_id) AS matches_played, 
+        SUM(f.points) AS total_fantasy_points,
+        f.team_id
+    FROM players p
+    JOIN fantasy_points_details f ON p.id = f.player_id
+    JOIN teams t ON f.team_id = t.id     -- Joining the teams table
+    WHERE f.team_id IN (?, ?)
+    GROUP BY p.id, f.team_id, t.name     -- Include t.name in GROUP BY
+    ORDER BY SUM(f.points) DESC
+    LIMIT 16
+`,
+      [teamId1, teamId2]
+    );
+    res.json(players);
   } catch (error) {
-      console.error("Failed to fetch top players:", error);
-      res.status(500).send("Failed to retrieve player data");
+    console.error("Failed to fetch top players:", error);
+    res.status(500).send("Failed to retrieve player data");
   }
 });
 
