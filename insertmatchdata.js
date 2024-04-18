@@ -354,6 +354,7 @@ async function insertData1() {
     const matches = response.data.response.items;
 
     for (const match of matches) {
+        console.log(match)
       if (match.status_str === "Completed") {
         // Enhanced Venue Insertion with additional details
         await connection.query(
