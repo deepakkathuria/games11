@@ -399,10 +399,10 @@ async function insertData1() {
         short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
         date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
         latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
-        toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition
+        toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition,competition_id
     )
     VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?
     )
     ON DUPLICATE KEY UPDATE
         team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
@@ -415,7 +415,7 @@ async function insertData1() {
         presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
         live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
         toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
-        batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition)
+        batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition),competition_id=VALUES(competition_id)
     `,
           [
             match.match_id,
@@ -461,6 +461,7 @@ async function insertData1() {
             match.pitch.batting_condition,
             match.pitch.pace_bowling_condition,
             match.pitch.spine_bowling_condition,
+            match.competition.cid
           ]
         );
 
@@ -1044,7 +1045,7 @@ async function runAllFunctions() {
 }
 
 // Call the main function to start all operations
-// runAllFunctions();
+runAllFunctions();
 
 async function fetchAndStoreTournamentData() {
     let connection;
@@ -1099,4 +1100,4 @@ async function fetchAndStoreTournamentData() {
   }
   
   // Run the function
-  fetchAndStoreTournamentData();
+//   fetchAndStoreTournamentData();

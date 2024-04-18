@@ -607,7 +607,7 @@ app.get('/team-matches/:teamId', async (req, res) => {
               m.name, 
               m.date_start, 
               m.match_number,
-              m.match_status_id, 
+              m.match_status_note, 
               m.winning_team_id,
               CASE WHEN m.winning_team_id = ? THEN 'Win' ELSE 'Loss' END AS result,
               IF(m.team_1 = ?, t2.name, t1.name) AS opponent_name
