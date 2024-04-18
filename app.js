@@ -636,9 +636,11 @@ app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
     SELECT 
         p.id AS player_id, 
         p.first_name, 
+        p.playing_role,
         p.last_name, 
         p.short_name,
         t.name AS team_name,            -- Added team name to the SELECT
+        t.short_name AS short_name,
         COUNT(f.match_id) AS matches_played, 
         SUM(f.points) AS total_fantasy_points,
         f.team_id
