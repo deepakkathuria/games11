@@ -20,6 +20,8 @@ const {
 require("./models/playerPerformance"); // Adjust the path as necessary
 require("./models/dreamTeam");
 // require("./models/scorecard_IPL2023")
+const mysql = require("mysql2/promise");
+require("dotenv").config();
 
 const app = express();
 app.use(express.json());
@@ -38,6 +40,20 @@ sequelize
   .catch((error) => {
     console.error("Failed to synchronize database:", error);
   });
+
+  const pool = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
+
+
+app.use(express.json());
 
 //  ENTITY MANIPULATION AND TAKING ENTITY DATA FROM TWO THREEE API AND SHOW IT ACCODINGLY APIS
 
@@ -63,11 +79,7 @@ app.get("/api/player-stats", async (req, res) => {
       !Array.isArray(matchData.points.teama.playing11) ||
       !Array.isArray(matchData.points.teamb.playing11)
     ) {
-      return res
-        .status(400)
-        .send(
-          []
-        );
+      return res.status(400).send([]);
     }
 
     const playersIds = [
@@ -320,7 +332,7 @@ app.get("/fetchDreamTeam", async (req, res) => {
       if (team && Array.isArray(team.playing11)) {
         for (const player of team.playing11) {
           allPlayers.push({
-            pid:player.pid,
+            pid: player.pid,
             name: player.name,
             rating: player.rating,
             points: player.point,
@@ -354,74 +366,51 @@ app.get("/fetchDreamTeam", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-// app.get('/match/:matchId/last-match-stats', async (req, res) => {
-//   try {
-//       const matchId = req.params.matchId;
-//       const playerIds = await fetchPlayerIdsFromMatch(matchId);
-//       const playersLastMatchStatsPromises = playerIds.map(playerId => fetchLastMatchStats(playerId));
-//       const playersLastMatchStats = await Promise.all(playersLastMatchStatsPromises);
-
-//       console.log(playersLastMatchStats,"pstatatatatatatat")
-    
-
-//       // Filter out any null results
-//       const filteredStats = playersLastMatchStats.filter(stats => stats !== null);
-
-//       // Now fetch points for each player in their last match
-//       const playerPointsPromises = filteredStats.map(playerStat =>
-//           fetchPlayerPointsInMatch(playerStat.lastMatch, playerStat.playerId));
-//       const playersPoints = await Promise.all(playerPointsPromises);
-  
-
-//       res.json(playersPoints);
-//   } catch (error) {
-//       console.error('Error fetching last match stats:', error);
-//       res.status(500).send('Internal Server Error');
-//   }
-// });
-
-app.get('/match/:matchId/last-match-stats', async (req, res) => {
+app.get("/match/:matchId/last-match-stats", async (req, res) => {
   try {
-      const matchId = req.params.matchId;
-      const playerIds = await fetchPlayerIdsFromMatch(matchId);
+    const matchId = req.params.matchId;
+    const playerIds = await fetchPlayerIdsFromMatch(matchId);
 
-      // Ensure playerIds array is filtered to remove any undefined or null entries
-      const filteredPlayerIds = playerIds.filter(playerId => playerId !== undefined);
-      console.log(filteredPlayerIds);
+    // Ensure playerIds array is filtered to remove any undefined or null entries
+    const filteredPlayerIds = playerIds.filter(
+      (playerId) => playerId !== undefined
+    );
+    console.log(filteredPlayerIds);
 
-      const playersLastMatchStatsPromises = filteredPlayerIds.map(playerId => fetchLastMatchStats(playerId));
-      const playersLastMatchStats = await Promise.all(playersLastMatchStatsPromises);
-      
-      // Filter out any null results
-      const filteredStats = playersLastMatchStats.filter(stats => stats !== null);
-      console.log(filteredStats, "Filtered player stats");
+    const playersLastMatchStatsPromises = filteredPlayerIds.map((playerId) =>
+      fetchLastMatchStats(playerId)
+    );
+    const playersLastMatchStats = await Promise.all(
+      playersLastMatchStatsPromises
+    );
 
-      // Fetch points for each player in their last matches
-      const playerPointsPromises = filteredStats.map(playerStat => {
-          // Ensure we are passing an array of match IDs to fetchPlayerPointsForMatches
-          if (playerStat?.lastMatchIds?.length) {
-              return fetchPlayerPointsForMatches(playerStat.lastMatchIds, playerStat.playerId);
-          } else {
-              // In case there are no last match IDs, return a default structure
-              return Promise.resolve({ playerId: playerStat.playerId, points: [] });
-          }
-      });
-      const playersPoints = await Promise.all(playerPointsPromises);
+    // Filter out any null results
+    const filteredStats = playersLastMatchStats.filter(
+      (stats) => stats !== null
+    );
+    console.log(filteredStats, "Filtered player stats");
 
-      res.json(playersPoints);
+    // Fetch points for each player in their last matches
+    const playerPointsPromises = filteredStats.map((playerStat) => {
+      // Ensure we are passing an array of match IDs to fetchPlayerPointsForMatches
+      if (playerStat?.lastMatchIds?.length) {
+        return fetchPlayerPointsForMatches(
+          playerStat.lastMatchIds,
+          playerStat.playerId
+        );
+      } else {
+        // In case there are no last match IDs, return a default structure
+        return Promise.resolve({ playerId: playerStat.playerId, points: [] });
+      }
+    });
+    const playersPoints = await Promise.all(playerPointsPromises);
+
+    res.json(playersPoints);
   } catch (error) {
-      console.error('Error fetching last match stats:', error);
-      res.status(500).send('Internal Server Error');
+    console.error("Error fetching last match stats:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
-
-
 
 async function fetchPlayerIdsFromMatch(matchId) {
   const url = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
@@ -429,9 +418,13 @@ async function fetchPlayerIdsFromMatch(matchId) {
   const data = response.data;
 
   let playerIds = [];
-  if (data.status === 'ok') {
-      data.response.teama.squads.forEach(player => playerIds.push(player.player_id));
-      data.response.teamb.squads.forEach(player => playerIds.push(player.player_id));
+  if (data.status === "ok") {
+    data.response.teama.squads.forEach((player) =>
+      playerIds.push(player.player_id)
+    );
+    data.response.teamb.squads.forEach((player) =>
+      playerIds.push(player.player_id)
+    );
   }
 
   return playerIds;
@@ -440,47 +433,57 @@ async function fetchPlayerIdsFromMatch(matchId) {
 async function fetchLastMatchStats(playerId) {
   const url = `https://rest.entitysport.com/v4/players/${playerId}/advancestats/?token=token=73d62591af4b3ccb51986ff5f8af5676`;
   try {
-      const response = await axios.get(url);
-      const data = response.data;
+    const response = await axios.get(url);
+    const data = response.data;
 
-      if (data.status === 'ok' && data.response.last10_matches.batting.length > 0) {
-          return {
-              playerId: playerId,
-              lastMatch: data?.response?.last10_matches?.batting[0]?.match_id
-          };
-      }
+    if (
+      data.status === "ok" &&
+      data.response.last10_matches.batting.length > 0
+    ) {
+      return {
+        playerId: playerId,
+        lastMatch: data?.response?.last10_matches?.batting[0]?.match_id,
+      };
+    }
   } catch (error) {
-      console.error(`Error fetching stats for player ${playerId}:`, error);
-      return null; // In case of an error, return null and filter these out later
+    console.error(`Error fetching stats for player ${playerId}:`, error);
+    return null; // In case of an error, return null and filter these out later
   }
 }
 async function fetchPlayerPointsForMatches(matchIds, playerId) {
   // Check for valid inputs
   if (!matchIds || !matchIds.length || !playerId) {
-      console.log(`Invalid input - Match IDs: ${matchIds}, Player ID: ${playerId}`);
-      return { playerId, points: [] }; // Return early with empty points array to indicate no data
+    console.log(
+      `Invalid input - Match IDs: ${matchIds}, Player ID: ${playerId}`
+    );
+    return { playerId, points: [] }; // Return early with empty points array to indicate no data
   }
 
   // Initialize an array to hold promises for each match ID's points fetch
-  const pointsPromises = matchIds.map(matchId => fetchPointsForSingleMatch(matchId, playerId));
+  const pointsPromises = matchIds.map((matchId) =>
+    fetchPointsForSingleMatch(matchId, playerId)
+  );
 
   try {
-      // Await all promises to resolve for points from each match
-      const pointsResults = await Promise.all(pointsPromises);
+    // Await all promises to resolve for points from each match
+    const pointsResults = await Promise.all(pointsPromises);
 
-      // Aggregate points from each match
-      const totalPoints = pointsResults.reduce((acc, result) => {
-          if (result && result.points) {
-              // Assuming points is an array of numbers
-              acc = acc.concat(result.points);
-          }
-          return acc;
-      }, []);
+    // Aggregate points from each match
+    const totalPoints = pointsResults.reduce((acc, result) => {
+      if (result && result.points) {
+        // Assuming points is an array of numbers
+        acc = acc.concat(result.points);
+      }
+      return acc;
+    }, []);
 
-      return { playerId, points: totalPoints };
+    return { playerId, points: totalPoints };
   } catch (error) {
-      console.error(`Error fetching points for player ${playerId} across matches:`, error);
-      return { playerId, points: [] }; // Return empty points array in case of an error
+    console.error(
+      `Error fetching points for player ${playerId} across matches:`,
+      error
+    );
+    return { playerId, points: [] }; // Return empty points array in case of an error
   }
 }
 
@@ -488,26 +491,29 @@ async function fetchPointsForSingleMatch(matchId, playerId) {
   const url = `https://rest.entitysport.com/v2/matches/${matchId}/newpoint2?token=73d62591af4b3ccb51986ff5f8af5676`;
 
   try {
-      const response = await axios.get(url);
-      const matchData = response.data;
+    const response = await axios.get(url);
+    const matchData = response.data;
 
-      let playerPoints = [];
+    let playerPoints = [];
 
-      ['teama', 'teamb'].forEach(teamKey => {
-          const team = matchData.response.points[teamKey];
-          if (team && Array.isArray(team.playing11)) {
-              team.playing11.forEach(player => {
-                  if (player.pid === playerId) {
-                      playerPoints = [player.point]; // Assuming point is a number
-                  }
-              });
+    ["teama", "teamb"].forEach((teamKey) => {
+      const team = matchData.response.points[teamKey];
+      if (team && Array.isArray(team.playing11)) {
+        team.playing11.forEach((player) => {
+          if (player.pid === playerId) {
+            playerPoints = [player.point]; // Assuming point is a number
           }
-      });
+        });
+      }
+    });
 
-      return { matchId, points: playerPoints }; // Return points for this match
+    return { matchId, points: playerPoints }; // Return points for this match
   } catch (error) {
-      console.error(`Error fetching points for player ${playerId} in match ${matchId}:`, error);
-      return { matchId, points: [] }; // Return empty array in case of an error
+    console.error(
+      `Error fetching points for player ${playerId} in match ${matchId}:`,
+      error
+    );
+    return { matchId, points: [] }; // Return empty array in case of an error
   }
 }
 
@@ -515,49 +521,54 @@ async function fetchPlayerIdsFromMatch(matchId) {
   const url = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
   const response = await axios.get(url);
   const data = response.data;
-  
+
   let playerIds = [];
-  if (data.status === 'ok') {
-      data.response.teama.squads.forEach(player => playerIds.push(player.player_id));
-      data.response.teamb.squads.forEach(player => playerIds.push(player.player_id));
+  if (data.status === "ok") {
+    data.response.teama.squads.forEach((player) =>
+      playerIds.push(player.player_id)
+    );
+    data.response.teamb.squads.forEach((player) =>
+      playerIds.push(player.player_id)
+    );
   }
-  
+
   return playerIds;
 }
 
 async function fetchLastMatchStats(playerId) {
   const url = `https://rest.entitysport.com/v4/players/${playerId}/advancestats/?token=73d62591af4b3ccb51986ff5f8af5676`;
   try {
-      const response = await axios.get(url);
-      const data = response.data;
-      
-      if (data.status === 'ok') {
-          const battingStats = data.response.last10_matches.batting;
-          const bowlingStats = data.response.last10_matches.bowling;
-          let matchIds = [];
+    const response = await axios.get(url);
+    const data = response.data;
 
-          // Get the last batting match ID, if available
-          if (battingStats.length > 0) {
-              matchIds.push(battingStats[0].match_id);
-          }
+    if (data.status === "ok") {
+      const battingStats = data.response.last10_matches.batting;
+      const bowlingStats = data.response.last10_matches.bowling;
+      let matchIds = [];
 
-          // Get the last bowling match ID, if available and different from batting match ID
-          if (bowlingStats.length > 0 && !matchIds.includes(bowlingStats[0].match_id)) {
-              matchIds.push(bowlingStats[0].match_id);
-          }
-
-          return {
-              playerId: playerId,
-              lastMatchIds: matchIds // This array can have one or two match IDs
-          };
+      // Get the last batting match ID, if available
+      if (battingStats.length > 0) {
+        matchIds.push(battingStats[0].match_id);
       }
+
+      // Get the last bowling match ID, if available and different from batting match ID
+      if (
+        bowlingStats.length > 0 &&
+        !matchIds.includes(bowlingStats[0].match_id)
+      ) {
+        matchIds.push(bowlingStats[0].match_id);
+      }
+
+      return {
+        playerId: playerId,
+        lastMatchIds: matchIds, // This array can have one or two match IDs
+      };
+    }
   } catch (error) {
-      console.error(`Error fetching stats for player ${playerId}:`, error);
-      return null; // In case of an error, return null to indicate failure
+    console.error(`Error fetching stats for player ${playerId}:`, error);
+    return null; // In case of an error, return null to indicate failure
   }
 }
-
-
 
 //  MY DB APIS GAMES11
 
@@ -584,6 +595,61 @@ app.get("/player-stats-ipl", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.get('/team-matches/:teamId', async (req, res) => {
+  const { teamId } = req.params;
+  try {
+      const [matches] = await pool.query(`
+          SELECT 
+              m.id, 
+              m.name, 
+              m.date_start, 
+              m.match_number,
+              m.match_status_id, 
+              m.winning_team_id,
+              CASE WHEN m.winning_team_id = ? THEN 'Win' ELSE 'Loss' END AS result,
+              IF(m.team_1 = ?, t2.name, t1.name) AS opponent_name
+          FROM matches m
+          LEFT JOIN teams t1 ON m.team_1 = t1.id
+          LEFT JOIN teams t2 ON m.team_2 = t2.id
+          WHERE ? IN (m.team_1, m.team_2)
+          ORDER BY m.date_start DESC
+          LIMIT 5
+      `, [teamId, teamId, teamId]);
+
+      res.json(matches);
+  } catch (error) {
+      console.error("Failed to fetch matches:", error);
+      res.status(500).send("Failed to retrieve match data");
+  }
+});
+
+
+app.get('/top-players/:teamId1/:teamId2', async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+  try {
+      const [players] = await pool.query(`
+          SELECT 
+              p.id AS player_id, 
+              p.first_name, 
+              p.last_name, 
+              COUNT(f.match_id) AS matches_played, 
+              SUM(f.points) AS total_fantasy_points,
+              f.team_id
+          FROM players p
+          JOIN fantasy_points_details f ON p.id = f.player_id
+          WHERE f.team_id IN (?, ?)
+          GROUP BY p.id, f.team_id
+          ORDER BY SUM(f.points) DESC
+          LIMIT 16
+      `, [teamId1, teamId2]);
+
+      res.json(players);
+  } catch (error) {
+      console.error("Failed to fetch top players:", error);
+      res.status(500).send("Failed to retrieve player data");
   }
 });
 
