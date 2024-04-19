@@ -599,26 +599,29 @@ app.get("/player-stats-ipl", async (req, res) => {
 
 app.get("/team-matches/:teamId", async (req, res) => {
   const { teamId } = req.params;
+  const competitionId = 128471; // Hardcoding the competition ID for example
+
   try {
     const [matches] = await pool.query(
       `
-          SELECT 
-              m.id, 
-              m.name, 
-              m.date_start, 
-              m.match_number,
-              m.status_note, 
-              m.winning_team_id,
-              CASE WHEN m.winning_team_id = ? THEN 'Win' ELSE 'Loss' END AS result,
-              IF(m.team_1 = ?, t2.name, t1.name) AS opponent_name
-          FROM matches m
-          LEFT JOIN teams t1 ON m.team_1 = t1.id
-          LEFT JOIN teams t2 ON m.team_2 = t2.id
-          WHERE ? IN (m.team_1, m.team_2)
-          ORDER BY m.date_start DESC
-          LIMIT 5
+      SELECT 
+          m.id, 
+          m.name, 
+          m.date_start, 
+          m.match_number,
+          m.status_note, 
+          m.winning_team_id,
+          CASE WHEN m.winning_team_id = ? THEN 'Win' ELSE 'Loss' END AS result,
+          IF(m.team_1 = ?, t2.name, t1.name) AS opponent_name
+      FROM matches m
+      LEFT JOIN teams t1 ON m.team_1 = t1.id
+      LEFT JOIN teams t2 ON m.team_2 = t2.id
+      WHERE ? IN (m.team_1, m.team_2)
+        AND m.competition_id = ?  -- Adding competition filter
+      ORDER BY m.date_start DESC
+      LIMIT 5
       `,
-      [teamId, teamId, teamId]
+      [teamId, teamId, teamId, competitionId] // Include competitionId in the query parameters
     );
 
     res.json(matches);
@@ -628,31 +631,34 @@ app.get("/team-matches/:teamId", async (req, res) => {
   }
 });
 
+
 app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
+  const competitionId = 128471;  // Hardcoding the competition ID
+
   try {
     const [players] = await pool.query(
       `
     SELECT 
         p.id AS player_id, 
         p.first_name, 
+        p.last_name,
         p.playing_role,
-        p.last_name, 
         p.short_name,
-        t.name AS team_name,            -- Added team name to the SELECT
+        t.name AS team_name,
         t.short_name AS short_team_name,
-        COUNT(f.match_id) AS matches_played, 
-        SUM(f.points) AS total_fantasy_points,
-        f.team_id
+        COUNT(distinct m.id) AS matches_played, 
+        SUM(fp.points) AS total_fantasy_points
     FROM players p
-    JOIN fantasy_points_details f ON p.id = f.player_id
-    JOIN teams t ON f.team_id = t.id     -- Joining the teams table
-    WHERE f.team_id IN (?, ?)
-    GROUP BY p.id, f.team_id, t.name     -- Include t.name in GROUP BY
-    ORDER BY SUM(f.points) DESC
+    JOIN fantasy_points_details fp ON p.id = fp.player_id
+    JOIN teams t ON fp.team_id = t.id
+    JOIN matches m ON m.id = fp.match_id AND m.competition_id = ?
+    WHERE fp.team_id IN (?, ?)
+    GROUP BY p.id, fp.team_id, t.name
+    ORDER BY SUM(fp.points) DESC
     LIMIT 16
-`,
-      [teamId1, teamId2]
+      `,
+      [competitionId, teamId1, teamId2]  // Passing hardcoded competitionId
     );
     res.json(players);
   } catch (error) {
@@ -660,7 +666,6 @@ app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
     res.status(500).send("Failed to retrieve player data");
   }
 });
-
 app.get("/player-stats/:playerIds/:scope", async (req, res) => {
   const { playerIds, scope } = req.params;
   const playerIdsArray = playerIds.split(",").map(id => parseInt(id.trim())); // Convert to array of integers
