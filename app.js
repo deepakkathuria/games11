@@ -661,6 +661,74 @@ app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
   }
 });
 
+app.get("/player-stats/:playerIds/:scope", async (req, res) => {
+  const { playerIds, scope } = req.params;
+  const playerIdsArray = playerIds.split(",").map((id) => parseInt(id.trim())); // Convert to array of integers
+
+  let query = "";
+  let limitClause = "";
+
+  switch (scope) {
+    case "last":
+      limitClause = "LIMIT 1";
+      break;
+    case "last5":
+      limitClause = "LIMIT 5";
+      break;
+    case "all":
+      limitClause = ""; // No limit for career stats
+      break;
+    default:
+      return res
+        .status(400)
+        .send("Invalid scope specified. Use 'last', 'last5', or 'all'.");
+  }
+
+  query = `
+  SELECT
+  m.id AS MatchID,
+  m.date_start AS MatchDate,
+  fp.points AS LastMatchPoints,
+  fp.rating AS LastMatchRating,
+  AVG(fp.points) OVER (ORDER BY m.date_start DESC ROWS BETWEEN CURRENT ROW AND CURRENT ROW) AS AvgFPLastMatch,
+  b.runs AS RunsScored,
+  b.balls_faced AS BallsFaced,
+  CASE WHEN b.runs >= 100 THEN 1 ELSE 0 END AS Hundreds,
+  CASE WHEN b.runs >= 50 THEN 1 ELSE 0 END AS Fifties,
+  (b.runs * 100.0 / NULLIF(b.balls_faced, 0)) AS StrikeRate,
+  b.how_out AS Dismissal,
+  bl.overs AS OversBowled,
+  bl.runs_conceded AS RunsConceded,
+  bl.wickets AS WicketsTaken,
+  (bl.runs_conceded / NULLIF(bl.overs, 0)) AS EconomyRate,
+  COALESCE(fld.catches, 0) AS Catches,
+  COALESCE(fld.runout_thrower, 0) + COALESCE(fld.runout_catcher, 0) + COALESCE(fld.runout_direct_hit, 0) AS TotalRunouts,
+  COALESCE(fld.stumping, 0) AS Stumpings
+FROM 
+  matches m
+  JOIN fantasy_points_details fp ON m.id = fp.match_id
+  LEFT JOIN match_inning_batters_test b ON m.id = b.match_id AND fp.player_id = b.batsman_id
+  LEFT JOIN match_inning_bowlers_test bl ON m.id = bl.match_id AND fp.player_id = bl.bowler_id
+  LEFT JOIN match_inning_fielders_test fld ON m.id = fld.match_id AND fp.player_id = fld.fielder_id
+WHERE
+  fp.player_id = 115
+ORDER BY
+  m.date_start DESC
+${limitClause};
+
+
+
+  `;
+
+  try {
+    const [results] = await pool.query(query, [playerIdsArray]); // Use proper parameter expansion if needed
+    res.json(results);
+  } catch (error) {
+    console.error("Failed to fetch player statistics:", error);
+    res.status(500).send("Failed to retrieve player data");
+  }
+});
+
 //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
 
 // insert data api which will run locally as well to insert data  IN DREAMTEAM TABLE
