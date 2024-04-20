@@ -631,10 +631,9 @@ app.get("/team-matches/:teamId", async (req, res) => {
   }
 });
 
-
 app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
-  const competitionId = 128471;  // Hardcoding the competition ID
+  const competitionId = 128471; // Hardcoding the competition ID
 
   try {
     const [players] = await pool.query(
@@ -658,7 +657,7 @@ app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
     ORDER BY SUM(fp.points) DESC
     LIMIT 16
       `,
-      [competitionId, teamId1, teamId2]  // Passing hardcoded competitionId
+      [competitionId, teamId1, teamId2] // Passing hardcoded competitionId
     );
     res.json(players);
   } catch (error) {
@@ -668,7 +667,7 @@ app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
 });
 app.get("/player-stats/:playerIds/:scope", async (req, res) => {
   const { playerIds, scope } = req.params;
-  const playerIdsArray = playerIds.split(",").map(id => parseInt(id.trim())); // Convert to array of integers
+  const playerIdsArray = playerIds.split(",").map((id) => parseInt(id.trim())); // Convert to array of integers
   const competitionId = 128471; // Assuming the competition ID is always this value, modify as needed
 
   let limitClause = "";
@@ -683,43 +682,47 @@ app.get("/player-stats/:playerIds/:scope", async (req, res) => {
       limitClause = ""; // No limit for career stats
       break;
     default:
-      return res.status(400).send("Invalid scope specified. Use 'last', 'last5', or 'all'.");
+      return res
+        .status(400)
+        .send("Invalid scope specified. Use 'last', 'last5', or 'all'.");
   }
 
-  query = `
-  SELECT
-    m.id AS MatchID,
-    m.date_start AS MatchDate,
-    p.first_name || ' ' || p.last_name AS PlayerName,
-    fp.points AS LastMatchPoints,
-    fp.rating AS LastMatchRating,
-    b.runs AS RunsScored,
-    b.balls_faced AS BallsFaced,
-    CASE WHEN b.runs >= 100 THEN 1 ELSE 0 END AS Hundreds,
-    CASE WHEN b.runs >= 50 THEN 1 ELSE 0 END AS Fifties,
-    (b.runs * 100.0 / NULLIF(b.balls_faced, 0)) AS StrikeRate,
-    b.how_out AS Dismissal,
-    bl.overs AS OversBowled,
-    bl.runs_conceded AS RunsConceded,
-    bl.wickets AS WicketsTaken,
-    (bl.runs_conceded / NULLIF(bl.overs, 0)) AS EconomyRate,
-    COALESCE(fld.catches, 0) AS Catches,
-    COALESCE(fld.runout_thrower, 0) + COALESCE(fld.runout_catcher, 0) + COALESCE(fld.runout_direct_hit, 0) AS TotalRunouts,
-    COALESCE(fld.stumping, 0) AS Stumpings
-  FROM 
-    matches m
-  JOIN fantasy_points_details fp ON m.id = fp.match_id
-  JOIN players p ON p.id = fp.player_id
-  LEFT JOIN match_inning_batters_test b ON m.id = b.match_id AND fp.player_id = b.batsman_id
-  LEFT JOIN match_inning_bowlers_test bl ON m.id = bl.match_id AND fp.player_id = bl.bowler_id
-  LEFT JOIN match_inning_fielders_test fld ON m.id = fld.match_id AND fp.player_id = fld.fielder_id
-  WHERE
-    fp.player_id IN (?) AND
-    m.competition_id = ${competitionId}
-  ORDER BY
-    m.date_start DESC
-  ${limitClause};
-  `;
+  const query = `
+    SELECT
+      m.id AS MatchID,
+      m.date_start AS MatchDate,
+      p.first_name || ' ' || p.last_name AS PlayerName,
+      fp.points AS LastMatchPoints,
+      fp.rating AS LastMatchRating,
+      b.runs AS RunsScored,
+      b.balls_faced AS BallsFaced,
+      CASE WHEN b.runs >= 100 THEN 1 ELSE 0 END AS Hundreds,
+      CASE WHEN b.runs >= 50 THEN 1 ELSE 0 END AS Fifties,
+      (b.runs * 100.0 / NULLIF(b.balls_faced, 0)) AS StrikeRate,
+      b.how_out AS Dismissal,
+      bl.overs AS OversBowled,
+      bl.runs_conceded AS RunsConceded,
+      bl.wickets AS WicketsTaken,
+      (bl.runs_conceded / NULLIF(bl.overs, 0)) AS EconomyRate,
+      COALESCE(fld.catches, 0) AS Catches,
+      COALESCE(fld.runout_thrower, 0) + COALESCE(fld.runout_catcher, 0) + COALESCE(fld.runout_direct_hit, 0) AS TotalRunouts,
+      COALESCE(fld.stumping, 0) AS Stumpings,
+      dt.team_position AS TeamPosition
+    FROM 
+      matches m
+    JOIN fantasy_points_details fp ON m.id = fp.match_id
+    JOIN players p ON p.id = fp.player_id
+    LEFT JOIN match_inning_batters_test b ON m.id = b.match_id AND fp.player_id = b.batsman_id
+    LEFT JOIN match_inning_bowlers_test bl ON m.id = bl.match_id AND fp.player_id = bl.bowler_id
+    LEFT JOIN match_inning_fielders_test fld ON m.id = fld.match_id AND fp.player_id = fld.fielder_id
+    LEFT JOIN DreamTeam_test dt ON m.id = dt.match_id AND p.id = dt.player_id
+    WHERE
+      fp.player_id IN (?) AND
+      m.competition_id = ${competitionId}
+    ORDER BY
+      m.date_start DESC
+    ${limitClause};
+    `;
 
   try {
     const [results] = await pool.query(query, [playerIdsArray]);
