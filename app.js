@@ -694,7 +694,7 @@ app.get("/player-stats/:playerIds/:scope", async (req, res) => {
       m.id AS MatchID,
       m.date_start AS MatchDate,
       p.first_name || ' ' || p.last_name AS PlayerName,
-      p.playing_role
+      p.playing_role,
       fp.points AS LastMatchPoints,
       fp.rating AS LastMatchRating,
       b.runs AS RunsScored,
