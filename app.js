@@ -694,6 +694,7 @@ app.get("/player-stats/:playerIds/:scope", async (req, res) => {
       m.id AS MatchID,
       m.date_start AS MatchDate,
       p.first_name || ' ' || p.last_name AS PlayerName,
+      p.playing_role
       fp.points AS LastMatchPoints,
       fp.rating AS LastMatchRating,
       b.runs AS RunsScored,
@@ -816,9 +817,6 @@ app.get("/top-players/:teamId/:venueId", async (req, res) => {
 });
 
 
-
-
-
 // top players batting first using team and venue
 
 app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
@@ -892,8 +890,6 @@ app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
       res.status(500).send("Failed to retrieve data");
   }
 });
-
-
 
 
 
