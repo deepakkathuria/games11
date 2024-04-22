@@ -597,6 +597,8 @@ app.get("/player-stats-ipl", async (req, res) => {
   }
 });
 
+// -------------------OVERVIEW ANS SQUADS API--------------------------------------------------
+
 app.get("/team-matches/:teamId", async (req, res) => {
   const { teamId } = req.params;
   const competitionId = 128471; // Hardcoding the competition ID for example
@@ -732,6 +734,196 @@ app.get("/player-stats/:playerIds/:scope", async (req, res) => {
     res.status(500).send("Failed to retrieve player data");
   }
 });
+
+// ----------------------VENUE AND PITCH REPORT API---------------------------------------------
+app.get("/team-stats/:teamId/:venueId", async (req, res) => {
+  const { teamId, venueId } = req.params;  // Extracting parameters from the request URL
+
+  const query = `
+      SELECT 
+          venue_id,
+          COUNT(*) AS total_matches,
+          SUM(CASE 
+              WHEN (toss_winner = ? AND toss_decision = 1) OR 
+                   (toss_winner != ? AND toss_decision = 2) THEN 1 
+              ELSE 0 END) AS matches_batted_first,
+          SUM(CASE 
+              WHEN (toss_winner = ? AND toss_decision = 2) OR 
+                   (toss_winner != ? AND toss_decision = 1) THEN 1 
+              ELSE 0 END) AS matches_chased,
+          SUM(CASE 
+              WHEN ((toss_winner = ? AND toss_decision = 1 OR toss_winner != ? AND toss_decision = 2) AND winning_team_id = ?) THEN 1 
+              ELSE 0 END) AS wins_batting_first,
+          SUM(CASE 
+              WHEN ((toss_winner = ? AND toss_decision = 2 OR toss_winner != ? AND toss_decision = 1) AND winning_team_id = ?) THEN 1 
+              ELSE 0 END) AS wins_chasing,
+          GROUP_CONCAT(id) AS match_ids
+      FROM matches
+      WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ?
+      GROUP BY venue_id;
+  `;
+
+  // Use the dynamic parameters in the query
+  const queryParams = [
+      teamId, teamId,  // for matches_batted_first conditions
+      teamId, teamId,  // for matches_chased conditions
+      teamId, teamId, teamId,  // for wins_batting_first conditions
+      teamId, teamId, teamId,  // for wins_chasing conditions
+      teamId, teamId,  // WHERE condition to filter matches involving the team
+      venueId  // WHERE condition to filter matches at the specific venue
+  ];
+
+  try {
+      const [results] = await pool.query(query, queryParams);
+      res.json(results.length > 0 ? results[0] : {});
+  } catch (error) {
+      console.error("Error fetching team stats:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+// top player using team at particular venue overall
+app.get("/top-players/:teamId/:venueId", async (req, res) => {
+  const { teamId, venueId } = req.params;
+
+  const query = `
+      SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          SUM(fp.points) AS total_fantasy_points,
+          COUNT(DISTINCT m.id) AS match_count,
+          GROUP_CONCAT(DISTINCT m.id ORDER BY m.id) AS match_ids
+      FROM matches m
+      JOIN fantasy_points_details fp ON m.id = fp.match_id
+      JOIN players p ON fp.player_id = p.id
+      JOIN team_players tp ON p.id = tp.player_id AND tp.team_id = ?
+      WHERE (m.team_1 = ? OR m.team_2 = ?) 
+        AND m.venue_id = ?
+        AND m.competition_id = 128471
+      GROUP BY p.id
+      ORDER BY total_fantasy_points DESC
+      LIMIT 10;
+  `;
+
+  try {
+      const [results] = await pool.query(query, [teamId, teamId, teamId, venueId]);
+      console.log("Query Results:", results); // Check the structure of the results here
+      res.json(results);
+  } catch (error) {
+      console.error("Error fetching top players:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+
+// top players batting first using team and venue
+
+app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
+  const { teamId, venueId } = req.params;
+
+  const query = `
+      SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          SUM(fp.points) AS total_fantasy_points,
+          COUNT(DISTINCT m.id) AS match_count
+      FROM matches m
+      JOIN fantasy_points_details fp ON m.id = fp.match_id
+      JOIN players p ON fp.player_id = p.id
+      JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = ?
+      WHERE (
+          (m.toss_winner = ? AND m.toss_decision = 1 AND m.team_1 = ?) OR 
+          (m.toss_winner = ? AND m.toss_decision = 2 AND m.team_2 = ?) OR
+          (m.toss_winner != ? AND m.toss_decision = 2 AND m.team_1 = ?) OR
+          (m.toss_winner != ? AND m.toss_decision = 1 AND m.team_2 = ?)
+      )
+      AND m.venue_id = ?
+      AND m.competition_id = 128471  // Filter by competition ID
+      GROUP BY p.id
+      ORDER BY total_fantasy_points DESC
+      LIMIT 10;
+  `;
+
+  try {
+      const [results] = await pool.query(query, [teamId, teamId, teamId, teamId, teamId, teamId, teamId, teamId, venueId]);
+      res.json(results);
+  } catch (error) {
+      console.error("Error fetching top players batting first:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+// top player bowling first using team and venue
+
+app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
+  const { teamId, venueId } = req.params;
+
+  const query = `
+      SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          SUM(fp.points) AS total_fantasy_points,
+          COUNT(DISTINCT m.id) AS match_count
+      FROM matches m
+      JOIN fantasy_points_details fp ON m.id = fp.match_id
+      JOIN players p ON fp.player_id = p.id
+      JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = ?
+      WHERE (
+          (m.toss_winner = ? AND m.toss_decision = 2 AND m.team_1 = ?) OR 
+          (m.toss_winner = ? AND m.toss_decision = 1 AND m.team_2 = ?) OR
+          (m.toss_winner != ? AND m.toss_decision = 1 AND m.team_1 = ?) OR
+          (m.toss_winner != ? AND m.toss_decision = 2 AND m.team_2 = ?)
+      )
+      AND m.venue_id = ?
+      AND m.competition_id = 128471  // Filter by competition ID
+      GROUP BY p.id
+      ORDER BY total_fantasy_points DESC
+      LIMIT 10;
+  `;
+
+  try {
+      const [results] = await pool.query(query, [teamId, teamId, teamId, teamId, teamId, teamId, teamId, teamId, venueId]);
+      res.json(results);
+  } catch (error) {
+      console.error("Error fetching top players bowling first:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
 
