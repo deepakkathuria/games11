@@ -931,7 +931,6 @@ app.get("/stats/venue/:venueId", async (req, res) => {
 });
 
 
-
 app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   const { venueId, teamId } = req.params;
   const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
@@ -939,7 +938,7 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   try {
       // Fetch the last five matches for a specific venue and team within a competition
       const [matches] = await pool.query(`
-          SELECT id AS match_id, date_start,short_title,status_note
+          SELECT id AS match_id, date_start, short_title, status_note
           FROM matches
           WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? AND competition_id = ?
           ORDER BY date_start DESC
@@ -951,8 +950,8 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
           return res.status(404).send('No matches found');
       }
 
-      // Query for batting, bowling, and fielding details
-      const [battingDetails, bowlingDetails, fieldingDetails, fantasyPoints, dreamTeams] = await Promise.all([
+      // Query for batting, bowling, fielding details, fantasy points, dream teams, and inning scores
+      const [battingDetails, bowlingDetails, fieldingDetails, fantasyPoints, dreamTeams, inningScores] = await Promise.all([
           pool.query(`
               SELECT 
                   b.match_id,
@@ -1020,15 +1019,29 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
               FROM DreamTeam_test dt
               JOIN players p ON dt.player_id = p.id
               WHERE dt.match_id IN (?)
+          `, [matchIds]),
+          pool.query(`
+              SELECT
+                  mi.match_id,
+                  mi.inning_number,
+                  mi.scores,
+                  mi.scores_full,
+                  t.id AS team_id,
+                  t.name AS team_name
+              FROM match_innings_test mi
+              JOIN matches m ON mi.match_id = m.id
+              LEFT JOIN teams t ON (mi.batting_team_id = t.id)
+              WHERE mi.match_id IN (?)
           `, [matchIds])
       ]);
 
       // Organize data by match_id
       const detailedMatches = matches.map(match => ({
           match_id: match.match_id,
-          short_title:match.short_title,
-          status_note:match.status_note,
+          short_title: match.short_title,
+          status_note: match.status_note,
           date_start: match.date_start,
+          innings: inningScores[0].filter(i => i.match_id === match.match_id),
           batting: battingDetails[0].filter(b => b.match_id === match.match_id),
           bowling: bowlingDetails[0].filter(b => b.match_id === match.match_id),
           fielding: fieldingDetails[0].filter(f => f.match_id === match.match_id),
@@ -1042,7 +1055,6 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
       res.status(500).send("Failed to retrieve data");
   }
 });
-
 
 
 

@@ -9,63 +9,56 @@ async function fetchTournaments() {
   return response.data.response.items;
 }
 
-async function fetchCompetitions(tournamentId, page = 1, allCompetitions = []) {
+async function fetchCompetitions(tournamentId) {
     const url = `${BASE_URL}/tournaments/${tournamentId}/competitions?token=${TOKEN}&per_page=80`;
     const response = await axios.get(url);
 
-    const { competitions, total_pages } = response.data.response.items;
-    allCompetitions.push(...competitions);
-
-    if (page < total_pages) {
-      return fetchCompetitions(tournamentId, page + 1, allCompetitions);
-    } else {
-      return allCompetitions;
-    }
+    const competitions = response.data.response.items.competitions;
+    return competitions.map(comp => ({
+      season: comp.season,
+      cid: comp.cid,
+      title: comp.title,
+      match_format: comp.match_format,
+      tournament_id: tournamentId,
+      tournament_name: comp.title
+    }));
 }
 
-async function writeCompetitionsToCSV(competitions) {
-  const csvWriter = createObjectCsvWriter({
-    path: './all_competitions.csv',
-    header: [
-      {id: 'tournament_id', title: 'TID'},
-      {id: 'tournament_name', title: 'TName'},
-      {id: 'cid', title: 'CID'},
-      {id: 'title', title: 'Title'},
-      {id: 'season', title: 'Season'},
-      {id: 'match_format', title: 'Match Format'}
-    ]
-  });
+async function writeSeasonWiseCompetitionsToCSV(seasonalData) {
+  for (const season in seasonalData) {
+    const csvWriter = createObjectCsvWriter({
+      path: `./competitions_${season}.csv`,
+      header: [
+        {id: 'tournament_id', title: 'Tournament ID'},
+        {id: 'tournament_name', title: 'Tournament Name'},
+        {id: 'cid', title: 'Competition ID'},
+        {id: 'title', title: 'Competition Title'},
+        {id: 'match_format', title: 'Match Format'},
+        {id: 'season', title: 'Season'}
+      ]
+    });
 
-  await csvWriter.writeRecords(competitions);
-  console.log('Written all competitions to CSV.');
+    await csvWriter.writeRecords(seasonalData[season]);
+    console.log(`Written competitions for season ${season} to CSV.`);
+  }
 }
 
 async function main() {
   const tournaments = await fetchTournaments();
-  let allCompetitions = [];
+  let seasonalData = {};
 
   for (const tournament of tournaments) {
+    console.log(`Fetching competitions for tournament ID: ${tournament.tournament_id}`);
     const competitions = await fetchCompetitions(tournament.tournament_id);
     competitions.forEach(comp => {
-      comp.tournament_id = tournament.tournament_id;
-      comp.tournament_name = tournament.name;
-      // Add match_format to the existing fields
-      comp.match_format = comp.match_format; // Assuming the field is directly available like other fields
+      if (!seasonalData[comp.season]) {
+        seasonalData[comp.season] = [];
+      }
+      seasonalData[comp.season].push(comp);
     });
-    allCompetitions.push(...competitions);
   }
 
-  // Transform the data to the desired format for the CSV
-  const transformedData = allCompetitions.map(comp => ({
-    tournament_id: comp.tournament_id,
-    tournament_name: comp.tournament_name,
-    cid: comp.cid,
-    title: comp.title,
-    season: comp.season,
-    match_format: comp.match_format
-  }));
-
-  await writeCompetitionsToCSV(transformedData);
+  await writeSeasonWiseCompetitionsToCSV(seasonalData);
 }
 
 main().catch(console.error);
