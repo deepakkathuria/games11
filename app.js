@@ -1056,21 +1056,147 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   }
 });
 
+app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
+  const { venueId, teamId1, teamId2 } = req.params;
+  const competitionId = 128471; // Static competition ID for IPL 2023
+
+  try {
+      const query = `
+          SELECT 
+              p.id AS player_id,
+              CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+              SUM(fp.points) AS total_fantasy_points,
+              COUNT(DISTINCT fp.match_id) AS match_count,
+              GROUP_CONCAT(DISTINCT m.team_1) AS team1_ids,
+              GROUP_CONCAT(DISTINCT m.team_2) AS team2_ids
+          FROM players p
+          JOIN fantasy_points_details fp ON p.id = fp.player_id
+          JOIN matches m ON fp.match_id = m.id
+          WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
+            AND m.venue_id = ?
+            AND m.competition_id = ? -- Filter by the competition ID for IPL 2023
+          GROUP BY p.id
+          ORDER BY total_fantasy_points DESC
+          LIMIT 10;
+      `;
+
+      const [players] = await pool.query(query, [teamId1, teamId1, teamId2, teamId2, venueId, competitionId]);
+      if (players.length === 0) {
+          return res.status(404).send('No players found');
+      }
+      res.json(players);
+  } catch (error) {
+      console.error("Error fetching top players by fantasy points:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 
 
+app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
+  const { venueId, teamId1, teamId2 } = req.params;
+
+  try {
+      const query = `
+        SELECT 
+          dt.player_id,
+          p.first_name,
+          p.last_name,
+          SUM(CASE WHEN dt.role = 'Captain' THEN 1 ELSE 0 END) AS times_captain,
+          SUM(CASE WHEN dt.role = 'Vice Captain' THEN 1 ELSE 0 END) AS times_vice_captain,
+          GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
+          COUNT(DISTINCT dt.match_id) AS match_count
+        FROM DreamTeam_test dt
+        JOIN matches m ON dt.match_id = m.id
+        JOIN players p ON dt.player_id = p.id
+        WHERE (m.team_1 = ? OR m.team_2 = ?) AND (m.team_1 = ? OR m.team_2 = ?)
+          AND m.venue_id = ?
+          AND m.competition_id = 128471
+        GROUP BY dt.player_id
+        ORDER BY times_captain DESC, times_vice_captain DESC;
+      `;
+
+      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2, venueId]);
+      res.json(results);
+  } catch (error) {
+      console.error("Error fetching frequent captains and vice captains:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 
+app.get("/player-stats1/:playerId/:teamId", async (req, res) => {
+  const { playerId, teamId } = req.params;
 
+  try {
+      // Batting stats query
+      const battingQuery = `
+          SELECT 
+            b.inning_number,
+            COUNT(*) AS innings_played,
+            SUM(b.runs) AS total_runs,
+            AVG(b.runs) AS average_runs,
+            SUM(b.balls_faced) AS total_balls_faced,
+            SUM(b.fours) AS total_fours,
+            SUM(b.sixes) AS total_sixes,
+            SUM(CASE WHEN b.runs >= 100 THEN 1 ELSE 0 END) AS centuries,
+            SUM(CASE WHEN b.runs >= 50 AND b.runs < 100 THEN 1 ELSE 0 END) AS fifties
+          FROM match_inning_batters_test b
+          JOIN matches m ON b.match_id = m.id
+          WHERE b.batsman_id = ? AND (m.team_1 = ? OR m.team_2 = ?)
+          GROUP BY b.inning_number;
+      `;
 
+      // Bowling stats query
+      const bowlingQuery = `
+          SELECT 
+            bl.inning_number,
+            COUNT(*) AS innings_bowled,
+            SUM(bl.overs) AS total_overs,
+            SUM(bl.runs_conceded) AS total_runs_conceded,
+            SUM(bl.wickets) AS total_wickets,
+            AVG(bl.econ) AS average_economy
+          FROM match_inning_bowlers_test bl
+          JOIN matches m ON bl.match_id = m.id
+          WHERE bl.bowler_id = ? AND (m.team_1 = ? OR m.team_2 = ?)
+          GROUP BY bl.inning_number;
+      `;
 
+      // Fielding stats query
+      const fieldingQuery = `
+          SELECT 
+            f.inning_number,
+            SUM(f.catches) AS total_catches,
+            SUM(f.stumping) AS total_stumpings,
+            SUM(f.runout_thrower + f.runout_catcher + f.runout_direct_hit) AS total_runouts
+          FROM match_inning_fielders_test f
+          JOIN matches m ON f.match_id = m.id
+          WHERE f.fielder_id = ? AND (m.team_1 = ? OR m.team_2 = ?)
+          GROUP BY f.inning_number;
+      `;
 
+      // Execute queries in parallel
+      const [battingStats, bowlingStats, fieldingStats] = await Promise.all([
+          pool.query(battingQuery, [playerId, teamId, teamId]),
+          pool.query(bowlingQuery, [playerId, teamId, teamId]),
+          pool.query(fieldingQuery, [playerId, teamId, teamId])
+      ]);
 
-
-
-
+      // Prepare the response
+      res.json({
+          playerId: playerId,
+          teamId: teamId,
+          batting: battingStats[0],
+          bowling: bowlingStats[0],
+          fielding: fieldingStats[0]
+      });
+  } catch (error) {
+      console.error("Error fetching player stats:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 
