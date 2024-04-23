@@ -892,14 +892,156 @@ app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
 });
 
 
+app.get("/stats/venue/:venueId", async (req, res) => {
+  const { venueId } = req.params;
+  const competitionId = 128471;  // Static competition ID for IPL 2024
+
+  const query = `
+      SELECT
+          AVG(first_innings_wickets) AS avg_wickets,
+          AVG(first_innings_score) AS avg_first_innings_score,
+          GROUP_CONCAT(DISTINCT last_five_matches.match_id ORDER BY last_five_matches.match_id) AS match_ids,
+          COUNT(DISTINCT last_five_matches.match_id) AS match_count
+      FROM (
+          SELECT 
+              m.id AS match_id,
+              SUM(b.wickets) AS first_innings_wickets,
+              CAST(SUBSTRING_INDEX(mi.scores, '/', 1) AS UNSIGNED) AS first_innings_score
+          FROM matches m
+          JOIN match_innings_test mi ON m.id = mi.match_id AND mi.inning_number = 1
+          LEFT JOIN match_inning_bowlers_test b ON m.id = b.match_id AND b.inning_number = 1
+          WHERE m.venue_id = ? AND m.competition_id = ?
+          GROUP BY m.id
+          ORDER BY m.date_start DESC
+          LIMIT 5
+      ) AS last_five_matches;
+  `;
+
+  try {
+      const [results] = await pool.query(query, [venueId, competitionId]);
+      if (results.length) {
+          res.json(results[0]);  // Return the first result in a structured format
+      } else {
+          res.status(404).send('No data found');
+      }
+  } catch (error) {
+      console.error("Error fetching average stats for venue:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 
+app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
+  const { venueId, teamId } = req.params;
+  const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
 
+  try {
+      // Fetch the last five matches for a specific venue and team within a competition
+      const [matches] = await pool.query(`
+          SELECT id AS match_id, date_start,short_title,status_note
+          FROM matches
+          WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? AND competition_id = ?
+          ORDER BY date_start DESC
+          LIMIT 5
+      `, [teamId, teamId, venueId, competitionId]);
 
+      const matchIds = matches.map(match => match.match_id);
+      if (matchIds.length === 0) {
+          return res.status(404).send('No matches found');
+      }
 
+      // Query for batting, bowling, and fielding details
+      const [battingDetails, bowlingDetails, fieldingDetails, fantasyPoints, dreamTeams] = await Promise.all([
+          pool.query(`
+              SELECT 
+                  b.match_id,
+                  p.id as player_id,
+                  p.first_name,
+                  p.last_name,
+                  b.runs,
+                  b.balls_faced,
+                  b.fours,
+                  b.sixes,
+                  b.strike_rate,
+                  b.how_out
+              FROM match_inning_batters_test b
+              JOIN players p ON b.batsman_id = p.id
+              WHERE b.match_id IN (?)
+          `, [matchIds]),
+          pool.query(`
+              SELECT 
+                  bl.match_id,
+                  p.id as player_id,
+                  p.first_name,
+                  p.last_name,
+                  bl.overs,
+                  bl.runs_conceded,
+                  bl.wickets,
+                  bl.econ
+              FROM match_inning_bowlers_test bl
+              JOIN players p ON bl.bowler_id = p.id
+              WHERE bl.match_id IN (?)
+          `, [matchIds]),
+          pool.query(`
+              SELECT 
+                  f.match_id,
+                  p.id as player_id,
+                  p.first_name,
+                  p.last_name,
+                  f.catches,
+                  f.stumping,
+                  f.runout_thrower,
+                  f.runout_catcher,
+                  f.runout_direct_hit
+              FROM match_inning_fielders_test f
+              JOIN players p ON f.fielder_id = p.id
+              WHERE f.match_id IN (?)
+          `, [matchIds]),
+          pool.query(`
+              SELECT 
+                  fp.match_id,
+                  p.id as player_id,
+                  p.first_name,
+                  p.last_name,
+                  fp.points
+              FROM fantasy_points_details fp
+              JOIN players p ON fp.player_id = p.id
+              WHERE fp.match_id IN (?)
+          `, [matchIds]),
+          pool.query(`
+              SELECT 
+                  dt.match_id,
+                  p.id as player_id,
+                  p.first_name,
+                  p.last_name,
+                  dt.role,
+                  dt.points
+              FROM DreamTeam_test dt
+              JOIN players p ON dt.player_id = p.id
+              WHERE dt.match_id IN (?)
+          `, [matchIds])
+      ]);
 
+      // Organize data by match_id
+      const detailedMatches = matches.map(match => ({
+          match_id: match.match_id,
+          short_title:match.short_title,
+          status_note:match.status_note,
+          date_start: match.date_start,
+          batting: battingDetails[0].filter(b => b.match_id === match.match_id),
+          bowling: bowlingDetails[0].filter(b => b.match_id === match.match_id),
+          fielding: fieldingDetails[0].filter(f => f.match_id === match.match_id),
+          fantasyPoints: fantasyPoints[0].filter(fp => fp.match_id === match.match_id),
+          dreamTeam: dreamTeams[0].filter(dt => dt.match_id === match.match_id)
+      }));
 
+      res.json(detailedMatches);
+  } catch (error) {
+      console.error("Error fetching match details:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 
