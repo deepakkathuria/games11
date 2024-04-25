@@ -1116,50 +1116,42 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   }
 });
 
-app.get(
-  "/top-players/venue/:venueId/teams/:teamId1/:teamId2",
-  async (req, res) => {
-    const { venueId, teamId1, teamId2 } = req.params;
-    const competitionId = 128471; // Static competition ID for IPL 2023
+app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
+  const { venueId, teamId1, teamId2 } = req.params;
+  const competitionId = 128471; // Static competition ID for IPL 2023
 
-    try {
-      const query = `
-          SELECT 
-              p.id AS player_id,
-              CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-              SUM(fp.points) AS total_fantasy_points,
-              COUNT(DISTINCT fp.match_id) AS match_count,
-              GROUP_CONCAT(DISTINCT m.team_1) AS team1_ids,
-              GROUP_CONCAT(DISTINCT m.team_2) AS team2_ids
-          FROM players p
-          JOIN fantasy_points_details fp ON p.id = fp.player_id
-          JOIN matches m ON fp.match_id = m.id
-          WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
-            AND m.venue_id = ?
-            AND m.competition_id = ? -- Filter by the competition ID for IPL 2023
-          GROUP BY p.id
-          ORDER BY total_fantasy_points DESC
-          LIMIT 10;
-      `;
+  try {
+    const query = `
+      SELECT 
+        p.id AS player_id,
+        p.playing_role,
+        CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+        t.name AS team_name,
+        SUM(fp.points) AS total_fantasy_points,
+        COUNT(DISTINCT fp.match_id) AS match_count
+      FROM players p
+      JOIN fantasy_points_details fp ON p.id = fp.player_id
+      JOIN teams t ON fp.team_id = t.id
+      JOIN matches m ON fp.match_id = m.id
+      WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
+        AND m.venue_id = ?
+        AND m.competition_id = ?
+      GROUP BY p.id, t.name
+      ORDER BY total_fantasy_points DESC
+      LIMIT 10;
+    `;
 
-      const [players] = await pool.query(query, [
-        teamId1,
-        teamId1,
-        teamId2,
-        teamId2,
-        venueId,
-        competitionId,
-      ]);
-      if (players.length === 0) {
-        return res.status(404).send("No players found");
-      }
-      res.json(players);
-    } catch (error) {
-      console.error("Error fetching top players by fantasy points:", error);
-      res.status(500).send("Failed to retrieve data");
+    const [players] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2, venueId, competitionId]);
+    if (players.length === 0) {
+      return res.status(404).send('No players found');
     }
+    res.json(players);
+  } catch (error) {
+    console.error("Error fetching top players by fantasy points:", error);
+    res.status(500).send("Failed to retrieve data");
   }
-);
+});
+
 
 app.get(
   "/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2",
@@ -1669,6 +1661,69 @@ app.get("/match-stats/teams/:teamId1/:teamId2/:specificTeamId", async (req, res)
     });
   } catch (error) {
     console.error("Error fetching match statistics and top players:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+  const competitionId = 128471; // Assuming competition ID for IPL 2023 is 128471
+
+  try {
+    // Get match IDs for last match, last five matches, and all matches between the two teams.
+    const getMatchIds = async (limit) => {
+      const query = `
+        SELECT id FROM matches
+        WHERE competition_id = ? AND ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
+        ORDER BY date_start DESC
+        ${limit ? `LIMIT ${limit}` : ''}
+      `;
+      const [matches] = await pool.query(query, [competitionId, teamId1, teamId2, teamId2, teamId1]);
+      return matches.map(m => m.id);
+    };
+
+    // Fetch match IDs
+    const lastMatchIds = await getMatchIds(1);
+    const lastFiveMatchIds = await getMatchIds(5);
+    const allMatchIds = await getMatchIds();
+
+    // Helper function to get dream team occurrences
+    const getDreamTeamOccurrences = async (matchIds) => {
+      if (matchIds.length === 0) return [];
+      const [occurrences] = await pool.query(`
+        SELECT 
+          dt.player_id, 
+          p.first_name, 
+          p.last_name, 
+          COUNT(*) AS occurrences,
+          GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
+          SUM(dt.points) AS total_points
+        FROM DreamTeam_test dt
+        JOIN players p ON dt.player_id = p.id
+        WHERE dt.match_id IN (?)
+        GROUP BY dt.player_id
+        ORDER BY occurrences DESC, total_points DESC
+        LIMIT 10
+      `, [matchIds]);
+      return occurrences;
+    };
+
+    // Get dream team occurrences for top players
+    const dreamTeamStats = {
+      lastMatch: await getDreamTeamOccurrences(lastMatchIds),
+      lastFiveMatches: await getDreamTeamOccurrences(lastFiveMatchIds),
+      overall: await getDreamTeamOccurrences(allMatchIds)
+    };
+
+    res.json({
+      dream_team_stats: {
+        last_match: dreamTeamStats.lastMatch,
+        last_five_matches: dreamTeamStats.lastFiveMatches,
+        overall: dreamTeamStats.overall
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching dream team statistics:", error);
     res.status(500).send("Failed to retrieve data");
   }
 });
