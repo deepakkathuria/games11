@@ -1164,6 +1164,8 @@ app.get(
           dt.player_id,
           p.first_name,
           p.last_name,
+          p.playing_role,
+          t.name AS team_name,
           SUM(CASE WHEN dt.role = 'Captain' THEN 1 ELSE 0 END) AS times_captain,
           SUM(CASE WHEN dt.role = 'Vice Captain' THEN 1 ELSE 0 END) AS times_vice_captain,
           GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
@@ -1171,10 +1173,12 @@ app.get(
         FROM DreamTeam_test dt
         JOIN matches m ON dt.match_id = m.id
         JOIN players p ON dt.player_id = p.id
+        JOIN team_players tp ON dt.player_id = tp.player_id
+        JOIN teams t ON tp.team_id = t.id
         WHERE (m.team_1 = ? OR m.team_2 = ?) AND (m.team_1 = ? OR m.team_2 = ?)
           AND m.venue_id = ?
           AND m.competition_id = 128471
-        GROUP BY dt.player_id
+        GROUP BY dt.player_id, p.playing_role, t.name
         ORDER BY times_captain DESC, times_vice_captain DESC;
       `;
 
@@ -1195,6 +1199,7 @@ app.get(
     }
   }
 );
+
 
 app.get("/match-stats/:venueId/:teamId", async (req, res) => {
   const { venueId, teamId } = req.params;
@@ -1727,6 +1732,28 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // -----------------------------------CHEATSHEET-----------------------------------------------
