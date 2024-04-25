@@ -1418,37 +1418,52 @@ app.get("/venue-stats-last-five/:venueId", async (req, res) => {
 
 app.get("/venue/:venueId/stats", async (req, res) => {
   const { venueId } = req.params;
+  const competitionId = 128471; // Assuming competition ID for IPL 2023 is 128471
 
   try {
+    // Query to get various statistics
     const query = `
-          SELECT 
-            COUNT(*) AS total_matches,
-            SUM(CASE WHEN m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_after_winning_toss,
-            SUM(CASE WHEN m.toss_winner != m.winning_team_id THEN 1 ELSE 0 END) AS wins_after_losing_toss,
-            SUM(CASE WHEN m.toss_decision = 1 AND m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_batting_first_after_winning_toss,
-            SUM(CASE WHEN m.toss_decision = 2 AND m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_bowling_first_after_winning_toss,
-            SUM(CASE WHEN m.toss_decision = 1 THEN 1 ELSE 0 END) AS chose_to_bat_first,
-            SUM(CASE WHEN m.toss_decision = 2 THEN 1 ELSE 0 END) AS chose_to_bowl_first,
-            GROUP_CONCAT(m.id) AS match_ids
-          FROM (
-            SELECT * FROM matches
-            WHERE venue_id = ? AND competition_id = 128471
-            ORDER BY date_start DESC
-            LIMIT 5
-          ) AS m;
-      `;
+      SELECT 
+        COUNT(*) AS total_matches,
+        SUM(CASE WHEN m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_after_winning_toss,
+        SUM(CASE WHEN m.toss_winner != m.winning_team_id THEN 1 ELSE 0 END) AS wins_after_losing_toss,
+        SUM(CASE WHEN m.toss_decision = 1 AND m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_batting_first_after_winning_toss,
+        SUM(CASE WHEN m.toss_decision = 2 AND m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_bowling_first_after_winning_toss,
+        SUM(CASE WHEN m.toss_decision = 1 THEN 1 ELSE 0 END) AS chose_to_bat_first,
+        SUM(CASE WHEN m.toss_decision = 2 THEN 1 ELSE 0 END) AS chose_to_bowl_first,
+        GROUP_CONCAT(DISTINCT m.id) AS match_ids,
+        SUM(CASE WHEN (m.team_1 = m.winning_team_id AND mi.inning_number = 1) OR
+                        (m.team_2 = m.winning_team_id AND mi.inning_number = 2) THEN 1 ELSE 0 END) AS wins_batting_first,
+        SUM(CASE WHEN (m.team_2 = m.winning_team_id AND mi.inning_number = 1) OR
+                        (m.team_1 = m.winning_team_id AND mi.inning_number = 2) THEN 1 ELSE 0 END) AS wins_chasing
+      FROM matches m
+      LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+      WHERE m.venue_id = ? AND m.competition_id = ?
+      GROUP BY m.venue_id;
+    `;
 
-    const [results] = await pool.query(query, [venueId]);
+    const [results] = await pool.query(query, [venueId, competitionId]);
     if (results.length === 0) {
       return res.status(404).send("No matches found");
     }
 
-    res.json(results[0]); // Return the statistics as JSON
+    const stats = results[0];
+    stats.wins_without_toss_consideration = {
+      batting_first: stats.wins_batting_first,
+      chasing: stats.wins_chasing
+    };
+
+    // Remove the redundant fields to clean up the JSON response
+    delete stats.wins_batting_first;
+    delete stats.wins_chasing;
+
+    res.json(stats); // Return the combined statistics as JSON
   } catch (error) {
     console.error("Error fetching venue statistics:", error);
     res.status(500).send("Failed to retrieve data");
   }
 });
+
 
 // matches and there top player  accoording to last 5 matches at this venue
 
@@ -1519,138 +1534,184 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
 });
 
 // ---------------------------------------------CHEAT SHEET---------------------------------------
-app.get("/venue/:venueId/fantasy-points", async (req, res) => {
-  const { venueId } = req.params;
-  const competitionId = 128471; // Assuming competition ID for IPL 2023 is 128471
+
+// overall  top 5 player according to fp  (last match , last 5 match, all) BETWEEN TWO TEAMS
+app.get("/match-stats/teams/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+  const competitionId = 128471; // Example competition ID
 
   try {
-    // Get the IDs of the last five matches at this venue.
-    const [lastFiveMatchesResult] = await pool.query(
-      `
-          SELECT id FROM matches
-          WHERE venue_id = ?
-          AND competition_id = ?
-          ORDER BY date_start DESC
-          LIMIT 5
-      `,
-      [venueId, competitionId]
-    );
+    // Get the IDs of the last five and all matches between the two teams.
+    const [matches] = await pool.query(`
+      SELECT id FROM matches
+      WHERE (team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)
+      AND competition_id = ?
+      ORDER BY date_start DESC
+    `, [teamId1, teamId2, teamId2, teamId1, competitionId]);
 
-    const matchIds = lastFiveMatchesResult.map((match) => match.id);
+    const matchIds = matches.map(match => match.id);
     if (matchIds.length === 0) {
-      return res.status(404).send("No matches found for this venue.");
+      return res.status(404).send("No matches found between the specified teams.");
     }
 
     const lastMatchId = matchIds[0]; // ID of the most recent match
+    const lastFiveMatchIds = matchIds.slice(0, 5);
 
-    // Get top players for the most recent match at the venue.
-    const [topPlayersLastMatch] = await pool.query(
-      `
-      SELECT 
+    // Define a function to fetch top player stats
+    const fetchTopPlayers = async (matchIdArray) => {
+      return pool.query(`
+        SELECT 
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-          tp.team_id AS team_id,
-          t.name AS team_name,
-          fp.points AS fantasy_points
-      FROM fantasy_points_details fp
-      JOIN players p ON fp.player_id = p.id
-      JOIN team_players tp ON p.id = tp.player_id
-      JOIN teams t ON tp.team_id = t.id
-      WHERE fp.match_id = ?
-      ORDER BY fp.points DESC
-    
-  `,
-      [lastMatchId]
-    );
-
-    // Get top players for the last five matches at the venue.
-    const [topPlayersLastFiveMatches] = await pool.query(
-      `
-      SELECT 
-          p.id AS player_id,
-          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-          tp.team_id AS team_id,
           t.name AS team_name,
           SUM(fp.points) AS total_fantasy_points,
           COUNT(DISTINCT fp.match_id) AS match_count
-      FROM fantasy_points_details fp
-      JOIN players p ON fp.player_id = p.id
-      JOIN team_players tp ON p.id = tp.player_id
-      JOIN teams t ON tp.team_id = t.id
-      WHERE fp.match_id IN (?)
-      GROUP BY p.id, tp.team_id, t.name
-      ORDER BY SUM(fp.points) DESC
-  `,
-      [matchIds]
-    );
+        FROM fantasy_points_details fp
+        JOIN players p ON fp.player_id = p.id
+        JOIN team_players tp ON p.id = tp.player_id
+        JOIN teams t ON tp.team_id = t.id
+        WHERE fp.match_id IN (?)
+        GROUP BY p.id, t.id
+        ORDER BY total_fantasy_points DESC
+        LIMIT 10
+      `, [matchIdArray]);
+    };
 
-    // Get top players overall at the venue.
-    const [topPlayersOverall] = await pool.query(
-      `
-      SELECT 
-          p.id AS player_id,
-          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-          tp.team_id AS team_id,
-          t.name AS team_name,
-          SUM(fp.points) AS total_fantasy_points,
-          COUNT(DISTINCT fp.match_id) AS match_count
-      FROM fantasy_points_details fp
-      JOIN players p ON fp.player_id = p.id
-      JOIN team_players tp ON p.id = tp.player_id
-      JOIN teams t ON tp.team_id = t.id
-      JOIN matches m ON fp.match_id = m.id
-      WHERE m.venue_id = ? AND m.competition_id = ?
-      GROUP BY p.id, tp.team_id, t.name
-      ORDER BY SUM(fp.points) DESC
-  `,
-      [venueId, competitionId]
-    );
+    // Fetch player stats for last match, last five matches, and all matches
+    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] = await Promise.all([
+      fetchTopPlayers([lastMatchId]),
+      fetchTopPlayers(lastFiveMatchIds),
+      fetchTopPlayers(matchIds)
+    ]);
 
     res.json({
-      venue_id: venueId,
-      top_players_last_match: topPlayersLastMatch,
-      top_players_last_five_matches: topPlayersLastFiveMatches,
-      top_players_overall: topPlayersOverall,
+      last_match: {
+        match_id: lastMatchId,
+        players: playersLastMatch[0]
+      },
+      last_five_matches: {
+        match_ids: lastFiveMatchIds,
+        players: playersLastFiveMatches[0]
+      },
+      all_matches: {
+        match_ids: matchIds,
+        players: playersAllMatches[0]
+      }
     });
   } catch (error) {
-    console.error(
-      "Error fetching top players by fantasy points including team name:",
-      error
-    );
+    console.error("Error fetching match statistics and top players:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+app.get("/match-stats/teams/:teamId1/:teamId2/:specificTeamId", async (req, res) => {
+  const { teamId1, teamId2, specificTeamId } = req.params;
+  const competitionId = 128471; // Example competition ID
+
+  try {
+    // Get the IDs of the last five and all matches between the two teams.
+    const [matches] = await pool.query(`
+      SELECT id FROM matches
+      WHERE (team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)
+      AND competition_id = ?
+      ORDER BY date_start DESC
+    `, [teamId1, teamId2, teamId2, teamId1, competitionId]);
+
+    const matchIds = matches.map(match => match.id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found between the specified teams.");
+    }
+
+    const lastMatchId = matchIds[0]; // ID of the most recent match
+    const lastFiveMatchIds = matchIds.slice(0, 5);
+
+    // Define a function to fetch top player stats
+    const fetchTopPlayers = async (matchIdArray, teamId) => {
+      return pool.query(`
+        SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          t.name AS team_name,
+          SUM(fp.points) AS total_fantasy_points,
+          COUNT(DISTINCT fp.match_id) AS match_count
+        FROM fantasy_points_details fp
+        JOIN players p ON fp.player_id = p.id
+        JOIN team_players tp ON p.id = tp.player_id
+        JOIN teams t ON tp.team_id = t.id
+        WHERE fp.match_id IN (?)
+        AND tp.team_id = ?
+        GROUP BY p.id, t.id
+        ORDER BY total_fantasy_points DESC
+        LIMIT 10
+      `, [matchIdArray, teamId]);
+    };
+
+    // Fetch player stats for last match, last five matches, and all matches for the specific team
+    const [playersLastMatchSpecificTeam, playersLastFiveMatchesSpecificTeam, playersAllMatchesSpecificTeam] = await Promise.all([
+      fetchTopPlayers([lastMatchId], specificTeamId),
+      fetchTopPlayers(lastFiveMatchIds, specificTeamId),
+      fetchTopPlayers(matchIds, specificTeamId)
+    ]);
+
+    res.json({
+      last_match_specific_team: {
+        match_id: lastMatchId,
+        players: playersLastMatchSpecificTeam[0]
+      },
+      last_five_matches_specific_team: {
+        match_ids: lastFiveMatchIds,
+        players: playersLastFiveMatchesSpecificTeam[0]
+      },
+      all_matches_specific_team: {
+        match_ids: matchIds,
+        players: playersAllMatchesSpecificTeam[0]
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching match statistics and top players:", error);
     res.status(500).send("Failed to retrieve data");
   }
 });
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // -----------------------------------CHEATSHEET-----------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
 
