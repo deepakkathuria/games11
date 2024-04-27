@@ -1516,6 +1516,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
       match_id: match.match_id,
       status_note: match.status_note,
       top_players: results[index][0].map((player) => ({
+        player_role: player.playing_role,
         player_id: player.player_id,
         player_name: player.player_name,
         team_name: player.team_name,
