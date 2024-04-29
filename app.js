@@ -742,26 +742,28 @@ app.get("/team-stats/:teamId/:venueId", async (req, res) => {
 
   const query = `
       SELECT 
-          venue_id,
+          m.venue_id,
           COUNT(*) AS total_matches,
           SUM(CASE 
-              WHEN (toss_winner = ? AND toss_decision = 1) OR 
-                   (toss_winner != ? AND toss_decision = 2) THEN 1 
+              WHEN (m.toss_winner = ? AND m.toss_decision = 1) OR 
+                   (m.toss_winner != ? AND m.toss_decision = 2) THEN 1 
               ELSE 0 END) AS matches_batted_first,
           SUM(CASE 
-              WHEN (toss_winner = ? AND toss_decision = 2) OR 
-                   (toss_winner != ? AND toss_decision = 1) THEN 1 
+              WHEN (m.toss_winner = ? AND m.toss_decision = 2) OR 
+                   (m.toss_winner != ? AND m.toss_decision = 1) THEN 1 
               ELSE 0 END) AS matches_chased,
           SUM(CASE 
-              WHEN ((toss_winner = ? AND toss_decision = 1 OR toss_winner != ? AND toss_decision = 2) AND winning_team_id = ?) THEN 1 
+              WHEN ((m.toss_winner = ? AND m.toss_decision = 1 OR m.toss_winner != ? AND m.toss_decision = 2) AND m.winning_team_id = ?) THEN 1 
               ELSE 0 END) AS wins_batting_first,
           SUM(CASE 
-              WHEN ((toss_winner = ? AND toss_decision = 2 OR toss_winner != ? AND toss_decision = 1) AND winning_team_id = ?) THEN 1 
+              WHEN ((m.toss_winner = ? AND m.toss_decision = 2 OR m.toss_winner != ? AND m.toss_decision = 1) AND m.winning_team_id = ?) THEN 1 
               ELSE 0 END) AS wins_chasing,
-          GROUP_CONCAT(id) AS match_ids
-      FROM matches
-      WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ?
-      GROUP BY venue_id;
+          GROUP_CONCAT(m.id) AS match_ids,
+          t.short_name AS team_short_name
+      FROM matches m
+      JOIN teams t ON m.team_1 = t.id OR m.team_2 = t.id
+      WHERE (m.team_1 = ? OR m.team_2 = ?) AND m.venue_id = ?
+      GROUP BY m.venue_id, t.short_name;
   `;
 
   // Use the dynamic parameters in the query
@@ -790,6 +792,7 @@ app.get("/team-stats/:teamId/:venueId", async (req, res) => {
   }
 });
 
+
 // top player using team at particular venue overall
 app.get("/top-players/:teamId/:venueId", async (req, res) => {
   const { teamId, venueId } = req.params;
@@ -800,15 +803,17 @@ app.get("/top-players/:teamId/:venueId", async (req, res) => {
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
           SUM(fp.points) AS total_fantasy_points,
           COUNT(DISTINCT m.id) AS match_count,
-          GROUP_CONCAT(DISTINCT m.id ORDER BY m.id) AS match_ids
+          GROUP_CONCAT(DISTINCT m.id ORDER BY m.id) AS match_ids,
+          t.short_name AS team_short_name  // Added this to get the team short name
       FROM matches m
       JOIN fantasy_points_details fp ON m.id = fp.match_id
       JOIN players p ON fp.player_id = p.id
       JOIN team_players tp ON p.id = tp.player_id AND tp.team_id = ?
+      JOIN teams t ON tp.team_id = t.id  // Joining with teams table to get the team details
       WHERE (m.team_1 = ? OR m.team_2 = ?) 
         AND m.venue_id = ?
         AND m.competition_id = 128471
-      GROUP BY p.id
+      GROUP BY p.id, t.short_name  // Modified GROUP BY to include t.short_name
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
   `;
@@ -828,6 +833,7 @@ app.get("/top-players/:teamId/:venueId", async (req, res) => {
   }
 });
 
+
 // top players batting first using team and venue
 
 app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
@@ -838,11 +844,13 @@ app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
           SUM(fp.points) AS total_fantasy_points,
-          COUNT(DISTINCT m.id) AS match_count
+          COUNT(DISTINCT m.id) AS match_count,
+          t.short_name AS team_short_name  // Added to get the team short name
       FROM matches m
       JOIN fantasy_points_details fp ON m.id = fp.match_id
       JOIN players p ON fp.player_id = p.id
       JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = ?
+      JOIN teams t ON tp.team_id = t.id  // Joining with teams table to get the team details
       WHERE (
           (m.toss_winner = ? AND m.toss_decision = 1 AND m.team_1 = ?) OR 
           (m.toss_winner = ? AND m.toss_decision = 2 AND m.team_2 = ?) OR
@@ -851,7 +859,7 @@ app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
       )
       AND m.venue_id = ?
       AND m.competition_id = 128471  // Filter by competition ID
-      GROUP BY p.id
+      GROUP BY p.id, t.short_name  // Modified GROUP BY to include t.short_name
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
   `;
@@ -868,6 +876,7 @@ app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
       teamId,
       venueId,
     ]);
+    console.log("Query Results:", results); // Check the structure of the results here
     res.json(results);
   } catch (error) {
     console.error("Error fetching top players batting first:", error);
@@ -875,8 +884,8 @@ app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
   }
 });
 
-// top player bowling first using team and venue
 
+// top player bowling first using team and venue
 app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
   const { teamId, venueId } = req.params;
 
@@ -884,12 +893,14 @@ app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
       SELECT 
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          t.short_name AS team_short_name, // Added to get the team short name
           SUM(fp.points) AS total_fantasy_points,
           COUNT(DISTINCT m.id) AS match_count
       FROM matches m
       JOIN fantasy_points_details fp ON m.id = fp.match_id
       JOIN players p ON fp.player_id = p.id
-      JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = ?
+      JOIN team_players tp ON p.id = tp.player_id AND tp.team_id = ?
+      JOIN teams t ON tp.team_id = t.id // Joining with teams table to get the team details
       WHERE (
           (m.toss_winner = ? AND m.toss_decision = 2 AND m.team_1 = ?) OR 
           (m.toss_winner = ? AND m.toss_decision = 1 AND m.team_2 = ?) OR
@@ -898,7 +909,7 @@ app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
       )
       AND m.venue_id = ?
       AND m.competition_id = 128471  // Filter by competition ID
-      GROUP BY p.id
+      GROUP BY p.id, t.short_name // Modified GROUP BY to include t.short_name
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
   `;
@@ -1124,9 +1135,9 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
     const query = `
       SELECT 
         p.id AS player_id,
-        p.playing_role,
+        p.playing_role, // Assuming 'playing_role' is a column in the 'players' table
         CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-        t.name AS team_name,
+        t.name AS team_name, // 'name' is assumed to be a column in the 'teams' table
         SUM(fp.points) AS total_fantasy_points,
         COUNT(DISTINCT fp.match_id) AS match_count
       FROM players p
@@ -1136,15 +1147,23 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
       WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
         AND m.venue_id = ?
         AND m.competition_id = ?
-      GROUP BY p.id, t.name
+      GROUP BY p.id, p.playing_role, t.name // Group by player ID, playing role, and team name
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
     `;
 
-    const [players] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2, venueId, competitionId]);
+    // Binding the parameters to avoid SQL injection
+    const params = [teamId1, teamId2, teamId1, teamId2, venueId, competitionId];
+
+    // Execute the query
+    const [players] = await pool.query(query, params);
+    
+    // Check if players data is found
     if (players.length === 0) {
       return res.status(404).send('No players found');
     }
+    
+    // Respond with the players data
     res.json(players);
   } catch (error) {
     console.error("Error fetching top players by fantasy points:", error);
@@ -1153,52 +1172,41 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
 });
 
 
-app.get(
-  "/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2",
-  async (req, res) => {
-    const { venueId, teamId1, teamId2 } = req.params;
+app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
+  const { venueId, teamId1, teamId2 } = req.params;
 
-    try {
-      const query = `
-        SELECT 
-          dt.player_id,
-          p.first_name,
-          p.last_name,
-          p.playing_role,
-          t.name AS team_name,
-          SUM(CASE WHEN dt.role = 'Captain' THEN 1 ELSE 0 END) AS times_captain,
-          SUM(CASE WHEN dt.role = 'Vice Captain' THEN 1 ELSE 0 END) AS times_vice_captain,
-          GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
-          COUNT(DISTINCT dt.match_id) AS match_count
-        FROM DreamTeam_test dt
-        JOIN matches m ON dt.match_id = m.id
-        JOIN players p ON dt.player_id = p.id
-        JOIN team_players tp ON dt.player_id = tp.player_id
-        JOIN teams t ON tp.team_id = t.id
-        WHERE (m.team_1 = ? OR m.team_2 = ?) AND (m.team_1 = ? OR m.team_2 = ?)
-          AND m.venue_id = ?
-          AND m.competition_id = 128471
-        GROUP BY dt.player_id, p.playing_role, t.name
-        ORDER BY times_captain DESC, times_vice_captain DESC;
-      `;
+  try {
+    const query = `
+      SELECT 
+        dt.player_id,
+        p.first_name,
+        p.last_name,
+        p.playing_role,
+        t.name AS team_name,
+        t.short_name AS team_short_name, // Assuming 'short_name' is a column in the 'teams' table
+        SUM(CASE WHEN dt.role = 'Captain' THEN 1 ELSE 0 END) AS times_captain,
+        SUM(CASE WHEN dt.role = 'Vice Captain' THEN 1 ELSE 0 END) AS times_vice_captain,
+        GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
+        COUNT(DISTINCT dt.match_id) AS match_count
+      FROM DreamTeam_test dt
+      JOIN matches m ON dt.match_id = m.id
+      JOIN players p ON dt.player_id = p.id
+      JOIN team_players tp ON dt.player_id = tp.player_id
+      JOIN teams t ON tp.team_id = t.id
+      WHERE (m.team_1 = ? OR m.team_2 = ?) AND (m.team_1 = ? OR m.team_2 = ?)
+        AND m.venue_id = ?
+        AND m.competition_id = 128471
+      GROUP BY dt.player_id, p.playing_role, t.name, t.short_name
+      ORDER BY times_captain DESC, times_vice_captain DESC;
+    `;
 
-      const [results] = await pool.query(query, [
-        teamId1,
-        teamId2,
-        teamId1,
-        teamId2,
-        venueId,
-      ]);
-      res.json(results);
-    } catch (error) {
-      console.error(
-        "Error fetching frequent captains and vice captains:",
-        error
-      );
-      res.status(500).send("Failed to retrieve data");
-    }
+    const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2, venueId]);
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching frequent captains and vice captains:", error);
+    res.status(500).send("Failed to retrieve data");
   }
-);
+});
 
 
 app.get("/match-stats/:venueId/:teamId", async (req, res) => {
@@ -1471,7 +1479,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     // Fetch the last five matches at the specified venue
     const [matches] = await pool.query(
       `
-          SELECT id AS match_id,status_note
+          SELECT id AS match_id, status_note
           FROM matches
           WHERE venue_id = ? AND competition_id = 128471
           ORDER BY date_start DESC
@@ -1484,15 +1492,17 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
       return res.status(404).send("No matches found at this venue.");
     }
 
-    // For each match, fetch the top 5 players along with their team names
+    // For each match, fetch the top 5 players along with their team and player short names
     const playerQueries = matches.map((match) =>
       pool.query(
         `
               SELECT 
                   p.id AS player_id,
-                  playing_role,
+                  p.playing_role,
+                  p.short_name AS player_short_name,
                   CONCAT(p.first_name, ' ', p.last_name) AS player_name,
                   t.name AS team_name,
+                  t.short_name AS team_short_name,
                   fp.points AS fantasy_points,
                   m.id AS match_id
               FROM fantasy_points_details fp
@@ -1516,10 +1526,12 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
       match_id: match.match_id,
       status_note: match.status_note,
       top_players: results[index][0].map((player) => ({
-        player_role: player.playing_role,
         player_id: player.player_id,
+        player_role: player.playing_role,
         player_name: player.player_name,
+        player_short_name: player.player_short_name,
         team_name: player.team_name,
+        team_short_name: player.team_short_name,
         fantasy_points: player.fantasy_points,
       })),
     }));
