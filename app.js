@@ -1718,7 +1718,7 @@ app.get("/match-stats/teams/:teamId1/:teamId2/:specificTeamId", async (req, res)
 
 app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
-  const competitionId = 128471; // Assuming competition ID for IPL 2023 is 128471
+  const competitionId = 128471; // Assuming competition ID for IPL 2023
 
   try {
     // Get match IDs for last match, last five matches, and all matches between the two teams.
@@ -1747,6 +1747,7 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
           p.first_name, 
           p.last_name, 
           COUNT(*) AS occurrences,
+          COUNT(DISTINCT dt.match_id) AS match_count,
           GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
           SUM(dt.points) AS total_points
         FROM DreamTeam_test dt
@@ -1754,7 +1755,7 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
         WHERE dt.match_id IN (?)
         GROUP BY dt.player_id
         ORDER BY occurrences DESC, total_points DESC
-        LIMIT 10
+        LIMIT 11
       `, [matchIds]);
       return occurrences;
     };
@@ -1775,6 +1776,396 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching dream team statistics:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+//TEAM RANK
+
+app.get("/team-performance/:teamId", async (req, res) => {
+  const { teamId } = req.params;
+  const competitionId = 128471; // Assuming a specific competition ID for context
+
+  try {
+    // Fetch the IDs of the last five and all matches for this team in the competition.
+    const [matches] = await pool.query(`
+      SELECT id, date_start FROM matches
+      WHERE (team_1 = ? OR team_2 = ?) AND competition_id = ?
+      ORDER BY date_start DESC
+    `, [teamId, teamId, competitionId]);
+
+    const matchIds = matches.map(match => match.id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found for the specified team.");
+    }
+
+    const lastMatchId = matchIds[0];
+    const lastFiveMatchIds = matchIds.slice(0, 5);
+
+    // Define a function to fetch top player stats for specific matches
+    const fetchTopPlayers = async (matchIdArray) => {
+      return pool.query(`
+        SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          p.short_name AS player_short_name,
+          t.name AS team_name,
+          t.short_name AS team_short_name,
+          SUM(fp.points) AS total_fantasy_points,
+          COUNT(DISTINCT fp.match_id) AS match_count
+        FROM fantasy_points_details fp
+        JOIN players p ON fp.player_id = p.id
+        JOIN team_players tp ON p.id = tp.player_id
+        JOIN teams t ON tp.team_id = t.id
+        WHERE fp.match_id IN (?) AND tp.team_id = ?
+        GROUP BY p.id, t.id
+        ORDER BY total_fantasy_points DESC
+        LIMIT 5
+      `, [matchIdArray, teamId]);
+    };
+
+    // Fetch top player stats for the last match, last five matches, and all matches
+    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] = await Promise.all([
+      fetchTopPlayers([lastMatchId]),
+      fetchTopPlayers(lastFiveMatchIds),
+      fetchTopPlayers(matchIds)
+    ]);
+
+    res.json({
+      team_id: teamId,
+      last_match: playersLastMatch[0],
+      last_five_matches: playersLastFiveMatches[0],
+      all_matches: playersAllMatches[0]
+    });
+  } catch (error) {
+    console.error("Error fetching top players and team performance:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+// POSITION RANK  
+
+app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
+  const { teamId, position } = req.params;
+  const validPositions = ['WK', 'BAT', 'AR', 'BOW'];
+  const competitionId = 128471; // Assuming a specific competition ID for context
+
+  if (!validPositions.includes(position)) {
+    return res.status(400).send("Invalid position specified");
+  }
+
+  try {
+    // Fetch all match IDs for this team in the competition, ordered by date.
+    const [matches] = await pool.query(`
+      SELECT id FROM matches
+      WHERE (team_1 = ? OR team_2 = ?) AND competition_id = ?
+      ORDER BY date_start DESC
+    `, [teamId, teamId, competitionId]);
+
+    const matchIds = matches.map(match => match.id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found for the specified team in the specified competition.");
+    }
+
+    const lastMatchIds = [matchIds[0]];
+    const lastFiveMatchIds = matchIds.slice(0, 5);
+
+    // Define a function to fetch top players for given match IDs
+    const fetchTopPlayers = async (matchIdArray) => {
+      return pool.query(`
+        SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          p.short_name AS player_short_name,
+          SUM(fp.points) AS total_fantasy_points
+        FROM fantasy_points_details fp
+        JOIN players p ON fp.player_id = p.id
+        JOIN team_players tp ON p.id = tp.player_id
+        WHERE fp.match_id IN (?) AND tp.team_id = ? AND p.playing_role = ?
+        GROUP BY p.id
+        ORDER BY total_fantasy_points DESC
+        LIMIT 5
+      `, [matchIdArray, teamId, position]);
+    };
+
+    // Fetch top player stats for the last match, last five matches, and all matches
+    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] = await Promise.all([
+      fetchTopPlayers(lastMatchIds),
+      fetchTopPlayers(lastFiveMatchIds),
+      fetchTopPlayers(matchIds)
+    ]);
+
+    res.json({
+      team_id: teamId,
+      position: position,
+      last_match: playersLastMatch[0],
+      last_five_matches: playersLastFiveMatches[0],
+      all_matches: playersAllMatches[0]
+    });
+  } catch (error) {
+    console.error("Error fetching top players by position:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+// MOST VALUABLE PLAYER 
+
+app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
+  const { teamA, teamB } = req.params;
+  const competitionId = 128471; // Static competition ID
+
+  try {
+    // Fetch all match IDs for the specified teams in the competition, ordered by date.
+    const [matches] = await pool.query(`
+      SELECT id FROM matches
+      WHERE competition_id = ? AND (team_1 IN (?, ?) AND team_2 IN (?, ?))
+      ORDER BY date_start DESC
+    `, [competitionId, teamA, teamB, teamA, teamB]);
+
+    const matchIds = matches.map(match => match.id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found for the specified teams in this competition.");
+    }
+
+    const lastMatchIds = [matchIds[0]]; // Most recent match
+    const lastFiveMatchIds = matchIds.slice(0, 5); // Last five matches
+
+    // Function to fetch players with their total points and salary normalized points.
+    const fetchValuablePlayers = async (matchIdArray, teamId = null) => {
+      let query = `
+        SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          p.short_name AS player_short_name,
+          MAX(t.name) AS team_name,
+          MAX(t.short_name) AS team_short_name,
+          SUM(fp.points) AS total_points,
+          p.fantasy_player_rating,
+          ROUND(SUM(fp.points) / p.fantasy_player_rating, 2) AS points_per_million
+        FROM fantasy_points_details fp
+        JOIN players p ON fp.player_id = p.id
+        JOIN team_players tp ON p.id = tp.player_id
+        JOIN teams t ON tp.team_id = t.id
+        WHERE fp.match_id IN (?) 
+      `;
+
+      if (teamId) {
+        query += ` AND tp.team_id = ?`;
+      }
+
+      query += `
+        GROUP BY p.id, p.first_name, p.last_name, p.short_name, p.fantasy_player_rating
+        ORDER BY points_per_million DESC
+        LIMIT 5
+      `;
+
+      return pool.query(query, teamId ? [matchIdArray, teamId] : [matchIdArray]);
+    };
+
+    // Fetch top player stats for the last match, last five matches, and all matches
+    const results = await Promise.all([
+      fetchValuablePlayers(lastMatchIds),
+      fetchValuablePlayers(lastFiveMatchIds),
+      fetchValuablePlayers(matchIds),
+      fetchValuablePlayers(lastMatchIds, teamA),
+      fetchValuablePlayers(lastFiveMatchIds, teamA),
+      fetchValuablePlayers(matchIds, teamA),
+      fetchValuablePlayers(lastMatchIds, teamB),
+      fetchValuablePlayers(lastFiveMatchIds, teamB),
+      fetchValuablePlayers(matchIds, teamB)
+    ]);
+
+    res.json({
+      competition_id: competitionId,
+      last_match: {
+        both_teams: results[0][0],
+        team_a: results[3][0],
+        team_b: results[6][0]
+      },
+      last_five_matches: {
+        both_teams: results[1][0],
+        team_a: results[4][0],
+        team_b: results[7][0]
+      },
+      all_matches: {
+        both_teams: results[2][0],
+        team_a: results[5][0],
+        team_b: results[8][0]
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching the most valuable players:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
+  const { teamA, teamB } = req.params;
+  const competitionId = 128471; // Static competition ID
+
+  try {
+    // Fetch all match IDs for the specified teams in the competition, ordered by date.
+    const [matches] = await pool.query(`
+      SELECT id FROM matches
+      WHERE competition_id = ? AND ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
+      ORDER BY date_start DESC
+    `, [competitionId, teamA, teamB, teamB, teamA]);
+
+    const matchIds = matches.map(match => match.id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found for the specified teams in this competition.");
+    }
+
+    // Function to fetch bottom players based on performance relative to potential.
+    const fetchBottomPlayers = async (matchIdArray, teamId = null) => {
+      let query = `
+        SELECT 
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          p.short_name AS player_short_name,
+          t.name AS team_name,
+          t.short_name AS team_short_name,
+          AVG(fp.points) OVER (PARTITION BY p.id ORDER BY m.date_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS avg_points,
+          SUM(fp.points) AS total_points,
+          (SUM(fp.points) - AVG(fp.points) OVER (PARTITION BY p.id ORDER BY m.date_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) AS performance_diff
+        FROM fantasy_points_details fp
+        JOIN players p ON fp.player_id = p.id
+        JOIN team_players tp ON p.id = tp.player_id
+        JOIN teams t ON tp.team_id = t.id
+        JOIN matches m ON fp.match_id = m.id
+        WHERE fp.match_id IN (?)
+      `;
+
+      if (teamId) {
+        query += ` AND tp.team_id = ?`;
+      }
+
+      query += `
+        GROUP BY p.id, t.id
+        ORDER BY performance_diff ASC
+        LIMIT 3
+      `;
+
+      return pool.query(query, teamId ? [matchIdArray, teamId] : [matchIdArray]);
+    };
+
+    // Fetch bottom player stats for both teams combined, and each team individually
+    const [playersBothTeams, playersTeamA, playersTeamB] = await Promise.all([
+      fetchBottomPlayers(matchIds),
+      fetchBottomPlayers(matchIds, teamA),
+      fetchBottomPlayers(matchIds, teamB)
+    ]);
+
+    res.json({
+      competition_id: competitionId,
+      both_teams: playersBothTeams[0],
+      team_a: playersTeamA[0],
+      team_b: playersTeamB[0]
+    });
+  } catch (error) {
+    console.error("Error fetching the bottom players:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+
+
+
+// -----------------------------------CHEATSHEET-----------------------------------------------
+
+
+
+
+
+
+
+
+
+
+// ------------------------------------player stats-------------------------------------------------
+
+app.get("/test/players/stats", async (req, res) => {
+  const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
+
+  // Base query setup
+  let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, t.name';
+
+  // Determine statistic to calculate
+  switch (statType) {
+    case 'TotalFantasyPoints':
+      selectClause = 'SUM(fp.points) AS total_points';
+      orderByClause = 'ORDER BY total_points DESC';
+      break;
+    case 'DreamTeamAppearances':
+      selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances';
+      joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
+      orderByClause = 'ORDER BY dream_team_appearances DESC';
+      break;
+    case 'WicketsTaken':
+      selectClause = 'SUM(b.wickets) AS wickets_taken';
+      joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
+      orderByClause = 'ORDER BY wickets_taken DESC';
+      break;
+  }
+
+  // Time Frame filter
+  if (timeFrame) {
+    const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
+    if (days > 0) {
+      whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
+    }
+  }
+
+  // Venue filter
+  if (venueId) {
+    whereClause += ` AND m.venue_id = ${venueId}`;
+  }
+
+  // Batting scenario filter
+  if (battingScenario) {
+    const team = battingScenario.split(' ')[0];
+    const action = battingScenario.split(' ')[2];
+    const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
+    whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
+  }
+
+  // Team filter for two specific teams
+  if (teamId1 && teamId2) {
+    whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
+  }
+
+  // Assemble full SQL query
+  const sql = `
+    SELECT p.id, p.first_name, p.last_name, ${selectClause}, t.name AS team_name
+    FROM players p
+    JOIN team_players tp ON p.id = tp.player_id
+    JOIN teams t ON tp.team_id = t.id
+    JOIN fantasy_points_details fp ON p.id = fp.player_id
+    JOIN matches m ON fp.match_id = m.id
+    ${joinClause}
+    ${whereClause}
+    ${groupByClause}
+    ${orderByClause}
+    LIMIT 100;
+  `;
+
+  try {
+    const [results] = await pool.query(sql);
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching player stats:", error);
     res.status(500).send("Failed to retrieve data");
   }
 });
@@ -1802,32 +2193,49 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
 
 
 
-// -----------------------------------CHEATSHEET-----------------------------------------------
+// ---------------------------------------------TEAM HEAD TO HEAD--------------------------------------
 
 
+app.get("/api/team/head-to-head", async (req, res) => {
+  const { teamId1, teamId2 } = req.query;
 
+  const sql = `
+    SELECT 
+      COUNT(*) AS total_matches,
+      SUM(CASE WHEN m.winning_team_id = ? THEN 1 ELSE 0 END) AS team1_wins,
+      SUM(CASE WHEN m.winning_team_id = ? THEN 1 ELSE 0 END) AS team2_wins,
+      AVG(innings.total_runs) AS avg_runs,
+      MAX(innings.total_runs) AS max_runs,
+      MIN(innings.total_runs) AS min_runs
+    FROM matches m
+    JOIN (
+      SELECT mi.match_id, mi.batting_team_id, SUM(b.runs) AS total_runs
+      FROM match_inning_batters_test b
+      JOIN match_innings_test mi ON b.match_id = mi.match_id AND b.inning_number = mi.inning_number
+      GROUP BY mi.match_id, mi.batting_team_id
+    ) innings ON m.id = innings.match_id
+    WHERE (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+  `;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  try {
+    const [stats] = await pool.query(sql, [teamId1, teamId2, teamId1, teamId2, teamId1, teamId2]);
+    res.json({
+      head_to_head: {
+        team1_id: teamId1,
+        team2_id: teamId2,
+        total_matches: stats[0].total_matches,
+        team1_wins: stats[0].team1_wins,
+        team2_wins: stats[0].team2_wins,
+        avg_runs: stats[0].avg_runs,
+        max_runs: stats[0].max_runs,
+        min_runs: stats[0].min_runs
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching head-to-head statistics:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 

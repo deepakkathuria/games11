@@ -354,7 +354,7 @@ async function insertData1() {
     const matches = response.data.response.items;
 
     for (const match of matches) {
-        console.log(match)
+      console.log(match);
       if (match.status_str === "Completed") {
         // Enhanced Venue Insertion with additional details
         await connection.query(
@@ -462,7 +462,7 @@ async function insertData1() {
             match.pitch.batting_condition,
             match.pitch.pace_bowling_condition,
             match.pitch.spine_bowling_condition,
-            match.competition.cid
+            match.competition.cid,
           ]
         );
 
@@ -853,8 +853,19 @@ async function insertFP() {
         for (const player of players) {
           await connection.query(
             `
-            INSERT INTO fantasy_points_details (match_id, player_id, team_id, points, runs, fours, sixes, catches, rating, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            INSERT INTO fantasy_points_details (
+                match_id, 
+                player_id, 
+                team_id, 
+                points, 
+                runs, 
+                fours, 
+                sixes, 
+                catches, 
+                rating,
+                playing_role,  
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE
                 team_id = VALUES(team_id),
                 points = VALUES(points), 
@@ -862,20 +873,22 @@ async function insertFP() {
                 fours = VALUES(fours), 
                 sixes = VALUES(sixes), 
                 catches = VALUES(catches),
-                rating = VALUES(rating);
-        `,
+                rating = VALUES(rating),
+                playing_role = VALUES(playing_role)  
+            `,
             [
-              matchData.match_id,
-              player.pid,
-              matchData.teama.team_id || matchData.teamb.team_id, // Correctly assume team from context
-              player.point,
-              player.run,
-              player.four,
-              player.six,
-              player.catch || 0, // Handle null cases for catches
-              player.rating || null, // Assuming 'rating' is a property of 'player'; handle null cases
+                matchData.match_id,
+                player.pid,
+                matchData.teama.team_id || matchData.teamb.team_id, // Correctly assume team from context
+                player.point,
+                player.run,
+                player.four,
+                player.six,
+                player.catch || 0, // Handle null cases for catches
+                player.rating || null, // Assuming 'rating' is a property of player; handle null cases
+                player.role  // This assumes that player.role contains the playing role
             ]
-          );
+        );
         }
         console.log(
           "Data successfully inserted for all matches and related details."
@@ -891,77 +904,150 @@ async function insertFP() {
   }
 }
 
+// async function createDreamTeam() {
+//     let connection;
+//     try {
+//         connection = await mysql.createConnection({
+//             host: process.env.DB_HOST,
+//             user: process.env.DB_USER,
+//             password: process.env.DB_PASSWORD,
+//             database: process.env.DB_NAME,
+//             port: process.env.DB_PORT,
+//         });
 
+//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128471/matches?token=${process.env.API_TOKEN}&per_page=80`);
+//         const matches = response.data.response.items;
 
+//         for (const match of matches) {
+//             if (match.status_str === "Completed") {
+//                 const [players] = await connection.execute(
+//                     `SELECT player_id, points,playing_role, rating FROM fantasy_points_details WHERE match_id = ? ORDER BY points DESC`,
+//                     [match.match_id]
+//                 );
+
+//                 let selectedPlayers = players.slice(0, 11);
+//                 let currentRating = selectedPlayers.reduce((acc, player) => acc + player.rating, 0);
+
+//                 while (currentRating > 100 && selectedPlayers.length > 0) {
+//                     selectedPlayers.pop();
+//                     currentRating = selectedPlayers.reduce((acc, player) => acc + player.rating, 0);
+//                 }
+
+//                 selectedPlayers.sort((a, b) => b.points - a.points);
+//                 selectedPlayers.forEach((player, index) => {
+//                     player.team_position = index + 1;
+//                 });
+
+//                 if (selectedPlayers.length === 11) {
+//                     for (const player of selectedPlayers) {
+//                         const role = player.team_position === 1 ? "Captain" : player.team_position === 2 ? "Vice Captain" : "Member";
+//                         await connection.execute(
+//                             `INSERT INTO DreamTeam_test (match_id, player_id, role, points, team_position,playing_role)
+//                              VALUES (?, ?, ?, ?, ?, ?)
+//                              ON DUPLICATE KEY UPDATE
+//                              role = VALUES(role), points = VALUES(points), team_position = VALUES(team_position),playing_role=VALUES(playing_role)`,
+//                             [match.match_id, player.player_id, role, player.points, player.team_position,player.playing_role]
+//                         );
+//                         await connection.execute(
+//                             `INSERT INTO PlayerPerformance_test (player_id, match_id, times_in_dream_team, times_captain, times_vice_captain)
+//                              VALUES (?, ?, 1, ?, ?)
+//                              ON DUPLICATE KEY UPDATE
+//                              times_in_dream_team = times_in_dream_team + 1,
+//                              times_captain = times_captain + VALUES(times_captain),
+//                              times_vice_captain = times_vice_captain + VALUES(times_vice_captain)`,
+//                             [player.player_id, match.match_id, role === "Captain" ? 1 : 0, role === "Vice Captain" ? 1 : 0]
+//                         );
+//                     }
+//                     console.log("Dream team created successfully for match:", match.match_id);
+//                 } else {
+//                     console.log("Insufficient players to form a Dream Team without exceeding the rating limit for match:", match.match_id);
+//                 }
+//             }
+//         }
+//     } catch (error) {
+//         console.error("Failed to create dream team:", error);
+//     } finally {
+//         if (connection) {
+//             await connection.end();
+//         }
+//     }
+// }
 
 async function createDreamTeam() {
-    let connection;
-    try {
-        connection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-            port: process.env.DB_PORT,
-        });
+  let connection;
+  try {
+      connection = await mysql.createConnection({
+          host: process.env.DB_HOST,
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+          database: process.env.DB_NAME,
+          port: process.env.DB_PORT,
+      });
 
-        const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128471/matches?token=${process.env.API_TOKEN}&per_page=80`);
-        const matches = response.data.response.items;
+      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128471/matches?token=${process.env.API_TOKEN}&per_page=80`);
+      const matches = response.data.response.items;
 
-        for (const match of matches) {
-            if (match.status_str === "Completed") {
-                const [players] = await connection.execute(
-                    `SELECT player_id, points, rating FROM fantasy_points_details WHERE match_id = ? ORDER BY points DESC`,
-                    [match.match_id]
-                );
+      for (const match of matches) {
+          if (match.status_str === "Completed") {
+              const [players] = await connection.execute(
+                  `SELECT player_id, points, rating, players.playing_role FROM fantasy_points_details 
+                   JOIN players ON players.id = fantasy_points_details.player_id
+                   WHERE match_id = ? ORDER BY points DESC`,
+                  [match.match_id]
+              );
 
-                let selectedPlayers = players.slice(0, 11);
-                let currentRating = selectedPlayers.reduce((acc, player) => acc + player.rating, 0);
+              let selectedPlayers = players.slice(0, 11);
+              let hasWicketkeeper = selectedPlayers.some(player => player.playing_role.includes('wk'));
 
-                while (currentRating > 100 && selectedPlayers.length > 0) {
-                    selectedPlayers.pop();
-                    currentRating = selectedPlayers.reduce((acc, player) => acc + player.rating, 0);
-                }
+              if (!hasWicketkeeper) {
+                  let wicketkeeper = players.find(player => player.playing_role.includes('wk'));
+                  if (wicketkeeper) {
+                      // Find the player with the least points to replace
+                      let lowestIndex = selectedPlayers.reduce((lowest, player, index) => (player.points < selectedPlayers[lowest].points) ? index : lowest, 0);
+                      selectedPlayers[lowestIndex] = wicketkeeper;
+                  } else {
+                      console.log("No wicketkeeper available for match:", match.match_id);
+                      continue; // Skip this match if no wicketkeeper is available
+                  }
+              }
 
-                selectedPlayers.sort((a, b) => b.points - a.points);
-                selectedPlayers.forEach((player, index) => {
-                    player.team_position = index + 1;
-                });
+              selectedPlayers.sort((a, b) => b.points - a.points); // Sort by points descending
 
-                if (selectedPlayers.length === 11) {
-                    for (const player of selectedPlayers) {
-                        const role = player.team_position === 1 ? "Captain" : player.team_position === 2 ? "Vice Captain" : "Member";
-                        await connection.execute(
-                            `INSERT INTO DreamTeam_test (match_id, player_id, role, points, team_position)
-                             VALUES (?, ?, ?, ?, ?)
-                             ON DUPLICATE KEY UPDATE
-                             role = VALUES(role), points = VALUES(points), team_position = VALUES(team_position)`,
-                            [match.match_id, player.player_id, role, player.points, player.team_position]
-                        );
-                        await connection.execute(
-                            `INSERT INTO PlayerPerformance_test (player_id, match_id, times_in_dream_team, times_captain, times_vice_captain)
-                             VALUES (?, ?, 1, ?, ?)
-                             ON DUPLICATE KEY UPDATE
-                             times_in_dream_team = times_in_dream_team + 1,
-                             times_captain = times_captain + VALUES(times_captain),
-                             times_vice_captain = times_vice_captain + VALUES(times_vice_captain)`,
-                            [player.player_id, match.match_id, role === "Captain" ? 1 : 0, role === "Vice Captain" ? 1 : 0]
-                        );
-                    }
-                    console.log("Dream team created successfully for match:", match.match_id);
-                } else {
-                    console.log("Insufficient players to form a Dream Team without exceeding the rating limit for match:", match.match_id);
-                }
-            }
-        }
-    } catch (error) {
-        console.error("Failed to create dream team:", error);
-    } finally {
-        if (connection) {
-            await connection.end();
-        }
-    }
+              selectedPlayers.forEach((player, index) => {
+                  const role = index === 0 ? "Captain" : (index === 1 ? "Vice Captain" : "Member");
+                  connection.execute(
+                      `INSERT INTO DreamTeam_test (match_id, player_id, role, points, team_position, playing_role)
+                       VALUES (?, ?, ?, ?, ?, ?)
+                       ON DUPLICATE KEY UPDATE
+                       role = VALUES(role), points = VALUES(points), team_position = VALUES(team_position), playing_role=VALUES(playing_role)`,
+                      [match.match_id, player.player_id, role, player.points, index + 1, player.playing_role]
+                  );
+
+                  connection.execute(
+                      `INSERT INTO PlayerPerformance_test (player_id, match_id, times_in_dream_team, times_captain, times_vice_captain)
+                       VALUES (?, ?, 1, ?, ?)
+                       ON DUPLICATE KEY UPDATE
+                       times_in_dream_team = times_in_dream_team + 1,
+                       times_captain = times_captain + VALUES(times_captain),
+                       times_vice_captain = times_vice_captain + VALUES(times_vice_captain)`,
+                      [player.player_id, match.match_id, role === "Captain" ? 1 : 0, role === "Vice Captain" ? 1 : 0]
+                  );
+              });
+
+              console.log("Dream team created successfully for match:", match.match_id);
+          }
+      }
+  } catch (error) {
+      console.error("Failed to create dream team:", error);
+  } finally {
+      if (connection) {
+          await connection.end();
+      }
+  }
 }
+
+
+
 
 //   insertFP()
 
@@ -997,84 +1083,74 @@ async function runAllFunctions() {
 runAllFunctions();
 
 async function fetchAndStoreTournamentData() {
-    let connection;
-    try {
-        connection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-            port: process.env.DB_PORT,
-          });
-        const tournamentsResponse = await axios.get(
-          "https://rest.entitysport.com/v4/tournaments?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+  let connection;
+  try {
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT,
+    });
+    const tournamentsResponse = await axios.get(
+      "https://rest.entitysport.com/v4/tournaments?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    );
+    const tournaments = tournamentsResponse.data.response.items;
+
+    for (const tournament of tournaments) {
+      const { tournament_id, name, type } = tournament;
+
+      await connection.execute(
+        "INSERT INTO tournaments (tournament_id, name, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, type = ?",
+        [
+          tournament_id || null,
+          name || null,
+          type || null,
+          name || null,
+          type || null,
+        ]
+      );
+
+      const competitionsResponse = await axios.get(
+        `https://rest.entitysport.com/v4/tournaments/${tournament_id}/competitions?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
+      );
+      const competitions =
+        competitionsResponse.data.response.items.competitions;
+
+      for (const competition of competitions) {
+        console.log("Inserting competition:", competition);
+        await connection.execute(
+          "INSERT INTO competitions (competition_id, tournament_id, name, season) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, season = ?",
+          [
+            competition.cid || null,
+            tournament_id || null,
+            competition.title || null,
+            competition.season || null,
+            competition.title || null,
+            competition.season || null,
+          ]
         );
-        const tournaments = tournamentsResponse.data.response.items;
-      
-        for (const tournament of tournaments) {
-          const { tournament_id, name, type } = tournament;
-      
-          await connection.execute(
-            "INSERT INTO tournaments (tournament_id, name, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, type = ?",
-            [tournament_id || null, name || null, type || null, name || null, type || null]
-          );
-      
-          const competitionsResponse = await axios.get(
-            `https://rest.entitysport.com/v4/tournaments/${tournament_id}/competitions?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
-          );
-          const competitions = competitionsResponse.data.response.items.competitions;
-      
-          for (const competition of competitions) {
-            console.log("Inserting competition:", competition);
-            await connection.execute(
-              "INSERT INTO competitions (competition_id, tournament_id, name, season) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, season = ?",
-              [competition.cid || null, tournament_id || null, competition.title || null, competition.season || null, competition.title || null, competition.season || null]
-            );
-          }
-        }
-        console.log("All tournaments and their competitions have been successfully fetched and stored.");
-      } catch (error) {
-        console.error("Failed to fetch or store data:", error);
-        console.error("Error details:", {
-          message: error.message,
-          stack: error.stack
-        });
-      } finally {
-        if (connection) {
-          console.log("Closing database connection.");
-          await connection.end();
-        }
       }
-      
+    }
+    console.log(
+      "All tournaments and their competitions have been successfully fetched and stored."
+    );
+  } catch (error) {
+    console.error("Failed to fetch or store data:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+    });
+  } finally {
+    if (connection) {
+      console.log("Closing database connection.");
+      await connection.end();
+    }
   }
-  
-  // Run the function
+}
+
+// Run the function
 //   fetchAndStoreTournamentData();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // async function createDreamTeam() {
 //     let connection;
@@ -1086,13 +1162,13 @@ async function fetchAndStoreTournamentData() {
 //         database: process.env.DB_NAME,
 //         port: process.env.DB_PORT,
 //       });
-  
+
 //       // Fetch matches from the API
 //       const response = await axios.get(
 //         `https://rest.entitysport.com/v2/competitions/128471/matches?token=${process.env.API_TOKEN}&per_page=80`
 //       );
 //       const matches = response.data.response.items;
-  
+
 //       for (const match of matches) {
 //         if (match.status_str === "Completed") {
 //           // Fetch all players based on points for the specific match
@@ -1105,11 +1181,11 @@ async function fetchAndStoreTournamentData() {
 //                       `,
 //             [match.match_id]
 //           );
-  
+
 //           let selectedPlayers = [];
 //           let currentRating = 0;
 //           const maxRating = 100;
-  
+
 //           // Initial selection based on fantasy points
 //           players.forEach((player) => {
 //             if (
@@ -1120,13 +1196,13 @@ async function fetchAndStoreTournamentData() {
 //               currentRating += player.rating;
 //             }
 //           });
-  
+
 //           // Check if we need more players or need to adjust due to rating overflow
 //           if (selectedPlayers.length < 11 || currentRating > maxRating) {
 //             // Adjust by finding less rated players if overflow or not enough players
 //             let adjustedPlayers = [];
 //             let adjustedRating = 0;
-  
+
 //             for (let player of players) {
 //               if (
 //                 adjustedPlayers.length < 11 &&
@@ -1140,7 +1216,7 @@ async function fetchAndStoreTournamentData() {
 //             selectedPlayers = adjustedPlayers;
 //             currentRating = adjustedRating;
 //           }
-  
+
 //           // Insert into DreamTeam table with role assignment and update PlayerPerformance
 //           if (selectedPlayers.length === 11) {
 //             await Promise.all(
@@ -1199,4 +1275,3 @@ async function fetchAndStoreTournamentData() {
 //       }
 //     }
 //   }
-  
