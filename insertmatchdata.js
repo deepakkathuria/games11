@@ -375,49 +375,31 @@ async function insertData1() {
         // Enhanced Team Insertion with logos and additional details
         await connection.query(
           `
-                INSERT INTO teams (id, name, logo_url, short_name)
-                VALUES (?, ?, ?, ?), (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE name=VALUES(name), logo_url=VALUES(logo_url), short_name=VALUES(short_name);
-            `,
-          [
-            match.teama.team_id,
-            match.teama.name,
-            match.teama.logo_url,
-            match.teama.short_name,
-            match.teamb.team_id,
-            match.teamb.name,
-            match.teamb.logo_url,
-            match.teamb.short_name,
-          ]
-        );
-
-        // Assuming match table exists and we need to insert basic match info
-        // Assuming match table has been expanded to include new columns
-        await connection.query(
-          `
-    INSERT INTO matches (
-        id, team_1, team_2, venue_id, format_str, match_number, status_str, result_type, win_margin, title, subtitle, 
-        short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
-        date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
-        latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
-        toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition,competition_id
-    )
-    VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?
-    )
-    ON DUPLICATE KEY UPDATE
-        team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
-        match_number=VALUES(match_number), status_str=VALUES(status_str), result_type=VALUES(result_type), win_margin=VALUES(win_margin),
-        title=VALUES(title), subtitle=VALUES(subtitle), short_title=VALUES(short_title), status_note=VALUES(status_note),
-        verified=VALUES(verified), pre_squad=VALUES(pre_squad), odds_available=VALUES(odds_available), game_state=VALUES(game_state),
-        game_state_str=VALUES(game_state_str), domestic=VALUES(domestic), date_start=VALUES(date_start), date_end=VALUES(date_end),
-        date_start_ist=VALUES(date_start_ist), umpires=VALUES(umpires), referee=VALUES(referee), equation=VALUES(equation), live=VALUES(live),
-        winning_team_id=VALUES(winning_team_id), commentary=VALUES(commentary), wagon=VALUES(wagon), latest_inning_number=VALUES(latest_inning_number),
-        presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
-        live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
-        toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
-        batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition),competition_id=VALUES(competition_id)
-    `,
+        INSERT INTO matches (
+            id, team_1, team_2, venue_id, format_str, match_number, status_str, result_type, win_margin, title, subtitle, 
+            short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
+            date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
+            latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
+            toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition, competition_id,
+            team_1_score, team_2_score
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        ON DUPLICATE KEY UPDATE
+            team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
+            match_number=VALUES(match_number), status_str=VALUES(status_str), result_type=VALUES(result_type), win_margin=VALUES(win_margin),
+            title=VALUES(title), subtitle=VALUES(subtitle), short_title=VALUES(short_title), status_note=VALUES(status_note),
+            verified=VALUES(verified), pre_squad=VALUES(pre_squad), odds_available=VALUES(odds_available), game_state=VALUES(game_state),
+            game_state_str=VALUES(game_state_str), domestic=VALUES(domestic), date_start=VALUES(date_start), date_end=VALUES(date_end),
+            date_start_ist=VALUES(date_start_ist), umpires=VALUES(umpires), referee=VALUES(referee), equation=VALUES(equation), live=VALUES(live),
+            winning_team_id=VALUES(winning_team_id), commentary=VALUES(commentary), wagon=VALUES(wagon), latest_inning_number=VALUES(latest_inning_number),
+            presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
+            live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
+            toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
+            batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition), competition_id=VALUES(competition_id),
+            team_1_score=VALUES(team_1_score), team_2_score=VALUES(team_2_score)
+        `,
           [
             match.match_id,
             match.teama.team_id,
@@ -463,6 +445,8 @@ async function insertData1() {
             match.pitch.pace_bowling_condition,
             match.pitch.spine_bowling_condition,
             match.competition.cid,
+            match.teama.scores,  // Score from team A
+            match.teamb.scores   // Score from team B
           ]
         );
 
@@ -1079,8 +1063,9 @@ async function runAllFunctions() {
   }
 }
 
+insertData1()
 // Call the main function to start all operations
-runAllFunctions();
+// runAllFunctions();
 
 async function fetchAndStoreTournamentData() {
   let connection;

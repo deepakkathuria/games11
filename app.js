@@ -2096,77 +2096,94 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
 
 // ------------------------------------player stats-------------------------------------------------
 
-app.get("/test/players/stats", async (req, res) => {
+app.get("/api/players/stats", async (req, res) => {
   const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
 
-  // Base query setup
   let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, t.name';
 
-  // Determine statistic to calculate
   switch (statType) {
-    case 'TotalFantasyPoints':
-      selectClause = 'SUM(fp.points) AS total_points';
-      orderByClause = 'ORDER BY total_points DESC';
-      break;
-    case 'DreamTeamAppearances':
-      selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances';
-      joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
-      orderByClause = 'ORDER BY dream_team_appearances DESC';
-      break;
-    case 'WicketsTaken':
-      selectClause = 'SUM(b.wickets) AS wickets_taken';
-      joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
-      orderByClause = 'ORDER BY wickets_taken DESC';
-      break;
+      case 'TotalFantasyPoints':
+          selectClause = 'SUM(fp.points) AS total_points';
+          orderByClause = 'ORDER BY total_points DESC';
+          break;
+      case 'DreamTeamAppearances':
+          selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances';
+          joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
+          orderByClause = 'ORDER BY dream_team_appearances DESC';
+          break;
+      case 'WicketsTaken':
+          selectClause = 'SUM(b.wickets) AS wickets_taken';
+          joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
+          orderByClause = 'ORDER BY wickets_taken DESC';
+          break;
+      case 'RunsScored':
+          selectClause = 'SUM(fb.runs) AS total_runs';
+          joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
+          orderByClause = 'ORDER BY total_runs DESC';
+          break;
+      case 'StrikeRate':
+          selectClause = 'AVG(fb.strike_rate) AS average_strike_rate';
+          joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
+          orderByClause = 'ORDER BY average_strike_rate DESC';
+          break;
+      case 'EconomyRate':
+          selectClause = 'AVG(b.econ) AS average_economy_rate';
+          joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id';
+          orderByClause = 'ORDER BY average_economy_rate ASC';
+          break;
+      case 'FieldingPoints':
+          selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points';
+          joinClause = ' JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id';
+          orderByClause = 'ORDER BY fielding_points DESC';
+          break;
+      case 'AverageFantasyPoints':
+          selectClause = 'AVG(fp.points) AS avg_fantasy_points';
+          orderByClause = 'ORDER BY avg_fantasy_points DESC';
+          break;
   }
 
-  // Time Frame filter
   if (timeFrame) {
-    const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
-    if (days > 0) {
-      whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
-    }
+      const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
+      if (days > 0) {
+          whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
+      }
   }
 
-  // Venue filter
   if (venueId) {
-    whereClause += ` AND m.venue_id = ${venueId}`;
+      whereClause += ` AND m.venue_id = ${venueId}`;
   }
 
-  // Batting scenario filter
   if (battingScenario) {
-    const team = battingScenario.split(' ')[0];
-    const action = battingScenario.split(' ')[2];
-    const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
-    whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
+      const team = battingScenario.split(' ')[0];
+      const action = battingScenario.split(' ')[1];
+      const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
+      whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
   }
 
-  // Team filter for two specific teams
   if (teamId1 && teamId2) {
-    whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
+      whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
   }
 
-  // Assemble full SQL query
   const sql = `
-    SELECT p.id, p.first_name, p.last_name, ${selectClause}, t.name AS team_name
-    FROM players p
-    JOIN team_players tp ON p.id = tp.player_id
-    JOIN teams t ON tp.team_id = t.id
-    JOIN fantasy_points_details fp ON p.id = fp.player_id
-    JOIN matches m ON fp.match_id = m.id
-    ${joinClause}
-    ${whereClause}
-    ${groupByClause}
-    ${orderByClause}
-    LIMIT 100;
+      SELECT p.id, p.first_name, p.last_name, ${selectClause}, t.name AS team_name
+      FROM players p
+      JOIN team_players tp ON p.id = tp.player_id
+      JOIN teams t ON tp.team_id = t.id
+      JOIN fantasy_points_details fp ON p.id = fp.player_id
+      JOIN matches m ON fp.match_id = m.id
+      ${joinClause}
+      ${whereClause}
+      ${groupByClause}
+      ${orderByClause}
+      LIMIT 100;
   `;
 
   try {
-    const [results] = await pool.query(sql);
-    res.json(results);
+      const [results] = await pool.query(sql);
+      res.json(results);
   } catch (error) {
-    console.error("Error fetching player stats:", error);
-    res.status(500).send("Failed to retrieve data");
+      console.error("Error fetching player stats:", error);
+      res.status(500).send("Failed to retrieve data");
   }
 });
 
@@ -2195,53 +2212,152 @@ app.get("/test/players/stats", async (req, res) => {
 
 // ---------------------------------------------TEAM HEAD TO HEAD--------------------------------------
 
+app.get('/api/match/stats', async (req, res) => {
+  const { team1Id, team2Id } = req.query;
 
-app.get("/api/team/head-to-head", async (req, res) => {
-  const { teamId1, teamId2 } = req.query;
+  // Validate input
+  if (!team1Id || !team2Id) {
+    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+  }
 
-  const sql = `
-    SELECT 
-      COUNT(*) AS total_matches,
-      SUM(CASE WHEN m.winning_team_id = ? THEN 1 ELSE 0 END) AS team1_wins,
-      SUM(CASE WHEN m.winning_team_id = ? THEN 1 ELSE 0 END) AS team2_wins,
-      AVG(innings.total_runs) AS avg_runs,
-      MAX(innings.total_runs) AS max_runs,
-      MIN(innings.total_runs) AS min_runs
-    FROM matches m
-    JOIN (
-      SELECT mi.match_id, mi.batting_team_id, SUM(b.runs) AS total_runs
-      FROM match_inning_batters_test b
-      JOIN match_innings_test mi ON b.match_id = mi.match_id AND b.inning_number = mi.inning_number
-      GROUP BY mi.match_id, mi.batting_team_id
-    ) innings ON m.id = innings.match_id
-    WHERE (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+  // SQL query
+  const query = `
+    SELECT
+      teams.name AS team_name,
+      -- Batting Statistics
+      COUNT(CASE WHEN m.team_1 = teams.id THEN 1 ELSE NULL END) AS batting_total_matches,
+      SUM(CASE WHEN m.winning_team_id = teams.id AND m.team_1 = teams.id THEN 1 ELSE 0 END) AS batting_wins,
+      COALESCE(AVG(CASE WHEN m.team_1 = teams.id THEN m.team_1_score ELSE NULL END), 0) AS batting_avg_runs,
+      COALESCE(MAX(CASE WHEN m.team_1 = teams.id THEN m.team_1_score ELSE NULL END), 0) AS batting_max_runs,
+      COALESCE(MIN(CASE WHEN m.team_1 = teams.id THEN m.team_1_score ELSE NULL END), 0) AS batting_min_runs,
+      -- Bowling Statistics
+      COUNT(CASE WHEN m.team_2 = teams.id THEN 1 ELSE NULL END) AS bowling_total_matches,
+      SUM(CASE WHEN m.winning_team_id = teams.id AND m.team_2 = teams.id THEN 1 ELSE 0 END) AS bowling_wins,
+      COALESCE(AVG(CASE WHEN m.team_2 = teams.id THEN m.team_2_score ELSE NULL END), 0) AS bowling_avg_runs,
+      COALESCE(MAX(CASE WHEN m.team_2 = teams.id THEN m.team_2_score ELSE NULL END), 0) AS bowling_max_runs,
+      COALESCE(MIN(CASE WHEN m.team_2 = teams.id THEN m.team_2_score ELSE NULL END), 0) AS bowling_min_runs
+    FROM teams
+    LEFT JOIN matches m ON teams.id IN (m.team_1, m.team_2)
+      AND m.status_str = 'Completed'
+      AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+    WHERE teams.id IN (?, ?)
+    GROUP BY teams.name
+    ORDER BY teams.name;
   `;
 
   try {
-    const [stats] = await pool.query(sql, [teamId1, teamId2, teamId1, teamId2, teamId1, teamId2]);
-    res.json({
-      head_to_head: {
-        team1_id: teamId1,
-        team2_id: teamId2,
-        total_matches: stats[0].total_matches,
-        team1_wins: stats[0].team1_wins,
-        team2_wins: stats[0].team2_wins,
-        avg_runs: stats[0].avg_runs,
-        max_runs: stats[0].max_runs,
-        min_runs: stats[0].min_runs
-      }
-    });
+    const params = [team1Id, team2Id, team1Id, team2Id, team1Id, team2Id];
+    const [results] = await pool.query(query, params);
+
+    // Modify response to include separate team data
+    const formattedResults = results.map(result => ({
+      team_name: result.team_name,
+      batting: {
+        total_matches: result.batting_total_matches,
+        wins: result.batting_wins,
+        avg_runs: result.batting_avg_runs,
+        max_runs: result.batting_max_runs,
+        min_runs: result.batting_min_runs,
+      },
+      bowling: {
+        total_matches: result.bowling_total_matches,
+        wins: result.bowling_wins,
+        avg_runs: result.bowling_avg_runs,
+        max_runs: result.bowling_max_runs,
+        min_runs: result.bowling_min_runs,
+      },
+    }));
+
+    res.json(formattedResults);
   } catch (error) {
-    console.error("Error fetching head-to-head statistics:", error);
-    res.status(500).send("Failed to retrieve data");
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Database query failed' });
+  }
+});
+
+
+
+app.get('/api/match/stats/batting-first', async (req, res) => {
+  const { team1Id, team2Id } = req.query;
+
+  // Validate input
+  if (!team1Id || !team2Id) {
+    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+  }
+
+  // SQL query
+  const query = `
+    SELECT
+      teams.name AS team_name,
+      'Batted First' AS batting_order,
+      COUNT(m.id) AS total_matches,
+      SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
+      COALESCE(AVG(CASE WHEN teams.id = m.team_1 THEN m.team_1_score ELSE m.team_2_score END), 0) AS avg_runs,
+      COALESCE(MAX(CASE WHEN teams.id = m.team_1 THEN m.team_1_score ELSE m.team_2_score END), 0) AS max_runs,
+      COALESCE(MIN(CASE WHEN teams.id = m.team_1 THEN m.team_1_score ELSE m.team_2_score END), 0) AS min_runs
+    FROM teams
+    LEFT JOIN matches m ON teams.id = m.toss_winner AND m.toss_decision = 1
+      AND m.status_str = 'Completed'
+      AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+    WHERE teams.id IN (?, ?)
+    GROUP BY teams.name
+    ORDER BY teams.name;
+  `;
+
+  try {
+    const params = [team1Id, team2Id, team1Id, team2Id, team1Id, team2Id];
+    const [results] = await pool.query(query, params);
+    res.json(results);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Database query failed' });
   }
 });
 
 
 
 
+app.get('/api/match/stats/bowling-first', async (req, res) => {
+  const { team1Id, team2Id } = req.query;
 
+  // Validate the input to ensure both team IDs are provided
+  if (!team1Id || !team2Id) {
+    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+  }
 
+  // SQL query to fetch bowling first statistics
+  const query = `
+    SELECT
+      teams.name AS team_name,
+      'Bowled First' AS bowling_order,
+      COUNT(m.id) AS total_matches,
+      SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
+      COALESCE(AVG(CASE WHEN teams.id != m.team_1 THEN m.team_2_score ELSE m.team_1_score END), 0) AS avg_runs,
+      COALESCE(MAX(CASE WHEN teams.id != m.team_1 THEN m.team_2_score ELSE m.team_1_score END), 0) AS max_runs,
+      COALESCE(MIN(CASE WHEN teams.id != m.team_1 THEN m.team_2_score ELSE m.team_1_score END), 0) AS min_runs
+    FROM teams
+    LEFT JOIN matches m ON (teams.id = m.team_1 OR teams.id = m.team_2)
+      AND m.status_str = 'Completed'
+      AND (
+        (m.toss_winner = teams.id AND m.toss_decision = 2) OR
+        (m.toss_winner != teams.id AND m.toss_decision = 1)
+      )
+      AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+    WHERE teams.id IN (?, ?)
+    GROUP BY teams.name
+    ORDER BY teams.name;
+  `;
+
+  try {
+    // Execute the query with the team IDs passed as parameters
+    const params = [team1Id, team2Id, team1Id, team2Id, team1Id, team2Id];
+    const [results] = await pool.query(query, params);
+    res.json(results);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Database query failed' });
+  }
+});
 
 
 
