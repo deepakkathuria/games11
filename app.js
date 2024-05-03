@@ -1247,7 +1247,95 @@ app.get("/venue1/:venueId/team/:teamId/match-details", async (req, res) => {
   }
 });
 
+//scoore card
+app.get("/match/:matchId/scorecard", async (req, res) => {
+  const { matchId } = req.params;
+   console.log(matchId,"params")
+  try {
+      // Fetch match details
+      const [[match]] = await pool.query(
+          `
+          SELECT id AS match_id, title, short_title, date_start, status_note
+          FROM matches
+          WHERE id = ?
+          `,
+          [matchId]
+      );
 
+      if (!match) {
+          return res.status(404).send("Match not found");
+      }
+
+      // Fetch all related details
+      const [
+          [batters],
+          [bowlers],
+          [fielders],
+          [inningsDetails]
+      ] = await Promise.all([
+          pool.query(
+              `SELECT b.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
+              FROM match_inning_batters_test b
+              JOIN players p ON b.batsman_id = p.id
+              JOIN match_innings_test mi ON mi.match_id = b.match_id AND mi.inning_number = b.inning_number
+              JOIN teams t ON mi.batting_team_id = t.id
+              WHERE b.match_id = ?`, [matchId]
+          ),
+          pool.query(
+              `SELECT bl.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
+              FROM match_inning_bowlers_test bl
+              JOIN players p ON bl.bowler_id = p.id
+              JOIN match_innings_test mi ON mi.match_id = bl.match_id AND mi.inning_number = bl.inning_number
+              JOIN teams t ON mi.fielding_team_id = t.id
+              WHERE bl.match_id = ?`, [matchId]
+          ),
+          pool.query(
+              `SELECT f.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
+              FROM match_inning_fielders_test f
+              JOIN players p ON f.fielder_id = p.id
+              JOIN match_innings_test mi ON mi.match_id = f.match_id AND mi.inning_number = f.inning_number
+              JOIN teams t ON mi.fielding_team_id = t.id
+              WHERE f.match_id = ?`, [matchId]
+          ),
+          pool.query(
+              `SELECT mi.*, t.name AS team_name
+              FROM match_innings_test mi
+              JOIN teams t ON mi.batting_team_id = t.id
+              WHERE mi.match_id = ? ORDER BY inning_number`, [matchId]
+          )
+      ]);
+
+      // Structure innings with batsmen, bowlers, and fielders
+      const matchInnings = inningsDetails.map(inning => {
+          const inningNumber = inning.inning_number;
+          return {
+              inning_number: inningNumber,
+              name: inning.name,
+              scores: inning.scores,
+              scores_full: inning.scores_full || `${inning.scores} (${inning.max_over} ov)`,
+              team_name: inning.team_name,
+              batsmen: batters.filter(b => b.inning_number === inningNumber),
+              bowlers: bowlers.filter(b => b.inning_number === inningNumber),
+              fielders: fielders.filter(f => f.inning_number === inningNumber)
+          };
+      });
+
+      // Construct the final response
+      const response = {
+          match_id: match.match_id,
+          title: match.title,
+          short_title: match.short_title,
+          date_start: match.date_start,
+          status_note: match.status_note,
+          innings: matchInnings
+      };
+
+      res.json({ status: "ok", response });
+  } catch (error) {
+      console.error("Error fetching scorecard details:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
 
 
 
@@ -2310,65 +2398,54 @@ app.get('/api/match/stats', async (req, res) => {
   const { team1Id, team2Id } = req.query;
   const competitionId = 128471; // Static competition ID
 
-
   // Validate input
   if (!team1Id || !team2Id) {
-    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+      return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
   }
 
   // SQL query
   const query = `
-    SELECT
-      teams.name AS team_name,
-      -- Batting Statistics
-      COUNT(CASE WHEN m.team_1 = teams.id THEN 1 ELSE NULL END) AS batting_total_matches,
-      SUM(CASE WHEN m.winning_team_id = teams.id AND m.team_1 = teams.id THEN 1 ELSE 0 END) AS batting_wins,
-      COALESCE(AVG(CASE WHEN m.team_1 = teams.id THEN m.team_1_score ELSE NULL END), 0) AS batting_avg_runs,
-      COALESCE(MAX(CASE WHEN m.team_1 = teams.id THEN m.team_1_score ELSE NULL END), 0) AS batting_max_runs,
-      COALESCE(MIN(CASE WHEN m.team_1 = teams.id THEN m.team_1_score ELSE NULL END), 0) AS batting_min_runs,
-      -- Bowling Statistics
-      COUNT(CASE WHEN m.team_2 = teams.id THEN 1 ELSE NULL END) AS bowling_total_matches,
-      SUM(CASE WHEN m.winning_team_id = teams.id AND m.team_2 = teams.id THEN 1 ELSE 0 END) AS bowling_wins,
-      COALESCE(AVG(CASE WHEN m.team_2 = teams.id THEN m.team_2_score ELSE NULL END), 0) AS bowling_avg_runs,
-      COALESCE(MAX(CASE WHEN m.team_2 = teams.id THEN m.team_2_score ELSE NULL END), 0) AS bowling_max_runs,
-      COALESCE(MIN(CASE WHEN m.team_2 = teams.id THEN m.team_2_score ELSE NULL END), 0) AS bowling_min_runs
-    FROM teams
-    LEFT JOIN matches m ON teams.id IN (m.team_1, m.team_2)
-      AND m.status_str = 'Completed'
-      AND m.competition_id = 128471
-      AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
-    WHERE teams.id IN (?, ?)
-    GROUP BY teams.name
-    ORDER BY teams.name;
+      SELECT
+          teams.name AS team_name,
+          COUNT(m.id) AS total_matches,
+          SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS total_wins,
+          AVG(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                   WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                   ELSE NULL END) AS avg_runs,
+          MAX(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                   WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                   ELSE NULL END) AS max_runs,
+          MIN(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                   WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                   ELSE NULL END) AS min_runs
+      FROM teams
+      LEFT JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
+          AND m.status_str = 'Completed'
+          AND m.competition_id = ?
+          AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+      WHERE teams.id IN (?, ?)
+      GROUP BY teams.name
+      ORDER BY teams.name;
   `;
 
   try {
-    const params = [team1Id, team2Id, team1Id, team2Id, team1Id, team2Id];
-    const [results] = await pool.query(query, params);
+      const params = [competitionId, team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
+      const [results] = await pool.query(query, params);
 
-    // Modify response to include separate team data
-    const formattedResults = results.map(result => ({
-      team_name: result.team_name,
-      batting: {
-        total_matches: result.batting_total_matches,
-        wins: result.batting_wins,
-        avg_runs: result.batting_avg_runs,
-        max_runs: result.batting_max_runs,
-        min_runs: result.batting_min_runs,
-      },
-      bowling: {
-        total_matches: result.bowling_total_matches,
-        wins: result.bowling_wins,
-        avg_runs: result.bowling_avg_runs,
-        max_runs: result.bowling_max_runs,
-        min_runs: result.bowling_min_runs,
-      },
-    }));
+      // Format the response
+      const formattedResults = results.map(result => ({
+          team_name: result.team_name,
+          total_matches: result.total_matches,
+          total_wins: result.total_wins,
+          avg_runs: result.avg_runs,
+          max_runs: result.max_runs,
+          min_runs: result.min_runs
+      }));
 
-    res.json(formattedResults);
+      res.json(formattedResults);
   } catch (error) {
-    console.error('Database query failed:', error);
-    res.status(500).json({ error: 'Database query failed' });
+      console.error('Database query failed:', error);
+      res.status(500).json({ error: 'Database query failed' });
   }
 });
 
