@@ -2553,6 +2553,74 @@ app.get('/api/match/stats/bowling-first', async (req, res) => {
 
 
 
+// ------------------------------------------------TEAM STATS-------------------------------------------------------
+app.get("/api/player/stats1", async (req, res) => {
+  const { teamId1, teamId2, timeFrame } = req.query;
+
+  // Convert to integer
+  const team1 = parseInt(teamId1, 10);
+  const team2 = parseInt(teamId2, 10);
+  const limit = timeFrame === "lastMatch" ? 1 : 5;
+
+  // SQL to fetch match IDs
+  const matchIdsSql = `
+    SELECT id 
+    FROM matches 
+    WHERE 
+      ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)) 
+    ORDER BY date_start DESC 
+    LIMIT ?
+  `;
+
+  try {
+    const [matchIdsResults] = await pool.query(matchIdsSql, [team1, team2, team2, team1, limit]);
+    const matchIds = matchIdsResults.map(row => row.id);
+
+    if (matchIds.length === 0) {
+      return res.json({ player_stats: [] });
+    }
+
+    // SQL to fetch player stats
+    const playerStatsSql = `
+      SELECT
+          p.id AS player_id,
+          CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+          t.name AS team_name,
+          p.playing_role AS position,
+          fp.rating AS salary,
+          SUM(fp.points) AS fantasy_points,
+          SUM(fp.runs) AS runs,
+          SUM(fp.fours) AS fours,
+          SUM(fp.sixes) AS sixes,
+          COUNT(CASE WHEN fp.runs >= 50 AND fp.runs < 100 THEN 1 END) AS half_century,
+          COUNT(CASE WHEN fp.runs >= 100 THEN 1 END) AS century,
+          SUM(fp.wickets) AS wickets,
+          SUM(fp.catches) AS catches,
+          SUM(fp.maiden_overs) AS maiden_overs
+      FROM matches m
+      JOIN fantasy_points_details fp ON fp.match_id = m.id
+      JOIN players p ON p.id = fp.player_id
+      JOIN team_players tp ON p.id = tp.player_id
+      JOIN teams t ON tp.team_id = t.id
+      WHERE m.id IN (?) AND t.id IN (?, ?)
+      GROUP BY p.id, p.first_name, p.last_name, t.name, p.playing_role, fp.rating
+      ORDER BY fantasy_points DESC;
+    `;
+
+    const [playerStats] = await pool.query(playerStatsSql, [matchIds, team1, team2]);
+    res.json({ player_stats: playerStats });
+  } catch (error) {
+    console.error("Error fetching player stats:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+
+
+
 //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
 
 // insert data api which will run locally as well to insert data  IN DREAMTEAM TABLE
