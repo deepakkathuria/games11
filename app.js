@@ -2453,85 +2453,97 @@ app.get('/api/match/stats', async (req, res) => {
 
 app.get('/api/match/stats/batting-first', async (req, res) => {
   const { team1Id, team2Id } = req.query;
+  const competitionId = 128471; // Assuming a static competition ID
 
   // Validate input
   if (!team1Id || !team2Id) {
-    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+      return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
   }
 
-  // SQL query
   const query = `
-    SELECT
-      teams.name AS team_name,
-      'Batted First' AS batting_order,
-      COUNT(m.id) AS total_matches,
-      SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
-      COALESCE(AVG(CASE WHEN teams.id = m.team_1 THEN m.team_1_score ELSE m.team_2_score END), 0) AS avg_runs,
-      COALESCE(MAX(CASE WHEN teams.id = m.team_1 THEN m.team_1_score ELSE m.team_2_score END), 0) AS max_runs,
-      COALESCE(MIN(CASE WHEN teams.id = m.team_1 THEN m.team_1_score ELSE m.team_2_score END), 0) AS min_runs
-    FROM teams
-    LEFT JOIN matches m ON teams.id = m.toss_winner AND m.toss_decision = 1
-      AND m.status_str = 'Completed'
-      AND m.competition_id = 128471
-      AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
-    WHERE teams.id IN (?, ?)
-    GROUP BY teams.name
-    ORDER BY teams.name;
+      SELECT
+          teams.name AS team_name,
+          'Batted First' AS batting_order,
+          COUNT(m.id) AS total_matches,
+          SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
+          COALESCE(AVG(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                            WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                            ELSE NULL END), 0) AS avg_runs,
+          COALESCE(MAX(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                            WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                            ELSE NULL END), 0) AS max_runs,
+          COALESCE(MIN(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                            WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                            ELSE NULL END), 0) AS min_runs
+      FROM teams
+      LEFT JOIN matches m ON teams.id IN (m.team_1, m.team_2)
+          AND m.status_str = 'Completed'
+          AND m.competition_id = ?
+          AND m.toss_winner = teams.id AND m.toss_decision = 1
+          AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+      WHERE teams.id IN (?, ?)
+      GROUP BY teams.name
+      ORDER BY teams.name;
   `;
 
   try {
-    const params = [team1Id, team2Id, team1Id, team2Id, team1Id, team2Id];
-    const [results] = await pool.query(query, params);
-    res.json(results);
+      const params = [competitionId, team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
+      const [results] = await pool.query(query, params);
+      res.json(results);
   } catch (error) {
-    console.error('Database query failed:', error);
-    res.status(500).json({ error: 'Database query failed' });
+      console.error('Database query failed:', error);
+      res.status(500).json({ error: 'Database query failed' });
   }
 });
-
 
 
 
 app.get('/api/match/stats/bowling-first', async (req, res) => {
   const { team1Id, team2Id } = req.query;
 
-  // Validate the input to ensure both team IDs are provided
+  // Validate input
   if (!team1Id || !team2Id) {
-    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+      return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
   }
 
-  // SQL query to fetch bowling first statistics
+  // SQL query to fetch bowling first statistics for Team B
   const query = `
-    SELECT
-      teams.name AS team_name,
-      'Bowled First' AS bowling_order,
-      COUNT(m.id) AS total_matches,
-      SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
-      COALESCE(AVG(CASE WHEN teams.id != m.team_1 THEN m.team_2_score ELSE m.team_1_score END), 0) AS avg_runs,
-      COALESCE(MAX(CASE WHEN teams.id != m.team_1 THEN m.team_2_score ELSE m.team_1_score END), 0) AS max_runs,
-      COALESCE(MIN(CASE WHEN teams.id != m.team_1 THEN m.team_2_score ELSE m.team_1_score END), 0) AS min_runs
-    FROM teams
-    LEFT JOIN matches m ON (teams.id = m.team_1 OR teams.id = m.team_2)
-      AND m.status_str = 'Completed'
-      AND m.competition_id = 128471
-      AND (
-        (m.toss_winner = teams.id AND m.toss_decision = 2) OR
-        (m.toss_winner != teams.id AND m.toss_decision = 1)
-      )
-      AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
-    WHERE teams.id IN (?, ?)
-    GROUP BY teams.name
-    ORDER BY teams.name;
+      SELECT
+          teams.name AS team_name,
+          'Bowled First' AS bowling_order,
+          COUNT(m.id) AS total_matches,
+          SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
+          COALESCE(AVG(CASE WHEN teams.id != m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                            ELSE CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                            END), 0) AS avg_runs,
+          COALESCE(MAX(CASE WHEN teams.id != m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                            ELSE CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                            END), 0) AS max_runs,
+          COALESCE(MIN(CASE WHEN teams.id != m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
+                            ELSE CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                            END), 0) AS min_runs
+      FROM teams
+      LEFT JOIN matches m ON (teams.id = m.team_1 OR teams.id = m.team_2)
+          AND m.status_str = 'Completed'
+          AND m.competition_id = 128471
+          AND (
+              (m.toss_winner = teams.id AND m.toss_decision = 2) OR
+              (m.toss_winner != teams.id AND m.toss_decision = 1)
+          )
+          AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+      WHERE teams.id IN (?, ?)
+      GROUP BY teams.name
+      ORDER BY teams.name;
   `;
 
   try {
-    // Execute the query with the team IDs passed as parameters
-    const params = [team1Id, team2Id, team1Id, team2Id, team1Id, team2Id];
-    const [results] = await pool.query(query, params);
-    res.json(results);
+      // Execute the query with the team IDs passed as parameters
+      const params = [team2Id, team1Id, team2Id, team1Id, team2Id, team1Id];
+      const [results] = await pool.query(query, params);
+      res.json(results);
   } catch (error) {
-    console.error('Database query failed:', error);
-    res.status(500).json({ error: 'Database query failed' });
+      console.error('Database query failed:', error);
+      res.status(500).json({ error: 'Database query failed' });
   }
 });
 
