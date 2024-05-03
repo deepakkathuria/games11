@@ -836,44 +836,65 @@ async function insertFP() {
 
         for (const player of players) {
           await connection.query(
-            `
-            INSERT INTO fantasy_points_details (
-                match_id, 
-                player_id, 
-                team_id, 
-                points, 
-                runs, 
-                fours, 
-                sixes, 
-                catches, 
-                rating,
-                playing_role,  
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE
-                team_id = VALUES(team_id),
-                points = VALUES(points), 
-                runs = VALUES(runs), 
-                fours = VALUES(fours), 
-                sixes = VALUES(sixes), 
-                catches = VALUES(catches),
-                rating = VALUES(rating),
-                playing_role = VALUES(playing_role)  
-            `,
-            [
-                matchData.match_id,
-                player.pid,
-                matchData.teama.team_id || matchData.teamb.team_id, // Correctly assume team from context
-                player.point,
-                player.run,
-                player.four,
-                player.six,
-                player.catch || 0, // Handle null cases for catches
-                player.rating || null, // Assuming 'rating' is a property of player; handle null cases
-                player.role  // This assumes that player.role contains the playing role
-            ]
-        );
-        }
+              `
+              INSERT INTO fantasy_points_details (
+                  match_id, 
+                  player_id, 
+                  team_id, 
+                  points, 
+                  runs, 
+                  fours, 
+                  sixes, 
+                  catches, 
+                  wickets, 
+                  maiden_overs, 
+                  strike_rate,
+                  fifty,
+                  duck,
+                  run_outs,
+                  stumping,
+                  rating,
+                  playing_role, 
+                  created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+              ON DUPLICATE KEY UPDATE
+                  team_id = VALUES(team_id),
+                  points = VALUES(points),
+                  runs = VALUES(runs),
+                  fours = VALUES(fours),
+                  sixes = VALUES(sixes),
+                  catches = VALUES(catches),
+                  wickets = VALUES(wickets),
+                  maiden_overs = VALUES(maiden_overs),
+                  strike_rate = VALUES(strike_rate),
+                  fifty = VALUES(fifty),
+                  duck = VALUES(duck),
+                  run_outs = VALUES(run_outs),
+                  stumping = VALUES(stumping),
+                  rating = VALUES(rating),
+                  playing_role = VALUES(playing_role)
+              `,
+              [
+                  matchData.match_id,
+                  player.pid,
+                  matchData.teama.team_id || matchData.teamb.team_id,
+                  player.point,
+                  player.run,
+                  player.four,
+                  player.six,
+                  player.catch || 0,
+                  player.wkts || 0,
+                  player.maidenover || 0,
+                  player.sr || 0,
+                  player.fifty || 0,
+                  player.duck || 0,
+                  player.runoutcatcher + player.runoutstumping + player.runoutthrower || 0,
+                  player.stumping || 0,
+                  player.rating || null,
+                  player.role
+              ]
+          );
+      }
         console.log(
           "Data successfully inserted for all matches and related details."
         );
@@ -1063,9 +1084,10 @@ async function runAllFunctions() {
   }
 }
 
-insertData1()
+// insertFP()
+// insertData1()
 // Call the main function to start all operations
-// runAllFunctions();
+runAllFunctions();
 
 async function fetchAndStoreTournamentData() {
   let connection;

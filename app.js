@@ -1160,6 +1160,100 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   }
 });
 
+app.get("/venue1/:venueId/team/:teamId/match-details", async (req, res) => {
+  const { venueId, teamId } = req.params;
+  const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
+
+  try {
+      const [matches] = await pool.query(
+          `
+          SELECT id AS match_id, date_start, short_title, status_note
+          FROM matches
+          WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? AND competition_id = ?
+          ORDER BY date_start DESC
+          LIMIT 5
+          `,
+          [teamId, teamId, venueId, competitionId]
+      );
+
+      const matchIds = matches.map(match => match.match_id);
+      if (matchIds.length === 0) {
+          return res.status(404).send("No matches found");
+      }
+
+      // Adjusted queries
+      const [
+          [batters],
+          [bowlers],
+          [fielders],
+          [inningsDetails]
+      ] = await Promise.all([
+          pool.query(
+              `SELECT b.*, p.first_name, p.last_name, p.short_name AS player_short_name
+              FROM match_inning_batters_test b
+              JOIN players p ON b.batsman_id = p.id
+              WHERE b.match_id IN (?)`, [matchIds]
+          ),
+          pool.query(
+              `SELECT bl.*, p.first_name, p.last_name, p.short_name AS player_short_name
+              FROM match_inning_bowlers_test bl
+              JOIN players p ON bl.bowler_id = p.id
+              WHERE bl.match_id IN (?)`, [matchIds]
+          ),
+          pool.query(
+              `SELECT f.*, p.first_name, p.last_name, p.short_name AS player_short_name
+              FROM match_inning_fielders_test f
+              JOIN players p ON f.fielder_id = p.id
+              WHERE f.match_id IN (?)`, [matchIds]
+          ),
+          pool.query(
+              `SELECT mi.*, t.name AS team_name
+              FROM match_innings_test mi
+              JOIN teams t ON mi.batting_team_id = t.id
+              WHERE mi.match_id IN (?) ORDER BY inning_number`, [matchIds]
+          )
+      ]);
+
+      const detailedMatches = matches.map(match => {
+          const matchInnings = inningsDetails
+              .filter(i => i.match_id === match.match_id)
+              .map(inning => {
+                  const inningNumber = inning.inning_number;
+                  return {
+                      inning_number: inningNumber,
+                      name: inning.name,
+                      scores: inning.scores,
+                      scores_full: inning.scores_full || `${inning.scores} (${inning.max_over} ov)`,
+                      team_name: inning.team_name,
+                      batsmen: batters.filter(b => b.match_id === match.match_id && b.inning_number === inningNumber),
+                      bowlers: bowlers.filter(b => b.match_id === match.match_id && b.inning_number === inningNumber),
+                      fielders: fielders.filter(f => f.match_id === match.match_id && f.inning_number === inningNumber)
+                  };
+              });
+
+          return {
+              match_id: match.match_id,
+              title: match.short_title,
+              status_note: match.status_note,
+              date_start: match.date_start,
+              innings: matchInnings
+          };
+      });
+
+      res.json({ status: "ok", response: detailedMatches });
+  } catch (error) {
+      console.error("Error fetching match details:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+
+
+
+
 app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
   const { venueId, teamId1, teamId2 } = req.params;
   const competitionId = 128471; // Static competition ID for IPL 2023
@@ -1168,9 +1262,9 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
     const query = `
       SELECT 
         p.id AS player_id,
-        p.playing_role, // Assuming 'playing_role' is a column in the 'players' table
+        p.playing_role, 
         CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-        t.name AS team_name, // 'name' is assumed to be a column in the 'teams' table
+        t.name AS team_name, 
         SUM(fp.points) AS total_fantasy_points,
         COUNT(DISTINCT fp.match_id) AS match_count
       FROM players p
@@ -1180,7 +1274,7 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
       WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
         AND m.venue_id = ?
         AND m.competition_id = ?
-      GROUP BY p.id, p.playing_role, t.name // Group by player ID, playing role, and team name
+      GROUP BY p.id, p.playing_role, t.name       
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
     `;
@@ -1216,7 +1310,7 @@ app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, 
         p.last_name,
         p.playing_role,
         t.name AS team_name,
-        t.short_name AS team_short_name, // Assuming 'short_name' is a column in the 'teams' table
+        t.short_name AS team_short_name, 
         SUM(CASE WHEN dt.role = 'Captain' THEN 1 ELSE 0 END) AS times_captain,
         SUM(CASE WHEN dt.role = 'Vice Captain' THEN 1 ELSE 0 END) AS times_vice_captain,
         GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
@@ -2094,7 +2188,7 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
 
 
 
-// ------------------------------------player stats-------------------------------------------------
+// ------------------------------------playground  stats-------------------------------------------------
 
 app.get("/api/players/stats", async (req, res) => {
   const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
@@ -2214,6 +2308,8 @@ app.get("/api/players/stats", async (req, res) => {
 
 app.get('/api/match/stats', async (req, res) => {
   const { team1Id, team2Id } = req.query;
+  const competitionId = 128471; // Static competition ID
+
 
   // Validate input
   if (!team1Id || !team2Id) {
@@ -2239,6 +2335,7 @@ app.get('/api/match/stats', async (req, res) => {
     FROM teams
     LEFT JOIN matches m ON teams.id IN (m.team_1, m.team_2)
       AND m.status_str = 'Completed'
+      AND m.competition_id = 128471
       AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
     WHERE teams.id IN (?, ?)
     GROUP BY teams.name
@@ -2298,6 +2395,7 @@ app.get('/api/match/stats/batting-first', async (req, res) => {
     FROM teams
     LEFT JOIN matches m ON teams.id = m.toss_winner AND m.toss_decision = 1
       AND m.status_str = 'Completed'
+      AND m.competition_id = 128471
       AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
     WHERE teams.id IN (?, ?)
     GROUP BY teams.name
@@ -2338,6 +2436,7 @@ app.get('/api/match/stats/bowling-first', async (req, res) => {
     FROM teams
     LEFT JOIN matches m ON (teams.id = m.team_1 OR teams.id = m.team_2)
       AND m.status_str = 'Completed'
+      AND m.competition_id = 128471
       AND (
         (m.toss_winner = teams.id AND m.toss_decision = 2) OR
         (m.toss_winner != teams.id AND m.toss_decision = 1)
