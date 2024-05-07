@@ -2399,15 +2399,15 @@ app.get('/api/match/stats', async (req, res) => {
           teams.name AS team_name,
           COUNT(m.id) AS total_matches,
           SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS total_wins,
-          AVG(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+          ROUND(AVG(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
                    WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                   ELSE NULL END) AS avg_runs,
-          MAX(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                   ELSE NULL END)) AS avg_runs,
+          ROUND(MAX(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
                    WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                   ELSE NULL END) AS max_runs,
-          MIN(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                   ELSE NULL END)) AS max_runs,
+          ROUND(MIN(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
                    WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                   ELSE NULL END) AS min_runs
+                   ELSE NULL END)) AS min_runs
       FROM teams
       LEFT JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
           AND m.status_str = 'Completed'
@@ -2425,11 +2425,11 @@ app.get('/api/match/stats', async (req, res) => {
       // Format the response
       const formattedResults = results.map(result => ({
           team_name: result.team_name,
-          total_matches: result.total_matches,
-          total_wins: result.total_wins,
-          avg_runs: result.avg_runs,
-          max_runs: result.max_runs,
-          min_runs: result.min_runs
+          total_matches: parseInt(result.total_matches, 10),
+          total_wins: parseInt(result.total_wins, 10),
+          avg_runs: parseInt(result.avg_runs, 10),
+          max_runs: parseInt(result.max_runs, 10),
+          min_runs: parseInt(result.min_runs, 10)
       }));
 
       res.json(formattedResults);
@@ -2443,97 +2443,106 @@ app.get('/api/match/stats', async (req, res) => {
 
 app.get('/api/match/stats/batting-first', async (req, res) => {
   const { team1Id, team2Id } = req.query;
-  const competitionId = 128471; // Assuming a static competition ID
 
-  // Validate input
   if (!team1Id || !team2Id) {
-      return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
   }
 
   const query = `
       SELECT
+          teams.id AS team_id,
           teams.name AS team_name,
           'Batted First' AS batting_order,
           COUNT(m.id) AS total_matches,
           SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
-          COALESCE(AVG(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
-                            WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                            ELSE NULL END), 0) AS avg_runs,
-          COALESCE(MAX(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
-                            WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                            ELSE NULL END), 0) AS max_runs,
-          COALESCE(MIN(CASE WHEN m.team_1 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
-                            WHEN m.team_2 = teams.id THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                            ELSE NULL END), 0) AS min_runs
+          ROUND(AVG(CASE WHEN teams.id = m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                         ELSE CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED) END), 0) AS avg_runs,
+          ROUND(MAX(CASE WHEN teams.id = m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                         ELSE CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED) END), 0) AS max_runs,
+          ROUND(MIN(CASE WHEN teams.id = m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                         ELSE CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED) END), 0) AS min_runs
       FROM teams
-      LEFT JOIN matches m ON teams.id IN (m.team_1, m.team_2)
+      JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
           AND m.status_str = 'Completed'
-          AND m.competition_id = ?
-          AND m.toss_winner = teams.id AND m.toss_decision = 1
+          AND m.competition_id = 128471
           AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+          AND (
+            (m.toss_winner = teams.id AND m.toss_decision = 1) OR
+            (m.toss_winner != teams.id AND m.toss_decision = 2)
+          )
       WHERE teams.id IN (?, ?)
-      GROUP BY teams.name
+      GROUP BY teams.id, teams.name
       ORDER BY teams.name;
   `;
 
   try {
-      const params = [competitionId, team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
-      const [results] = await pool.query(query, params);
-      res.json(results);
+    const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
+    const [results] = await pool.query(query, params);
+    res.json(results.map(result => ({
+      team_id: result.team_id,
+      team_name: result.team_name,
+      batting_order: result.batting_order,
+      total_matches: result.total_matches,
+      wins: result.wins,
+      avg_runs: result.avg_runs,
+      max_runs: result.max_runs,
+      min_runs: result.min_runs
+    })));
   } catch (error) {
-      console.error('Database query failed:', error);
-      res.status(500).json({ error: 'Database query failed' });
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Database query failed' });
   }
 });
-
 
 
 app.get('/api/match/stats/bowling-first', async (req, res) => {
   const { team1Id, team2Id } = req.query;
 
-  // Validate input
   if (!team1Id || !team2Id) {
-      return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
   }
 
-  // SQL query to fetch bowling first statistics for Team B
   const query = `
       SELECT
+          teams.id AS team_id,
           teams.name AS team_name,
-          'Bowled First' AS bowling_order,
           COUNT(m.id) AS total_matches,
           SUM(CASE WHEN m.winning_team_id = teams.id THEN 1 ELSE 0 END) AS wins,
-          COALESCE(AVG(CASE WHEN teams.id != m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                            ELSE CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
-                            END), 0) AS avg_runs,
-          COALESCE(MAX(CASE WHEN teams.id != m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                            ELSE CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
-                            END), 0) AS max_runs,
-          COALESCE(MIN(CASE WHEN teams.id != m.team_1 THEN CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED)
-                            ELSE CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
-                            END), 0) AS min_runs
+          ROUND(AVG(CASE WHEN teams.id = m.team_2 THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                         ELSE CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED) END), 0) AS avg_runs,
+          ROUND(MAX(CASE WHEN teams.id = m.team_2 THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                         ELSE CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED) END), 0) AS max_runs,
+          ROUND(MIN(CASE WHEN teams.id = m.team_2 THEN CAST(SUBSTRING_INDEX(m.team_1_score, '/', 1) AS UNSIGNED)
+                         ELSE CAST(SUBSTRING_INDEX(m.team_2_score, '/', 1) AS UNSIGNED) END), 0) AS min_runs
       FROM teams
-      LEFT JOIN matches m ON (teams.id = m.team_1 OR teams.id = m.team_2)
+      JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
           AND m.status_str = 'Completed'
           AND m.competition_id = 128471
-          AND (
-              (m.toss_winner = teams.id AND m.toss_decision = 2) OR
-              (m.toss_winner != teams.id AND m.toss_decision = 1)
-          )
           AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+          AND (
+            (m.toss_winner = teams.id AND m.toss_decision = 2) OR
+            (m.toss_winner != teams.id AND m.toss_decision = 1)
+          )
       WHERE teams.id IN (?, ?)
-      GROUP BY teams.name
+      GROUP BY teams.id, teams.name
       ORDER BY teams.name;
   `;
 
   try {
-      // Execute the query with the team IDs passed as parameters
-      const params = [team2Id, team1Id, team2Id, team1Id, team2Id, team1Id];
-      const [results] = await pool.query(query, params);
-      res.json(results);
+    const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
+    const [results] = await pool.query(query, params);
+    res.json(results.map(result => ({
+      team_id: result.team_id,
+      team_name: result.team_name,
+      total_matches: result.total_matches,
+      wins: result.wins,
+      avg_runs: result.avg_runs,
+      max_runs: result.max_runs,
+      min_runs: result.min_runs
+    })));
   } catch (error) {
-      console.error('Database query failed:', error);
-      res.status(500).json({ error: 'Database query failed' });
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Database query failed' });
   }
 });
 
