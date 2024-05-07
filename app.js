@@ -2281,45 +2281,45 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
 app.get("/api/players/stats", async (req, res) => {
   const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
 
-  let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, t.name';
+  let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, p.short_name, t.name, t.short_name';
 
   switch (statType) {
       case 'TotalFantasyPoints':
-          selectClause = 'SUM(fp.points) AS total_points';
+          selectClause = 'SUM(fp.points) AS total_points, COUNT(DISTINCT fp.match_id) AS match_count';
           orderByClause = 'ORDER BY total_points DESC';
           break;
       case 'DreamTeamAppearances':
-          selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances';
+          selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances, COUNT(DISTINCT dt.match_id) AS match_count';
           joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
           orderByClause = 'ORDER BY dream_team_appearances DESC';
           break;
       case 'WicketsTaken':
-          selectClause = 'SUM(b.wickets) AS wickets_taken';
+          selectClause = 'SUM(b.wickets) AS wickets_taken, COUNT(DISTINCT b.match_id) AS match_count';
           joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
           orderByClause = 'ORDER BY wickets_taken DESC';
           break;
       case 'RunsScored':
-          selectClause = 'SUM(fb.runs) AS total_runs';
+          selectClause = 'SUM(fb.runs) AS total_runs, COUNT(DISTINCT fb.match_id) AS match_count';
           joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
           orderByClause = 'ORDER BY total_runs DESC';
           break;
       case 'StrikeRate':
-          selectClause = 'AVG(fb.strike_rate) AS average_strike_rate';
+          selectClause = 'AVG(fb.strike_rate) AS average_strike_rate, COUNT(DISTINCT fb.match_id) AS match_count';
           joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
           orderByClause = 'ORDER BY average_strike_rate DESC';
           break;
       case 'EconomyRate':
-          selectClause = 'AVG(b.econ) AS average_economy_rate';
+          selectClause = 'AVG(b.econ) AS average_economy_rate, COUNT(DISTINCT b.match_id) AS match_count';
           joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id';
           orderByClause = 'ORDER BY average_economy_rate ASC';
           break;
       case 'FieldingPoints':
-          selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points';
+          selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points, COUNT(DISTINCT f.match_id) AS match_count';
           joinClause = ' JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id';
           orderByClause = 'ORDER BY fielding_points DESC';
           break;
       case 'AverageFantasyPoints':
-          selectClause = 'AVG(fp.points) AS avg_fantasy_points';
+          selectClause = 'AVG(fp.points) AS avg_fantasy_points, COUNT(DISTINCT fp.match_id) AS match_count';
           orderByClause = 'ORDER BY avg_fantasy_points DESC';
           break;
   }
@@ -2347,7 +2347,7 @@ app.get("/api/players/stats", async (req, res) => {
   }
 
   const sql = `
-      SELECT p.id, p.first_name, p.last_name, ${selectClause}, t.name AS team_name
+      SELECT p.id, p.first_name, p.short_name, p.last_name, ${selectClause}, t.name AS team_name, t.short_name AS team_short_name
       FROM players p
       JOIN team_players tp ON p.id = tp.player_id
       JOIN teams t ON tp.team_id = t.id
@@ -2368,16 +2368,6 @@ app.get("/api/players/stats", async (req, res) => {
       res.status(500).send("Failed to retrieve data");
   }
 });
-
-
-
-
-
-
-
-
-
-
 
 
 
