@@ -2651,3 +2651,17 @@ app.get("/api/fetch-matches", async (req, res) => {
     res.status(500).send("Error fetching and saving match details.");
   }
 });
+
+
+app.get('/competitions/:tournamentId', async (req, res) => {
+  try {
+      const { tournamentId } = req.params;
+      const [rows] = await pool.query(
+          'SELECT * FROM competitions WHERE tournament_id = ?',
+          [tournamentId]
+      );
+      res.json(rows);
+  } catch (error) {
+      res.status(500).send('Server error: ' + error.message);
+  }
+});
