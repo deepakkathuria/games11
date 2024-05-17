@@ -2547,7 +2547,43 @@ app.get('/api/match/stats/bowling-first', async (req, res) => {
 });
 
 
+app.get('/api/playerstastofteam', async (req, res) => {
+  const { team1, team2 } = req.query;
 
+  // Validate query parameters
+  if (!team1 || !team2) {
+      return res.status(400).json({ error: 'Both team1 and team2 query parameters are required' });
+  }
+
+  try {
+      const [rows] = await pool.query(`
+          SELECT 
+              p.first_name AS Player,
+              t.name AS Team,
+              MIN(m.date_start) AS FirstMatch,
+              MAX(m.date_start) AS LastMatch,
+              COUNT(DISTINCT m.id) AS Mat,
+              COUNT(DISTINCT mi.match_id) AS Inn,
+              SUM(b.runs) AS Runs,
+              MAX(b.runs) AS Hs
+          FROM players p
+          JOIN team_players tp ON tp.player_id = p.id
+          JOIN teams t ON tp.team_id = t.id
+          JOIN match_inning_batters_test b ON p.id = b.batsman_id
+          JOIN match_innings_test mi ON mi.match_id = b.match_id AND mi.batting_team_id = t.id
+          JOIN matches m ON mi.match_id = m.id
+          WHERE (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          GROUP BY p.id, t.name
+          ORDER BY Runs DESC
+          LIMIT 0, 10000;
+      `, [team1, team2, team2, team1]);
+
+      res.json(rows);
+  } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 
 

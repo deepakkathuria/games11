@@ -22,16 +22,10 @@ async function insertData1() {
     });
     
 
-    const competitionsResponse = await axios.get(`https://hammerhead-app-jkdit.ondigitalocean.app/competitions/1`);
-   
-    const competitions = competitionsResponse.data;
-
-    // Process each competition
-    for (const competition of competitions) {
-        const matchesResponse = await axios.get(
-            `https://rest.entitysport.com/v2/competitions/${competition.competition_id}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
-        );
-        const matches = matchesResponse.data.response.items;
+    const response = await axios.get(
+      "https://rest.entitysport.com/v2/competitions/128471/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    );
+    const matches = response.data.response.items;
 
     for (const match of matches) {
       console.log(match);
@@ -239,7 +233,6 @@ async function insertData1() {
         // Additional data handling can be included here for other tables
       }
     }
-  }
     console.log("Data successfully inserted for all matches.");
   } catch (error) {
     console.error("Failed to insert data:", error);
@@ -265,16 +258,11 @@ async function insertData() {
       port: process.env.DB_PORT,
     });
 
-    const competitionsResponse = await axios.get(`https://hammerhead-app-jkdit.ondigitalocean.app/competitions/1`);
-   
-    const competitions = competitionsResponse.data;
-
-    // Process each competition
-    for (const competition of competitions) {
-        const matchesResponse = await axios.get(
-            `https://rest.entitysport.com/v2/competitions/${competition.competition_id}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
-        );
-        const matches = matchesResponse.data.response.items;
+    // Fetch matches from API
+    const response = await axios.get(
+      "https://rest.entitysport.com/v2/competitions/128471/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    );
+    const matches = response.data.response.items;
 
     for (const match of matches) {
       if (match.status_str === "Completed") {
@@ -424,7 +412,6 @@ async function insertData() {
         }
       }
     }
-  }
 
     console.log(
       "Data successfully inserted for all matches and related details."
@@ -500,16 +487,10 @@ async function insertFP() {
 
     // Fetch matches from API
 
-    const competitionsResponse = await axios.get(`https://hammerhead-app-jkdit.ondigitalocean.app/competitions/1`);
-   
-    const competitions = competitionsResponse.data;
-
-    // Process each competition
-    for (const competition of competitions) {
-        const matchesResponse = await axios.get(
-            `https://rest.entitysport.com/v2/competitions/${competition.competition_id}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
-        );
-        const matches = matchesResponse.data.response.items;
+    const response = await axios.get(
+      "https://rest.entitysport.com/v2/competitions/128471/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    );
+    const matches = response.data.response.items;
 
     for (const match of matches) {
       if (match.status_str === "Completed") {
@@ -594,7 +575,6 @@ async function insertFP() {
         );
       }
     }
-  }
   } catch (error) {
     console.error("Failed to insert data:", error);
   } finally {
@@ -684,16 +664,8 @@ async function createDreamTeam() {
           port: process.env.DB_PORT,
       });
 
-      const competitionsResponse = await axios.get(`https://hammerhead-app-jkdit.ondigitalocean.app/competitions/1`);
-   
-    const competitions = competitionsResponse.data;
-
-    // Process each competition
-    for (const competition of competitions) {
-        const matchesResponse = await axios.get(
-            `https://rest.entitysport.com/v2/competitions/${competition.competition_id}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
-        );
-        const matches = matchesResponse.data.response.items;
+      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128471/matches?token=${process.env.API_TOKEN}&per_page=80`);
+      const matches = response.data.response.items;
 
       for (const match of matches) {
           if (match.status_str === "Completed") {
@@ -745,7 +717,6 @@ async function createDreamTeam() {
               console.log("Dream team created successfully for match:", match.match_id);
           }
       }
-    }
   } catch (error) {
       console.error("Failed to create dream team:", error);
   } finally {
@@ -863,3 +834,46 @@ async function fetchAndStoreTournamentData() {
 
 
 // List of tournament IDs to process
+const tournamentIds = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 46, 47, 48, 49, 50, 51];
+
+// Function to process each tournament
+async function processTournaments() {
+    for (const tournamentId of tournamentIds) {
+        await processDataForTournament(tournamentId);
+    }
+}
+
+async function processDataForTournament(tournamentId) {
+    let connection;
+    try {
+        connection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+            port: process.env.DB_PORT,
+        });
+
+        console.log(`Processing data for tournament ID: ${tournamentId}`);
+        
+        // Fetch competitions for the tournament
+        const competitionsResponse = await axios.get(`https://rest.entitysport.com/v2/competitions/${tournamentId}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`);
+        const competitions = competitionsResponse.data.response.items;
+        
+        // Iterate over competitions and process matches
+        for (const competition of competitions) {
+            // Your existing processing logic for matches
+            await processMatches(competition.match_id);
+        }
+
+    } catch (error) {
+        console.error("Failed to process tournament data:", error);
+    } finally {
+        if (connection) {
+            await connection.end();
+        }
+    }
+}
+
+// Call the function to start processing
+// processTournaments();
