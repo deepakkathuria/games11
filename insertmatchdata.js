@@ -20,226 +20,239 @@ async function insertData1() {
       database: process.env.DB_NAME,
       port: process.env.DB_PORT,
     });
-    
 
     const competitionsResponse = await axios.get(`https://hammerhead-app-jkdit.ondigitalocean.app/competitions/1`);
-   
     const competitions = competitionsResponse.data;
 
-    // Process each competition
+    const formatDateTime = (dateTimeStr) => {
+      if (!dateTimeStr) return null;
+      const dateTime = new Date(dateTimeStr);
+      return isNaN(dateTime) ? null : dateTime.toISOString().slice(0, 19).replace("T", " ");
+    };
+
     for (const competition of competitions) {
-        const matchesResponse = await axios.get(
-            `https://rest.entitysport.com/v2/competitions/${competition.competition_id}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
-        );
-        const matches = matchesResponse.data.response.items;
+      const matchesResponse = await axios.get(
+        `https://rest.entitysport.com/v2/competitions/${competition.competition_id}/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80`
+      );
+      const matches = matchesResponse.data.response.items;
 
-    for (const match of matches) {
-      console.log(match);
-      if (match.status_str === "Completed") {
-        // Enhanced Venue Insertion with additional details
-        await connection.query(
-          `
-                INSERT INTO venues (id, name, city, country, status)
-                VALUES (?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE name=VALUES(name), city=VALUES(city), country=VALUES(country), status=VALUES(status);
+      for (const match of matches) {
+        console.log(match);
+        if (match.status_str === "Completed") {
+          await connection.query(
+            `
+              INSERT INTO venues (id, name, city, country, status)
+              VALUES (?, ?, ?, ?, ?)
+              ON DUPLICATE KEY UPDATE name=VALUES(name), city=VALUES(city), country=VALUES(country), status=VALUES(status);
             `,
-          [
-            match.venue.venue_id,
-            match.venue.name,
-            match.venue.location,
-            match.venue.country,
-            "Active",
-          ]
-        );
-
-        // Enhanced Team Insertion with logos and additional details
-        await connection.query(
-          `
-        INSERT INTO matches (
-            id,tournament_id, team_1, team_2, venue_id, format_str, match_number, status_str, result_type, win_margin, title, subtitle, 
-            short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
-            date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
-            latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
-            toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition, competition_id,
-            team_1_score, team_2_score
-        )
-        VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )
-        ON DUPLICATE KEY UPDATE
-            tournament_id=VALUES(tournament_id),team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
-            match_number=VALUES(match_number), status_str=VALUES(status_str), result_type=VALUES(result_type), win_margin=VALUES(win_margin),
-            title=VALUES(title), subtitle=VALUES(subtitle), short_title=VALUES(short_title), status_note=VALUES(status_note),
-            verified=VALUES(verified), pre_squad=VALUES(pre_squad), odds_available=VALUES(odds_available), game_state=VALUES(game_state),
-            game_state_str=VALUES(game_state_str), domestic=VALUES(domestic), date_start=VALUES(date_start), date_end=VALUES(date_end),
-            date_start_ist=VALUES(date_start_ist), umpires=VALUES(umpires), referee=VALUES(referee), equation=VALUES(equation), live=VALUES(live),
-            winning_team_id=VALUES(winning_team_id), commentary=VALUES(commentary), wagon=VALUES(wagon), latest_inning_number=VALUES(latest_inning_number),
-            presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
-            live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
-            toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
-            batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition), competition_id=VALUES(competition_id),
-            team_1_score=VALUES(team_1_score), team_2_score=VALUES(team_2_score)
-        `,
-          [
-            match.match_id,
-            tournament_id=1,
-            match.teama.team_id,
-            match.teamb.team_id,
-            match.venue.venue_id,
-            match.format_str,
-            match.match_number,
-            match.status_str,
-            match.result_type,
-            match.win_margin,
-            match.title,
-            match.subtitle,
-            match.short_title,
-            match.status_note,
-            match.verified === "true" ? 1 : 0,
-            match.pre_squad === "true" ? 1 : 0,
-            match.odds_available === "true" ? 1 : 0,
-            match.game_state,
-            match.game_state_str,
-            match.domestic === "1" ? 1 : 0,
-            match.date_start,
-            match.date_end,
-            match.date_start_ist,
-            match.umpires,
-            match.referee,
-            match.equation,
-            match.live,
-            match.winning_team_id,
-            match.commentary === "true" ? 1 : 0,
-            match.wagon === "true" ? 1 : 0,
-            match.latest_inning_number,
-            match.presquad_time,
-            match.verify_time,
-            match.match_dls_affected === "true" ? 1 : 0,
-            match.live_inning_number,
-            match.day,
-            match.session,
-            match.toss.text,
-            match.toss.winner,
-            match.toss.decision,
-            match.pitch.pitch_condition,
-            match.pitch.batting_condition,
-            match.pitch.pace_bowling_condition,
-            match.pitch.spine_bowling_condition,
-            match.competition.cid,
-            match.teama.scores,  // Score from team A
-            match.teamb.scores   // Score from team B
-          ]
-        );
-
-        // Handle Players and Match Squads more comprehensively
-        const squadsResponse = await axios.get(
-          "https://rest.entitysport.com/v2/competitions/128471/squads?token=73d62591af4b3ccb51986ff5f8af5676"
-        );
-        const teams = squadsResponse.data.response.squads;
-
-        // Iterate through each team and their players
-        for (const team of teams) {
-          for (const player of team.players) {
-            await connection.query(
-              `
-                INSERT INTO players (
-                    id, first_name, last_name, middle_name, short_name, alt_name, dob, birthplace, country,
-                    primary_teams, image, image_alt, playing_role, batting_style, bowling_style, fielding_position,
-                    facebook_profile, twitter_profile, instagram_profile, nationality, gender, jersey_number,
-                    ipl_debut, debut_data, fantasy_player_rating, meta_title, meta_description, meta_keywords,
-                    breadcrumb, heading, api_id, is_active_player, status, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    first_name=VALUES(first_name), last_name=VALUES(last_name), middle_name=VALUES(middle_name),
-                    short_name=VALUES(short_name), alt_name=VALUES(alt_name), dob=VALUES(dob), birthplace=VALUES(birthplace),
-                    country=VALUES(country), primary_teams=VALUES(primary_teams), image=VALUES(image), image_alt=VALUES(image_alt),
-                    playing_role=VALUES(playing_role), batting_style=VALUES(batting_style), bowling_style=VALUES(bowling_style),
-                    fielding_position=VALUES(fielding_position), facebook_profile=VALUES(facebook_profile),
-                    twitter_profile=VALUES(twitter_profile), instagram_profile=VALUES(instagram_profile),
-                    nationality=VALUES(nationality), gender=VALUES(gender), jersey_number=VALUES(jersey_number),
-                    ipl_debut=VALUES(ipl_debut), debut_data=VALUES(debut_data), fantasy_player_rating=VALUES(fantasy_player_rating),
-                    meta_title=VALUES(meta_title), meta_description=VALUES(meta_description), meta_keywords=VALUES(meta_keywords),
-                    breadcrumb=VALUES(breadcrumb), heading=VALUES(heading), api_id=VALUES(api_id),
-                    is_active_player=VALUES(is_active_player), status=VALUES(status), updated_at=NOW()
-            `,
-              [
-                player.pid,
-                player.first_name,
-                player.last_name || "",
-                player.middle_name || "",
-                player.short_name,
-                player.alt_name,
-                player.birthdate ? player.birthdate : null, // Only insert date if valid, otherwise null
-                player.birthplace,
-                player.country,
-                JSON.stringify(player.primary_team),
-                player.logo_url,
-                player.thumb_url,
-                player.playing_role,
-                player.batting_style,
-                player.bowling_style,
-                player.fielding_position,
-                player.facebook_profile,
-                player.twitter_profile,
-                player.instagram_profile,
-                player.nationality,
-                player.gender,
-                player.jersey_number || null,
-                player.ipl_debut || "",
-                player.debut_data || "",
-                player.fantasy_player_rating || "",
-                "", // meta_title
-                "", // meta_description
-                JSON.stringify([]), // meta_keywords
-                "", // breadcrumb
-                "", // heading
-                "", // api_id
-                1, // is_active_player
-                1, // status
-                new Date().toISOString().slice(0, 19).replace("T", " "),
-                new Date().toISOString().slice(0, 19).replace("T", " "),
-              ]
-            );
-          }
-        }
-        const teamIds = [match.teama.team_id, match.teamb.team_id];
-        for (const teamId of teamIds) {
-          const squadsResponse = await axios.get(
-            `https://rest.entitysport.com/v2/matches/${match.match_id}/squads?token=73d62591af4b3ccb51986ff5f8af5676`
+            [
+              match.venue.venue_id,
+              match.venue.name,
+              match.venue.location,
+              match.venue.country,
+              "Active",
+            ]
           );
-          const team =
-            teamId === match.teama.team_id
-              ? squadsResponse.data.response.teama
-              : squadsResponse.data.response.teamb;
 
-          for (const player of team.squads) {
-            await connection.execute(
-              `INSERT INTO match_squads (
-                    match_id, team_id, player_id, substitute, \`out\`, \`in\`, role_str, role, playing11, ordering)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE
-                    team_id=VALUES(team_id), player_id=VALUES(player_id), substitute=VALUES(substitute), \`out\`=VALUES(\`out\`), \`in\`=VALUES(\`in\`), role_str=VALUES(role_str), role=VALUES(role), playing11=VALUES(playing11), ordering=VALUES(ordering)`,
-              [
-                match.match_id,
-                teamId,
-                player.player_id,
-                player.substitute || "false",
-                player.out || "false",
-                player.in || "false",
-                player.role_str || "",
-                player.role || "",
-                player.playing11 || "false",
-                0, // Assuming 'ordering' is not provided and defaults to 0
-              ]
+          const date_start = formatDateTime(match.date_start);
+          const date_end = formatDateTime(match.date_end);
+          const date_start_ist = formatDateTime(match.date_start_ist);
+          const presquad_time = formatDateTime(match.presquad_time);
+          const verify_time = formatDateTime(match.verify_time);
+
+          console.log({
+            date_start,
+            date_end,
+            date_start_ist,
+            presquad_time,
+            verify_time
+          });
+
+          await connection.query(
+            `
+              INSERT INTO matches (
+                id, tournament_id, team_1, team_2, venue_id, format_str, match_number, status_str, result_type, win_margin, title, subtitle, 
+                short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
+                date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
+                latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
+                toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition, competition_id,
+                team_1_score, team_2_score
+              )
+              VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+              )
+              ON DUPLICATE KEY UPDATE
+                tournament_id=VALUES(tournament_id), team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
+                match_number=VALUES(match_number), status_str=VALUES(status_str), result_type=VALUES(result_type), win_margin=VALUES(win_margin),
+                title=VALUES(title), subtitle=VALUES(subtitle), short_title=VALUES(short_title), status_note=VALUES(status_note),
+                verified=VALUES(verified), pre_squad=VALUES(pre_squad), odds_available=VALUES(odds_available), game_state=VALUES(game_state),
+                game_state_str=VALUES(game_state_str), domestic=VALUES(domestic), date_start=VALUES(date_start), date_end=VALUES(date_end),
+                date_start_ist=VALUES(date_start_ist), umpires=VALUES(umpires), referee=VALUES(referee), equation=VALUES(equation), live=VALUES(live),
+                winning_team_id=VALUES(winning_team_id), commentary=VALUES(commentary), wagon=VALUES(wagon), latest_inning_number=VALUES(latest_inning_number),
+                presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
+                live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
+                toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
+                batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition), competition_id=VALUES(competition_id),
+                team_1_score=VALUES(team_1_score), team_2_score=VALUES(team_2_score)
+            `,
+            [
+              match.match_id,
+              1, // tournament_id should be assigned appropriately
+              match.teama.team_id,
+              match.teamb.team_id,
+              match.venue.venue_id,
+              match.format_str,
+              match.match_number,
+              match.status_str,
+              match.result_type,
+              match.win_margin,
+              match.title,
+              match.subtitle,
+              match.short_title,
+              match.status_note,
+              match.verified === "true" ? 1 : 0,
+              match.pre_squad === "true" ? 1 : 0,
+              match.odds_available === "true" ? 1 : 0,
+              match.game_state,
+              match.game_state_str,
+              match.domestic === "1" ? 1 : 0,
+              date_start,
+              date_end,
+              date_start_ist,
+              match.umpires,
+              match.referee,
+              match.equation,
+              match.live,
+              match.winning_team_id,
+              match.commentary === "true" ? 1 : 0,
+              match.wagon === "true" ? 1 : 0,
+              match.latest_inning_number,
+              presquad_time,
+              verify_time,
+              match.match_dls_affected === "true" ? 1 : 0,
+              match.live_inning_number,
+              match.day,
+              match.session,
+              match.toss.text,
+              match.toss.winner,
+              match.toss.decision,
+              match.pitch.pitch_condition,
+              match.pitch.batting_condition,
+              match.pitch.pace_bowling_condition,
+              match.pitch.spine_bowling_condition,
+              match.competition.cid,
+              match.teama.scores,  // Score from team A
+              match.teamb.scores   // Score from team B
+            ]
+          );
+
+          const squadsResponse = await axios.get(
+            "https://rest.entitysport.com/v2/competitions/128471/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+          );
+          const teams = squadsResponse.data.response.squads;
+
+          for (const team of teams) {
+            for (const player of team.players) {
+              await connection.query(
+                `
+                  INSERT INTO players (
+                      id, first_name, last_name, middle_name, short_name, alt_name, dob, birthplace, country,
+                      primary_teams, image, image_alt, playing_role, batting_style, bowling_style, fielding_position,
+                      facebook_profile, twitter_profile, instagram_profile, nationality, gender, jersey_number,
+                      ipl_debut, debut_data, fantasy_player_rating, meta_title, meta_description, meta_keywords,
+                      breadcrumb, heading, api_id, is_active_player, status, created_at, updated_at
+                  )
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  ON DUPLICATE KEY UPDATE
+                      first_name=VALUES(first_name), last_name=VALUES(last_name), middle_name=VALUES(middle_name),
+                      short_name=VALUES(short_name), alt_name=VALUES(alt_name), dob=VALUES(dob), birthplace=VALUES(birthplace),
+                      country=VALUES(country), primary_teams=VALUES(primary_teams), image=VALUES(image), image_alt=VALUES(image_alt),
+                      playing_role=VALUES(playing_role), batting_style=VALUES(batting_style), bowling_style=VALUES(bowling_style),
+                      fielding_position=VALUES(fielding_position), facebook_profile=VALUES(facebook_profile),
+                      twitter_profile=VALUES(twitter_profile), instagram_profile=VALUES(instagram_profile),
+                      nationality=VALUES(nationality), gender=VALUES(gender), jersey_number=VALUES(jersey_number),
+                      ipl_debut=VALUES(ipl_debut), debut_data=VALUES(debut_data), fantasy_player_rating=VALUES(fantasy_player_rating),
+                      meta_title=VALUES(meta_title), meta_description=VALUES(meta_description), meta_keywords=VALUES(meta_keywords),
+                      breadcrumb=VALUES(breadcrumb), heading=VALUES(heading), api_id=VALUES(api_id),
+                      is_active_player=VALUES(is_active_player), status=VALUES(status), updated_at=NOW()
+              `,
+                [
+                  player.pid,
+                  player.first_name,
+                  player.last_name || "",
+                  player.middle_name || "",
+                  player.short_name,
+                  player.alt_name,
+                  player.birthdate ? player.birthdate : null, // Only insert date if valid, otherwise null
+                  player.birthplace,
+                  player.country,
+                  JSON.stringify(player.primary_team),
+                  player.logo_url,
+                  player.thumb_url,
+                  player.playing_role,
+                  player.batting_style,
+                  player.bowling_style,
+                  player.fielding_position,
+                  player.facebook_profile,
+                  player.twitter_profile,
+                  player.instagram_profile,
+                  player.nationality,
+                  player.gender,
+                  player.jersey_number || null,
+                  player.ipl_debut || "",
+                  player.debut_data || "",
+                  player.fantasy_player_rating || "",
+                  "", // meta_title
+                  "", // meta_description
+                  JSON.stringify([]), // meta_keywords
+                  "", // breadcrumb
+                  "", // heading
+                  "", // api_id
+                  1, // is_active_player
+                  1, // status
+                  new Date().toISOString().slice(0, 19).replace("T", " "),
+                  new Date().toISOString().slice(0, 19).replace("T", " "),
+                ]
+              );
+            }
+          }
+
+          const teamIds = [match.teama.team_id, match.teamb.team_id];
+          for (const teamId of teamIds) {
+            const squadsResponse = await axios.get(
+              `https://rest.entitysport.com/v2/matches/${match.match_id}/squads?token=73d62591af4b3ccb51986ff5f8af5676`
             );
+            const team =
+              teamId === match.teama.team_id
+                ? squadsResponse.data.response.teama
+                : squadsResponse.data.response.teamb;
+
+            for (const player of team.squads) {
+              await connection.execute(
+                `INSERT INTO match_squads (
+                      match_id, team_id, player_id, substitute, \`out\`, \`in\`, role_str, role, playing11, ordering)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON DUPLICATE KEY UPDATE
+                      team_id=VALUES(team_id), player_id=VALUES(player_id), substitute=VALUES(substitute), \`out\`=VALUES(\`out\`), \`in\`=VALUES(\`in\`), role_str=VALUES(role_str), role=VALUES(role), playing11=VALUES(playing11), ordering=VALUES(ordering)`,
+                [
+                  match.match_id,
+                  teamId,
+                  player.player_id,
+                  player.substitute || "false",
+                  player.out || "false",
+                  player.in || "false",
+                  player.role_str || "",
+                  player.role || "",
+                  player.playing11 || "false",
+                  0, // Assuming 'ordering' is not provided and defaults to 0
+                ]
+              );
+            }
           }
         }
-
-        // Additional data handling can be included here for other tables
       }
     }
-  }
+
     console.log("Data successfully inserted for all matches.");
   } catch (error) {
     console.error("Failed to insert data:", error);
@@ -249,6 +262,9 @@ async function insertData1() {
     }
   }
 }
+
+// Call the main function to start all operations
+insertData1();
 
 // insertData1();
 

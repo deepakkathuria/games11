@@ -23,7 +23,7 @@ async function insertData1() {
     
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      "https://rest.entitysport.com/v2/competitions/127579/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -127,7 +127,7 @@ async function insertData1() {
 
         // Handle Players and Match Squads more comprehensively
         const squadsResponse = await axios.get(
-          "https://rest.entitysport.com/v2/competitions/10058/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+          "https://rest.entitysport.com/v2/competitions/127579/squads?token=73d62591af4b3ccb51986ff5f8af5676"
         );
         const teams = squadsResponse.data.response.squads;
 
@@ -260,7 +260,7 @@ async function insertData() {
 
     // Fetch matches from API
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      "https://rest.entitysport.com/v2/competitions/127579/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -439,7 +439,7 @@ async function insertData3() {
 
     // Fetch teams and their squads from API
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+      "https://rest.entitysport.com/v2/competitions/127579/squads?token=73d62591af4b3ccb51986ff5f8af5676"
     );
 
     const teams = response.data.response.squads;
@@ -488,7 +488,7 @@ async function insertFP() {
     // Fetch matches from API
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      "https://rest.entitysport.com/v2/competitions/127579/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -595,7 +595,7 @@ async function insertFP() {
 //             port: process.env.DB_PORT,
 //         });
 
-//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/10058/matches?token=${process.env.API_TOKEN}&per_page=80`);
+//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/127579/matches?token=${process.env.API_TOKEN}&per_page=80`);
 //         const matches = response.data.response.items;
 
 //         for (const match of matches) {
@@ -654,77 +654,78 @@ async function insertFP() {
 // }
 
 async function createDreamTeam() {
-  let connection;
-  try {
+    let connection;
+    try {
       connection = await mysql.createConnection({
-          host: process.env.DB_HOST,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-          port: process.env.DB_PORT,
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        port: process.env.DB_PORT,
       });
-
-      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/10058/matches?token=${process.env.API_TOKEN}&per_page=80`);
+  
+      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/127579/matches?token=${process.env.API_TOKEN}&per_page=80`);
       const matches = response.data.response.items;
-
+  
       for (const match of matches) {
-          if (match.status_str === "Completed") {
-              const [players] = await connection.execute(
-                  `SELECT player_id, points, rating, players.playing_role FROM fantasy_points_details 
-                   JOIN players ON players.id = fantasy_points_details.player_id
-                   WHERE match_id = ? ORDER BY points DESC`,
-                  [match.match_id]
-              );
-
-              let selectedPlayers = players.slice(0, 11);
-              let hasWicketkeeper = selectedPlayers.some(player => player.playing_role.includes('wk'));
-
-              if (!hasWicketkeeper) {
-                  let wicketkeeper = players.find(player => player.playing_role.includes('wk'));
-                  if (wicketkeeper) {
-                      // Find the player with the least points to replace
-                      let lowestIndex = selectedPlayers.reduce((lowest, player, index) => (player.points < selectedPlayers[lowest].points) ? index : lowest, 0);
-                      selectedPlayers[lowestIndex] = wicketkeeper;
-                  } else {
-                      console.log("No wicketkeeper available for match:", match.match_id);
-                      continue; // Skip this match if no wicketkeeper is available
-                  }
-              }
-
-              selectedPlayers.sort((a, b) => b.points - a.points); // Sort by points descending
-
-              selectedPlayers.forEach((player, index) => {
-                  const role = index === 0 ? "Captain" : (index === 1 ? "Vice Captain" : "Member");
-                  connection.execute(
-                      `INSERT INTO DreamTeam_test (match_id, player_id, role, points, team_position, playing_role)
-                       VALUES (?, ?, ?, ?, ?, ?)
-                       ON DUPLICATE KEY UPDATE
-                       role = VALUES(role), points = VALUES(points), team_position = VALUES(team_position), playing_role=VALUES(playing_role)`,
-                      [match.match_id, player.player_id, role, player.points, index + 1, player.playing_role]
-                  );
-
-                  connection.execute(
-                      `INSERT INTO PlayerPerformance_test (player_id, match_id, times_in_dream_team, times_captain, times_vice_captain)
-                       VALUES (?, ?, 1, ?, ?)
-                       ON DUPLICATE KEY UPDATE
-                       times_in_dream_team = times_in_dream_team + 1,
-                       times_captain = times_captain + VALUES(times_captain),
-                       times_vice_captain = times_vice_captain + VALUES(times_vice_captain)`,
-                      [player.player_id, match.match_id, role === "Captain" ? 1 : 0, role === "Vice Captain" ? 1 : 0]
-                  );
-              });
-
-              console.log("Dream team created successfully for match:", match.match_id);
+        if (match.status_str === "Completed") {
+          const [players] = await connection.execute(
+            `SELECT player_id, points, rating, players.playing_role FROM fantasy_points_details 
+             JOIN players ON players.id = fantasy_points_details.player_id
+             WHERE match_id = ? ORDER BY points DESC`,
+            [match.match_id]
+          );
+  
+          let selectedPlayers = players.slice(0, 11);
+          let hasWicketkeeper = selectedPlayers.some(player => player.playing_role.toLowerCase().includes('wk') || player.playing_role.toLowerCase().includes('wicketkeeper'));
+  
+          if (!hasWicketkeeper) {
+            let wicketkeeper = players.find(player => player.playing_role.toLowerCase().includes('wk') || player.playing_role.toLowerCase().includes('wicketkeeper'));
+            if (wicketkeeper) {
+              // Find the player with the least points to replace
+              let lowestIndex = selectedPlayers.reduce((lowest, player, index) => (player.points < selectedPlayers[lowest].points) ? index : lowest, 0);
+              selectedPlayers[lowestIndex] = wicketkeeper;
+            } else {
+              console.log("No wicketkeeper available for match:", match.match_id);
+              continue; // Skip this match if no wicketkeeper is available
+            }
           }
+  
+          selectedPlayers.sort((a, b) => b.points - a.points); // Sort by points descending
+  
+          selectedPlayers.forEach((player, index) => {
+            const role = index === 0 ? "Captain" : (index === 1 ? "Vice Captain" : "Member");
+            connection.execute(
+              `INSERT INTO DreamTeam_test (match_id, player_id, role, points, team_position, playing_role)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE
+               role = VALUES(role), points = VALUES(points), team_position = VALUES(team_position), playing_role=VALUES(playing_role)`,
+              [match.match_id, player.player_id, role, player.points, index + 1, player.playing_role]
+            );
+  
+            connection.execute(
+              `INSERT INTO PlayerPerformance_test (player_id, match_id, times_in_dream_team, times_captain, times_vice_captain)
+               VALUES (?, ?, 1, ?, ?)
+               ON DUPLICATE KEY UPDATE
+               times_in_dream_team = times_in_dream_team + 1,
+               times_captain = times_captain + VALUES(times_captain),
+               times_vice_captain = times_vice_captain + VALUES(times_vice_captain)`,
+              [player.player_id, match.match_id, role === "Captain" ? 1 : 0, role === "Vice Captain" ? 1 : 0]
+            );
+          });
+  
+          console.log("Dream team created successfully for match:", match.match_id);
+        }
       }
-  } catch (error) {
+    } catch (error) {
       console.error("Failed to create dream team:", error);
-  } finally {
+    } finally {
       if (connection) {
-          await connection.end();
+        await connection.end();
       }
+    }
   }
-}
+  
 
 
 
@@ -736,20 +737,20 @@ async function createDreamTeam() {
 async function runAllFunctions() {
   try {
     // Call the first function and wait for it to complete
-    await insertData1();
-    console.log("Data insertion for insertData1 is complete.");
+    // await insertData1();
+    // console.log("Data insertion for insertData1 is complete.");
 
-    // Call the second function and wait for it to complete
-    await insertData();
-    console.log("Data insertion for insertData is complete.");
+    // // Call the second function and wait for it to complete
+    // await insertData();
+    // console.log("Data insertion for insertData is complete.");
 
-    // Call the third function and wait for it to complete
-    await insertData3();
-    console.log("Data insertion for insertData3 is complete.");
+    // // Call the third function and wait for it to complete
+    // await insertData3();
+    // console.log("Data insertion for insertData3 is complete.");
 
-    // Call the fantasy points insertion function and wait for it to complete
-    await insertFP();
-    console.log("Fantasy points insertion is complete.");
+    // // Call the fantasy points insertion function and wait for it to complete
+    // await insertFP();
+    // console.log("Fantasy points insertion is complete.");
 
     // Call the function to create Dream Teams and wait for it to complete
     await createDreamTeam();

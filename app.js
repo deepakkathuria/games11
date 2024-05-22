@@ -1247,6 +1247,196 @@ app.get("/venue1/:venueId/team/:teamId/match-details", async (req, res) => {
   }
 });
 
+//DREAM TEAM VENUE
+app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (req, res) => {
+  const { venueId, team1Id, team2Id } = req.params;
+  const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
+
+  try {
+    // Fetch the last five matches for a specific venue and between two teams within a competition
+    const [matches] = await pool.query(
+      `
+          SELECT id AS match_id, date_start, short_title, status_note
+          FROM matches
+          WHERE (team_1 = ? AND team_2 = ? OR team_1 = ? AND team_2 = ?) AND venue_id = ? AND competition_id = ?
+          ORDER BY date_start DESC
+          LIMIT 5
+      `,
+      [team1Id, team2Id, team2Id, team1Id, venueId, competitionId]
+    );
+
+    const matchIds = matches.map(match => match.match_id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found");
+    }
+
+    // Query for batting, bowling, fielding details, fantasy points, dream teams, and inning scores
+    const [
+      battingDetails,
+      bowlingDetails,
+      fieldingDetails,
+      fantasyPoints,
+      dreamTeams,
+      inningScores,
+    ] = await Promise.all([
+      pool.query(
+        `
+          SELECT 
+              b.match_id,
+              p.id as player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name as player_short_name,
+              p.playing_role,
+              p.fantasy_player_rating as player_rating,
+              b.runs,
+              b.balls_faced,
+              b.fours,
+              b.sixes,
+              b.strike_rate,
+              b.how_out,
+              t.id as team_id,
+              t.short_name as team_short_name
+          FROM match_inning_batters_test b
+          JOIN players p ON b.batsman_id = p.id
+          JOIN team_players tp ON p.id = tp.player_id
+          JOIN teams t ON tp.team_id = t.id
+          WHERE b.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
+        `,
+        [matchIds, team1Id, team2Id]
+      ),
+      pool.query(
+        `
+          SELECT 
+              bl.match_id,
+              p.id as player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name as player_short_name,
+              p.playing_role,
+              p.fantasy_player_rating as player_rating,
+              bl.overs,
+              bl.runs_conceded,
+              bl.wickets,
+              bl.econ,
+              t.id as team_id,
+              t.short_name as team_short_name
+          FROM match_inning_bowlers_test bl
+          JOIN players p ON bl.bowler_id = p.id
+          JOIN team_players tp ON p.id = tp.player_id
+          JOIN teams t ON tp.team_id = t.id
+          WHERE bl.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
+        `,
+        [matchIds, team1Id, team2Id]
+      ),
+      pool.query(
+        `
+          SELECT 
+              f.match_id,
+              p.id as player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name as player_short_name,
+              p.playing_role,
+              p.fantasy_player_rating as player_rating,
+              f.catches,
+              f.stumping,
+              f.runout_thrower,
+              f.runout_catcher,
+              f.runout_direct_hit,
+              t.id as team_id,
+              t.short_name as team_short_name
+          FROM match_inning_fielders_test f
+          JOIN players p ON f.fielder_id = p.id
+          JOIN team_players tp ON p.id = tp.player_id
+          JOIN teams t ON tp.team_id = t.id
+          WHERE f.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
+        `,
+        [matchIds, team1Id, team2Id]
+      ),
+      pool.query(
+        `
+          SELECT 
+              fp.match_id,
+              p.id as player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name as player_short_name,
+              p.playing_role,
+              p.fantasy_player_rating as player_rating,
+              fp.points,
+              t.id as team_id,
+              t.short_name as team_short_name
+          FROM fantasy_points_details fp
+          JOIN players p ON fp.player_id = p.id
+          JOIN team_players tp ON p.id = tp.player_id
+          JOIN teams t ON tp.team_id = t.id
+          WHERE fp.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
+        `,
+        [matchIds, team1Id, team2Id]
+      ),
+      pool.query(
+        `
+          SELECT 
+              dt.match_id,
+              p.id as player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name as player_short_name,
+              p.playing_role,
+              p.fantasy_player_rating as player_rating,
+              dt.role,
+              dt.points,
+              t.id as team_id,
+              t.short_name as team_short_name
+          FROM DreamTeam_test dt
+          JOIN players p ON dt.player_id = p.id
+          JOIN team_players tp ON p.id = tp.player_id
+          JOIN teams t ON tp.team_id = t.id
+          WHERE dt.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
+        `,
+        [matchIds, team1Id, team2Id]
+      ),
+      pool.query(
+        `
+          SELECT
+              mi.match_id,
+              mi.inning_number,
+              mi.scores,
+              mi.scores_full,
+              t.id AS team_id,
+              t.name AS team_name
+          FROM match_innings_test mi
+          JOIN matches m ON mi.match_id = m.id
+          LEFT JOIN teams t ON (mi.batting_team_id = t.id)
+          WHERE mi.match_id IN (?) AND (mi.batting_team_id = ? OR mi.batting_team_id = ?)
+        `,
+        [matchIds, team1Id, team2Id]
+      ),
+    ]);
+
+    // Organize data by match_id
+    const detailedMatches = matches.map(match => ({
+      match_id: match.match_id,
+      short_title: match.short_title,
+      status_note: match.status_note,
+      date_start: match.date_start,
+      innings: inningScores[0].filter(i => i.match_id === match.match_id),
+      batting: battingDetails[0].filter(b => b.match_id === match.match_id),
+      bowling: bowlingDetails[0].filter(b => b.match_id === match.match_id),
+      fielding: fieldingDetails[0].filter(f => f.match_id === match.match_id),
+      fantasyPoints: fantasyPoints[0].filter(fp => fp.match_id === match.match_id),
+      dreamTeam: dreamTeams[0].filter(dt => dt.match_id === match.match_id),
+    }));
+
+    res.json(detailedMatches);
+  } catch (error) {
+    console.error("Error fetching match details:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
 //scoore card
 app.get("/match/:matchId/scorecard", async (req, res) => {
   const { matchId } = req.params;
