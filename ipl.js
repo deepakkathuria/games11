@@ -23,7 +23,7 @@ async function insertData1() {
     
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      "https://rest.entitysport.com/v2/competitions/128414/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -76,7 +76,7 @@ async function insertData1() {
         `,
           [
             match.match_id,
-            tournament_id=1,
+            tournament_id=10,
             match.teama.team_id,
             match.teamb.team_id,
             match.venue.venue_id,
@@ -127,7 +127,7 @@ async function insertData1() {
 
         // Handle Players and Match Squads more comprehensively
         const squadsResponse = await axios.get(
-          "https://rest.entitysport.com/v2/competitions/10058/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+          "https://rest.entitysport.com/v2/competitions/128414/squads?token=73d62591af4b3ccb51986ff5f8af5676"
         );
         const teams = squadsResponse.data.response.squads;
 
@@ -260,7 +260,7 @@ async function insertData() {
 
     // Fetch matches from API
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      "https://rest.entitysport.com/v2/competitions/128414/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -439,7 +439,7 @@ async function insertData3() {
 
     // Fetch teams and their squads from API
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+      "https://rest.entitysport.com/v2/competitions/128414/squads?token=73d62591af4b3ccb51986ff5f8af5676"
     );
 
     const teams = response.data.response.squads;
@@ -488,7 +488,7 @@ async function insertFP() {
     // Fetch matches from API
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/10058/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      "https://rest.entitysport.com/v2/competitions/128414/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -595,7 +595,7 @@ async function insertFP() {
 //             port: process.env.DB_PORT,
 //         });
 
-//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/10058/matches?token=${process.env.API_TOKEN}&per_page=80`);
+//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128414/matches?token=${process.env.API_TOKEN}&per_page=80`);
 //         const matches = response.data.response.items;
 
 //         for (const match of matches) {
@@ -664,7 +664,7 @@ async function createDreamTeam() {
           port: process.env.DB_PORT,
       });
 
-      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/10058/matches?token=${process.env.API_TOKEN}&per_page=80`);
+      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128414/matches?token=${process.env.API_TOKEN}&per_page=80`);
       const matches = response.data.response.items;
 
       for (const match of matches) {

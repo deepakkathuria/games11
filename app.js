@@ -619,7 +619,6 @@ app.get("/team-matches/:teamId", async (req, res) => {
       LEFT JOIN teams t1 ON m.team_1 = t1.id
       LEFT JOIN teams t2 ON m.team_2 = t2.id
       WHERE ? IN (m.team_1, m.team_2)
-        AND m.competition_id = ?  -- Adding competition filter
       ORDER BY m.date_start DESC
       LIMIT 5
       `,
@@ -653,13 +652,13 @@ app.get("/top-players/:teamId1/:teamId2", async (req, res) => {
     FROM players p
     JOIN fantasy_points_details fp ON p.id = fp.player_id
     JOIN teams t ON fp.team_id = t.id
-    JOIN matches m ON m.id = fp.match_id AND m.competition_id = ?
+    JOIN matches m ON m.id = fp.match_id 
     WHERE fp.team_id IN (?, ?)
     GROUP BY p.id, fp.team_id, t.name
     ORDER BY SUM(fp.points) DESC
     LIMIT 16
       `,
-      [competitionId, teamId1, teamId2] // Passing hardcoded competitionId
+      [teamId1, teamId2] // Passing hardcoded competitionId
     );
     res.json(players);
   } catch (error) {
@@ -720,8 +719,7 @@ app.get("/player-stats/:playerIds/:scope", async (req, res) => {
     LEFT JOIN match_inning_fielders_test fld ON m.id = fld.match_id AND fp.player_id = fld.fielder_id
     LEFT JOIN DreamTeam_test dt ON m.id = dt.match_id AND p.id = dt.player_id
     WHERE
-      fp.player_id IN (?) AND
-      m.competition_id = ${competitionId}
+      fp.player_id IN (?)
     ORDER BY
       m.date_start DESC
     ${limitClause};
@@ -804,16 +802,15 @@ app.get("/top-players/:teamId/:venueId", async (req, res) => {
           SUM(fp.points) AS total_fantasy_points,
           COUNT(DISTINCT m.id) AS match_count,
           GROUP_CONCAT(DISTINCT m.id ORDER BY m.id) AS match_ids,
-          t.short_name AS team_short_name  // Added this to get the team short name
+          t.short_name AS team_short_name  
       FROM matches m
       JOIN fantasy_points_details fp ON m.id = fp.match_id
       JOIN players p ON fp.player_id = p.id
       JOIN team_players tp ON p.id = tp.player_id AND tp.team_id = ?
-      JOIN teams t ON tp.team_id = t.id  // Joining with teams table to get the team details
+      JOIN teams t ON tp.team_id = t.id  
       WHERE (m.team_1 = ? OR m.team_2 = ?) 
         AND m.venue_id = ?
-        AND m.competition_id = 128471
-      GROUP BY p.id, t.short_name  // Modified GROUP BY to include t.short_name
+      GROUP BY p.id, t.short_name  
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
   `;
@@ -858,8 +855,7 @@ app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
           (m.toss_winner != ? AND m.toss_decision = 1 AND m.team_2 = ?)
       )
       AND m.venue_id = ?
-      AND m.competition_id = 128471  // Filter by competition ID
-      GROUP BY p.id, t.short_name  // Modified GROUP BY to include t.short_name
+\      GROUP BY p.id, t.short_name  
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
   `;
@@ -908,8 +904,7 @@ app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
           (m.toss_winner != ? AND m.toss_decision = 2 AND m.team_2 = ?)
       )
       AND m.venue_id = ?
-      AND m.competition_id = 128471  // Filter by competition ID
-      GROUP BY p.id, t.short_name // Modified GROUP BY to include t.short_name
+      GROUP BY p.id, t.short_name 
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
   `;
@@ -952,7 +947,7 @@ app.get("/stats/venue/:venueId", async (req, res) => {
           FROM matches m
           JOIN match_innings_test mi ON m.id = mi.match_id AND mi.inning_number = 1
           LEFT JOIN match_inning_bowlers_test b ON m.id = b.match_id AND b.inning_number = 1
-          WHERE m.venue_id = ? AND m.competition_id = ?
+          WHERE m.venue_id = ?
           GROUP BY m.id
           ORDER BY m.date_start DESC
           LIMIT 5
@@ -960,7 +955,7 @@ app.get("/stats/venue/:venueId", async (req, res) => {
   `;
 
   try {
-    const [results] = await pool.query(query, [venueId, competitionId]);
+    const [results] = await pool.query(query, [venueId]);
     if (results.length) {
       res.json(results[0]); // Return the first result in a structured format
     } else {
@@ -982,11 +977,11 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
       `
           SELECT id AS match_id, date_start, short_title, status_note
           FROM matches
-          WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? AND competition_id = ?
+          WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? 
           ORDER BY date_start DESC
           LIMIT 5
       `,
-      [teamId, teamId, venueId, competitionId]
+      [teamId, teamId, venueId]
     );
 
     const matchIds = matches.map(match => match.match_id);
@@ -1169,11 +1164,11 @@ app.get("/venue1/:venueId/team/:teamId/match-details", async (req, res) => {
           `
           SELECT id AS match_id, date_start, short_title, status_note
           FROM matches
-          WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? AND competition_id = ?
+          WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? 
           ORDER BY date_start DESC
           LIMIT 5
           `,
-          [teamId, teamId, venueId, competitionId]
+          [teamId, teamId, venueId]
       );
 
       const matchIds = matches.map(match => match.match_id);
@@ -1258,11 +1253,11 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
       `
           SELECT id AS match_id, date_start, short_title, status_note
           FROM matches
-          WHERE (team_1 = ? AND team_2 = ? OR team_1 = ? AND team_2 = ?) AND venue_id = ? AND competition_id = ?
+          WHERE (team_1 = ? AND team_2 = ? OR team_1 = ? AND team_2 = ?) AND venue_id = ?
           ORDER BY date_start DESC
           LIMIT 5
       `,
-      [team1Id, team2Id, team2Id, team1Id, venueId, competitionId]
+      [team1Id, team2Id, team2Id, team1Id, venueId]
     );
 
     const matchIds = matches.map(match => match.match_id);
@@ -1551,14 +1546,13 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
       JOIN matches m ON fp.match_id = m.id
       WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
         AND m.venue_id = ?
-        AND m.competition_id = ?
       GROUP BY p.id, p.playing_role, t.name       
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
     `;
 
     // Binding the parameters to avoid SQL injection
-    const params = [teamId1, teamId2, teamId1, teamId2, venueId, competitionId];
+    const params = [teamId1, teamId2, teamId1, teamId2, venueId];
 
     // Execute the query
     const [players] = await pool.query(query, params);
@@ -1600,7 +1594,6 @@ app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, 
       JOIN teams t ON tp.team_id = t.id
       WHERE (m.team_1 = ? OR m.team_2 = ?) AND (m.team_1 = ? OR m.team_2 = ?)
         AND m.venue_id = ?
-        AND m.competition_id = 128471
       GROUP BY dt.player_id, p.playing_role, t.name, t.short_name
       ORDER BY times_captain DESC, times_vice_captain DESC;
     `;
@@ -1630,7 +1623,7 @@ app.get("/match-stats/:venueId/:teamId", async (req, res) => {
                 (m.toss_winner != ? AND m.toss_decision = 1 AND m.winning_team_id = ?)) THEN 1 
           ELSE 0 END) AS wins_chasing
       FROM matches m
-      WHERE (m.team_1 = ? OR m.team_2 = ?) AND m.venue_id = ? AND m.competition_id = 128471;
+      WHERE (m.team_1 = ? OR m.team_2 = ?) AND m.venue_id = ?;
       `;
 
     const params = [
@@ -1686,7 +1679,7 @@ app.get("/venue-stats/:venueId", async (req, res) => {
                   ELSE 0 END) AS wins_chasing,
               GROUP_CONCAT(m.id) AS match_ids
           FROM matches m
-          WHERE m.venue_id = ? AND m.competition_id = 128471;
+          WHERE m.venue_id = ?;
       `;
 
     const [results] = await pool.query(query, [venueId]);
@@ -1800,7 +1793,7 @@ app.get("/venue-stats-last-five/:venueId", async (req, res) => {
               GROUP_CONCAT(m.id) AS match_ids
           FROM (
             SELECT * FROM matches 
-            WHERE venue_id = ? AND competition_id = 128471
+            WHERE venue_id = ? 
             ORDER BY date_start DESC
             LIMIT 5
           ) AS m;
@@ -1848,11 +1841,11 @@ app.get("/venue/:venueId/stats", async (req, res) => {
                         (m.team_1 = m.winning_team_id AND mi.inning_number = 2) THEN 1 ELSE 0 END) AS wins_chasing
       FROM matches m
       LEFT JOIN match_innings_test mi ON m.id = mi.match_id
-      WHERE m.venue_id = ? AND m.competition_id = ?
+      WHERE m.venue_id = ? 
       GROUP BY m.venue_id;
     `;
 
-    const [results] = await pool.query(query, [venueId, competitionId]);
+    const [results] = await pool.query(query, [venueId]);
     if (results.length === 0) {
       return res.status(404).send("No matches found");
     }
@@ -1886,7 +1879,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
       `
           SELECT id AS match_id, status_note
           FROM matches
-          WHERE venue_id = ? AND competition_id = 128471
+          WHERE venue_id = ? 
           ORDER BY date_start DESC
           LIMIT 5
       `,
@@ -1960,7 +1953,6 @@ app.get("/match-stats/teams/:teamId1/:teamId2", async (req, res) => {
     const [matches] = await pool.query(`
       SELECT id FROM matches
       WHERE (team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)
-      AND competition_id = ?
       ORDER BY date_start DESC
     `, [teamId1, teamId2, teamId2, teamId1, competitionId]);
 
@@ -2028,9 +2020,8 @@ app.get("/match-stats/teams/:teamId1/:teamId2/:specificTeamId", async (req, res)
     const [matches] = await pool.query(`
       SELECT id FROM matches
       WHERE (team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)
-      AND competition_id = ?
       ORDER BY date_start DESC
-    `, [teamId1, teamId2, teamId2, teamId1, competitionId]);
+    `, [teamId1, teamId2, teamId2, teamId1]);
 
     const matchIds = matches.map(match => match.id);
     if (matchIds.length === 0) {
@@ -2097,11 +2088,11 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
     const getMatchIds = async (limit) => {
       const query = `
         SELECT id FROM matches
-        WHERE competition_id = ? AND ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
+        WHERE ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
         ORDER BY date_start DESC
         ${limit ? `LIMIT ${limit}` : ''}
       `;
-      const [matches] = await pool.query(query, [competitionId, teamId1, teamId2, teamId2, teamId1]);
+      const [matches] = await pool.query(query, [teamId1, teamId2, teamId2, teamId1]);
       return matches.map(m => m.id);
     };
 
@@ -2164,9 +2155,9 @@ app.get("/team-performance/:teamId", async (req, res) => {
     // Fetch the IDs of the last five and all matches for this team in the competition.
     const [matches] = await pool.query(`
       SELECT id, date_start FROM matches
-      WHERE (team_1 = ? OR team_2 = ?) AND competition_id = ?
+      WHERE (team_1 = ? OR team_2 = ?) 
       ORDER BY date_start DESC
-    `, [teamId, teamId, competitionId]);
+    `, [teamId, teamId]);
 
     const matchIds = matches.map(match => match.id);
     if (matchIds.length === 0) {
@@ -2235,9 +2226,9 @@ app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
     // Fetch all match IDs for this team in the competition, ordered by date.
     const [matches] = await pool.query(`
       SELECT id FROM matches
-      WHERE (team_1 = ? OR team_2 = ?) AND competition_id = ?
+      WHERE (team_1 = ? OR team_2 = ?) 
       ORDER BY date_start DESC
-    `, [teamId, teamId, competitionId]);
+    `, [teamId, teamId]);
 
     const matchIds = matches.map(match => match.id);
     if (matchIds.length === 0) {
@@ -2298,9 +2289,9 @@ app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
     // Fetch all match IDs for the specified teams in the competition, ordered by date.
     const [matches] = await pool.query(`
       SELECT id FROM matches
-      WHERE competition_id = ? AND (team_1 IN (?, ?) AND team_2 IN (?, ?))
+      WHERE (team_1 IN (?, ?) AND team_2 IN (?, ?))
       ORDER BY date_start DESC
-    `, [competitionId, teamA, teamB, teamA, teamB]);
+    `, [ teamA, teamB, teamA, teamB]);
 
     const matchIds = matches.map(match => match.id);
     if (matchIds.length === 0) {
@@ -2388,9 +2379,9 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
     // Fetch all match IDs for the specified teams in the competition, ordered by date.
     const [matches] = await pool.query(`
       SELECT id FROM matches
-      WHERE competition_id = ? AND ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
+      WHERE ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
       ORDER BY date_start DESC
-    `, [competitionId, teamA, teamB, teamB, teamA]);
+    `, [ teamA, teamB, teamB, teamA]);
 
     const matchIds = matches.map(match => match.id);
     if (matchIds.length === 0) {
@@ -2601,7 +2592,6 @@ app.get('/api/match/stats', async (req, res) => {
       FROM teams
       LEFT JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
           AND m.status_str = 'Completed'
-          AND m.competition_id = ?
           AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
       WHERE teams.id IN (?, ?)
       GROUP BY teams.name
@@ -2609,7 +2599,7 @@ app.get('/api/match/stats', async (req, res) => {
   `;
 
   try {
-      const params = [competitionId, team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
+      const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
       const [results] = await pool.query(query, params);
 
       // Format the response
@@ -2654,7 +2644,6 @@ app.get('/api/match/stats/batting-first', async (req, res) => {
       FROM teams
       JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
           AND m.status_str = 'Completed'
-          AND m.competition_id = 128471
           AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
           AND (
             (m.toss_winner = teams.id AND m.toss_decision = 1) OR
@@ -2707,7 +2696,6 @@ app.get('/api/match/stats/bowling-first', async (req, res) => {
       FROM teams
       JOIN matches m ON (m.team_1 = teams.id OR m.team_2 = teams.id)
           AND m.status_str = 'Completed'
-          AND m.competition_id = 128471
           AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
           AND (
             (m.toss_winner = teams.id AND m.toss_decision = 2) OR
