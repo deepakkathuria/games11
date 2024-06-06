@@ -2879,3 +2879,192 @@ app.get('/competitions/:tournamentId', async (req, res) => {
       res.status(500).send('Server error: ' + error.message);
   }
 });
+
+
+
+
+
+// ---------------------------------------api win percentage ------------------------------------------------
+
+app.get('/teams/win-percentage/:teamId1/:teamId2', async (req, res) => {
+  try {
+      const { teamId1, teamId2 } = req.params;
+      
+      const query = `
+          WITH TeamMatches AS (
+              SELECT 
+                  m.id AS match_id,
+                  m.team_1,
+                  m.team_2,
+                  m.winning_team_id
+              FROM 
+                  matches m
+              WHERE 
+                  (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ),
+          TeamStats AS (
+              SELECT 
+                  ? AS team_id,
+                  COUNT(*) AS total_matches,
+                  SUM(CASE WHEN tm.winning_team_id = ? THEN 1 ELSE 0 END) AS wins
+              FROM 
+                  TeamMatches tm
+              UNION ALL
+              SELECT 
+                  ? AS team_id,
+                  COUNT(*) AS total_matches,
+                  SUM(CASE WHEN tm.winning_team_id = ? THEN 1 ELSE 0 END) AS wins
+              FROM 
+                  TeamMatches tm
+          )
+          SELECT 
+              team_id,
+              total_matches,
+              wins,
+              (wins / total_matches) * 100 AS win_percentage
+          FROM 
+              TeamStats;
+      `;
+
+      const [rows] = await pool.query(query, [teamId1, teamId2, teamId2, teamId1, teamId1, teamId1, teamId2, teamId2]);
+      res.json(rows);
+  } catch (error) {
+      res.status(500).send('Server error: ' + error.message);
+  }
+});
+
+// /teams/win-percentage/:teamId1/:teamId2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------------------------------------new design apis ---------------------------------------------------
+
+
+app.get("/new/top-players-stats/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+
+  try {
+      // Fetch top players for the specified teams
+      const [players] = await pool.query(
+          `
+          SELECT 
+              p.id AS player_id, 
+              p.first_name, 
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              t.name AS team_name,
+              t.short_name AS short_team_name,
+              COUNT(DISTINCT m.id) AS matches_played, 
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.runs) AS average_runs,
+              MAX(fp.runs) AS max_runs
+          FROM players p
+          JOIN fantasy_points_details fp ON p.id = fp.player_id
+          JOIN teams t ON fp.team_id = t.id
+          JOIN matches m ON m.id = fp.match_id 
+          WHERE 
+              ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+          GROUP BY p.id, p.first_name, p.last_name, p.playing_role, p.short_name, t.name, t.short_name
+          ORDER BY SUM(fp.points) DESC
+          LIMIT 16
+          `,
+          [teamId1, teamId2, teamId2, teamId1]
+      );
+
+      const playerIdsArray = players.map(player => player.player_id);
+
+      if (playerIdsArray.length === 0) {
+          return res.json([]);
+      }
+
+      // Fetch detailed statistics for each top player
+      const [playerStats] = await pool.query(
+          `
+          SELECT
+              fp.player_id,
+              GROUP_CONCAT(DISTINCT m.id) AS match_ids,
+              COUNT(DISTINCT m.id) AS matches_played,
+              SUM(fp.points) AS total_points,
+              AVG(fp.rating) AS average_rating,
+              SUM(b.runs) AS total_runs,
+              AVG(b.runs) AS average_runs,
+              MAX(b.runs) AS max_runs,
+              SUM(b.balls_faced) AS total_balls_faced,
+              AVG(b.balls_faced) AS average_balls_faced,
+              SUM(CASE WHEN b.runs >= 100 THEN 1 ELSE 0 END) AS hundreds,
+              SUM(CASE WHEN b.runs >= 50 THEN 1 ELSE 0 END) AS fifties,
+              AVG(b.runs * 100.0 / NULLIF(b.balls_faced, 0)) AS strike_rate,
+              SUM(bl.overs) AS total_overs_bowled,
+              SUM(bl.runs_conceded) AS total_runs_conceded,
+              SUM(bl.wickets) AS total_wickets,
+              AVG(bl.runs_conceded / NULLIF(bl.overs, 0)) AS economy_rate,
+              SUM(COALESCE(fld.catches, 0)) AS total_catches,
+              SUM(COALESCE(fld.runout_thrower, 0) + COALESCE(fld.runout_catcher, 0) + COALESCE(fld.runout_direct_hit, 0)) AS total_runouts,
+              SUM(COALESCE(fld.stumping, 0)) AS total_stumpings
+          FROM 
+              matches m
+          JOIN fantasy_points_details fp ON m.id = fp.match_id
+          JOIN players p ON p.id = fp.player_id
+          LEFT JOIN match_inning_batters_test b ON m.id = b.match_id AND fp.player_id = b.batsman_id
+          LEFT JOIN match_inning_bowlers_test bl ON m.id = bl.match_id AND fp.player_id = bl.bowler_id
+          LEFT JOIN match_inning_fielders_test fld ON m.id = fld.match_id AND fp.player_id = fld.fielder_id
+          LEFT JOIN DreamTeam_test dt ON m.id = dt.match_id AND p.id = dt.player_id
+          WHERE
+              fp.player_id IN (?) AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+          GROUP BY
+              fp.player_id
+          ORDER BY
+              total_points DESC;
+          `,
+          [playerIdsArray, teamId1, teamId2, teamId2, teamId1]
+      );
+
+      // Combine top players with their stats
+      const topPlayersWithStats = players.map(player => {
+          const stats = playerStats.find(stat => stat.player_id === player.player_id);
+          return {
+              ...player,
+              match_ids: stats.match_ids.split(',').map(id => parseInt(id)),
+              stats: {
+                  matches_played: stats.matches_played,
+                  total_points: stats.total_points,
+                  average_rating: stats.average_rating,
+                  total_runs: stats.total_runs,
+                  average_runs: stats.average_runs,
+                  max_runs: stats.max_runs,
+                  total_balls_faced: stats.total_balls_faced,
+                  average_balls_faced: stats.average_balls_faced,
+                  hundreds: stats.hundreds,
+                  fifties: stats.fifties,
+                  strike_rate: stats.strike_rate,
+                  total_overs_bowled: stats.total_overs_bowled,
+                  total_runs_conceded: stats.total_runs_conceded,
+                  total_wickets: stats.total_wickets,
+                  economy_rate: stats.economy_rate,
+                  total_catches: stats.total_catches,
+                  total_runouts: stats.total_runouts,
+                  total_stumpings: stats.total_stumpings,
+              }
+          };
+      });
+
+      res.json(topPlayersWithStats);
+  } catch (error) {
+      console.error("Failed to fetch player statistics:", error);
+      res.status(500).send("Failed to retrieve player data");
+  }
+});

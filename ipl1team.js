@@ -8,8 +8,36 @@ const axios = require("axios");
 require("dotenv").config();
 
 
+
+
+const url = 'https://rest.entitysport.com/v2/teams/19/matches?status=2&token=73d62591af4b3ccb51986ff5f8af5676';
+
+// Function to fetch match IDs
+const fetchMatchIds = async () => {
+  try {
+    const response = await axios.get(url);
+    const data = response.data;
+
+    if (data.status === 'ok') {
+      const matchIds = data.response.items.map(item => item.match_id);
+      console.log(matchIds);
+      return matchIds;
+    } else {
+      console.error('Error: Status not OK');
+    }
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  }
+};
+
+
 // insertData();
 // venue  ,   match_squad,  players, matches
+
+var team_id = 127775
+
+// const teams = [17]
+
 async function insertData1() {
   let connection;
   try {
@@ -20,15 +48,18 @@ async function insertData1() {
       database: process.env.DB_NAME,
       port: process.env.DB_PORT,
     });
-    
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/121877/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    //   "https://rest.entitysport.com/v2/competitions/128414/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    `https://rest.entitysport.com/v2/teams/${team_id}/matches?status=2&token=73d62591af4b3ccb51986ff5f8af5676&per_page=10`
     );
     const matches = response.data.response.items;
+    
+  
 
     for (const match of matches) {
-    //   if (match.status_str === "Completed") {
+        console.log(matches)
+      if (match.status_str === "Completed") {
         // Enhanced Venue Insertion with additional details
         await connection.query(
           `
@@ -47,86 +78,90 @@ async function insertData1() {
 
         // Enhanced Team Insertion with logos and additional details
         await connection.query(
-            `
-            INSERT INTO matches (
-                id, tournament_id, team_1, team_2, venue_id, format_str, match_number, status_str, result_type, win_margin, title, subtitle, 
-                short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
-                date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
-                latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
-                toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition, competition_id,
-                team_1_score, team_2_score
-            )
-            VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-            ON DUPLICATE KEY UPDATE
-                tournament_id=VALUES(tournament_id),team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
-                match_number=VALUES(match_number), status_str=VALUES(status_str), result_type=VALUES(result_type), win_margin=VALUES(win_margin),
-                title=VALUES(title), subtitle=VALUES(subtitle), short_title=VALUES(short_title), status_note=VALUES(status_note),
-                verified=VALUES(verified), pre_squad=VALUES(pre_squad), odds_available=VALUES(odds_available), game_state=VALUES(game_state),
-                game_state_str=VALUES(game_state_str), domestic=VALUES(domestic), date_start=VALUES(date_start), date_end=VALUES(date_end),
-                date_start_ist=VALUES(date_start_ist), umpires=VALUES(umpires), referee=VALUES(referee), equation=VALUES(equation), live=VALUES(live),
-                winning_team_id=VALUES(winning_team_id), commentary=VALUES(commentary), wagon=VALUES(wagon), latest_inning_number=VALUES(latest_inning_number),
-                presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
-                live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
-                toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
-                batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition), competition_id=VALUES(competition_id),
-                team_1_score=VALUES(team_1_score), team_2_score=VALUES(team_2_score)
-            `,
-            [
-                match.match_id,
-                10,  // tournament_id
-                match.teama.team_id,
-                match.teamb.team_id,
-                match.venue.venue_id,
-                match.format_str,
-                match.match_number,
-                match.status_str,
-                match.result_type,
-                match.win_margin,
-                match.title,
-                match.subtitle,
-                match.short_title,
-                match.status_note,
-                match.verified === "true" ? 1 : 0,
-                match.pre_squad === "true" ? 1 : 0,
-                match.odds_available === "true" ? 1 : 0,
-                match.game_state,
-                match.game_state_str,
-                match.domestic === "1" ? 1 : 0,
-                match.date_start,
-                match.date_end,
-                match.date_start_ist,
-                match.umpires,
-                match.referee,
-                match.equation,
-                match.live,
-                match.winning_team_id,
-                match.commentary === "true" ? 1 : 0,
-                match.wagon === "true" ? 1 : 0,
-                match.latest_inning_number,
-                match.presquad_time || null,
-                match.verify_time || null,
-                match.match_dls_affected === "true" ? 1 : 0,
-                match.live_inning_number,
-                match.day,
-                match.session,
-                match.toss.text,
-                match.toss.winner,
-                match.toss.decision,
-                match.pitch.pitch_condition,
-                match.pitch.batting_condition,
-                match.pitch.pace_bowling_condition,
-                match.pitch.spine_bowling_condition,
-                match.competition.cid,
-                match.teama.scores,  // Score from team A
-                match.teamb.scores   // Score from team B
-            ]
+          `
+        INSERT INTO matches (
+            id,tournament_id, team_1, team_2, venue_id, format_str, match_number, status_str, result_type, win_margin, title, subtitle, 
+            short_title, status_note, verified, pre_squad, odds_available, game_state, game_state_str, domestic, 
+            date_start, date_end, date_start_ist, umpires, referee, equation, live, winning_team_id, commentary, wagon, 
+            latest_inning_number, presquad_time, verify_time, match_dls_affected, live_inning_number, day, session,
+            toss_text, toss_winner, toss_decision, pitch_condition, batting_condition, pace_bowling_condition, spine_bowling_condition, competition_id,
+            team_1_score, team_2_score
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        ON DUPLICATE KEY UPDATE
+            tournament_id=VALUES(tournament_id),team_1=VALUES(team_1), team_2=VALUES(team_2), venue_id=VALUES(venue_id), format_str=VALUES(format_str),
+            match_number=VALUES(match_number), status_str=VALUES(status_str), result_type=VALUES(result_type), win_margin=VALUES(win_margin),
+            title=VALUES(title), subtitle=VALUES(subtitle), short_title=VALUES(short_title), status_note=VALUES(status_note),
+            verified=VALUES(verified), pre_squad=VALUES(pre_squad), odds_available=VALUES(odds_available), game_state=VALUES(game_state),
+            game_state_str=VALUES(game_state_str), domestic=VALUES(domestic), date_start=VALUES(date_start), date_end=VALUES(date_end),
+            date_start_ist=VALUES(date_start_ist), umpires=VALUES(umpires), referee=VALUES(referee), equation=VALUES(equation), live=VALUES(live),
+            winning_team_id=VALUES(winning_team_id), commentary=VALUES(commentary), wagon=VALUES(wagon), latest_inning_number=VALUES(latest_inning_number),
+            presquad_time=VALUES(presquad_time), verify_time=VALUES(verify_time), match_dls_affected=VALUES(match_dls_affected),
+            live_inning_number=VALUES(live_inning_number), day=VALUES(day), session=VALUES(session), toss_text=VALUES(toss_text),
+            toss_winner=VALUES(toss_winner), toss_decision=VALUES(toss_decision), pitch_condition=VALUES(pitch_condition),
+            batting_condition=VALUES(batting_condition), pace_bowling_condition=VALUES(pace_bowling_condition), spine_bowling_condition=VALUES(spine_bowling_condition), competition_id=VALUES(competition_id),
+            team_1_score=VALUES(team_1_score), team_2_score=VALUES(team_2_score)
+        `,
+          [
+            match.match_id,
+            tournament_id=0,
+            match.teama.team_id,
+            match.teamb.team_id,
+            match.venue.venue_id,
+            match.format_str,
+            match.match_number,
+            match.status_str,
+            match.result_type,
+            match.win_margin,
+            match.title,
+            match.subtitle,
+            match.short_title,
+            match.status_note,
+            match.verified === "true" ? 1 : 0,
+            match.pre_squad === "true" ? 1 : 0,
+            match.odds_available === "true" ? 1 : 0,
+            match.game_state,
+            match.game_state_str,
+            match.domestic === "1" ? 1 : 0,
+            match.date_start,
+            match.date_end,
+            match.date_start_ist,
+            match.umpires,
+            match.referee,
+            match.equation,
+            match.live,
+            match.winning_team_id,
+            match.commentary === "true" ? 1 : 0,
+            match.wagon === "true" ? 1 : 0,
+            match.latest_inning_number,
+            match.presquad_time,
+            match.verify_time,
+            match.match_dls_affected === "true" ? 1 : 0,
+            match.live_inning_number,
+            match.day,
+            match.session,
+            match.toss.text,
+            match.toss.winner,
+            match.toss.decision,
+            match.pitch.pitch_condition,
+            match.pitch.batting_condition,
+            match.pitch.pace_bowling_condition,
+            match.pitch.spine_bowling_condition,
+            match.competition.cid,
+            match.teama.scores,  // Score from team A
+            match.teamb.scores   // Score from team B
+          ]
         );
+
+        console.log("gihihihihihii")
 
         // Handle Players and Match Squads more comprehensively
         const squadsResponse = await axios.get(
-          "https://rest.entitysport.com/v2/competitions/121877/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+          `https://rest.entitysport.com/v2/competitions/${match.competition.cid}/squads?token=73d62591af4b3ccb51986ff5f8af5676`
+        //   `https://rest.entitysport.com/v2/matches/${match.match_id}/squads?token=73d62591af4b3ccb51986ff5f8af5676`
+
         );
         const teams = squadsResponse.data.response.squads;
 
@@ -196,8 +231,6 @@ async function insertData1() {
             );
           }
         }
-        await connection.commit();
-
         const teamIds = [match.teama.team_id, match.teamb.team_id];
         for (const teamId of teamIds) {
           const squadsResponse = await axios.get(
@@ -207,7 +240,7 @@ async function insertData1() {
             teamId === match.teama.team_id
               ? squadsResponse.data.response.teama
               : squadsResponse.data.response.teamb;
-          
+
           for (const player of team.squads) {
             await connection.execute(
               `INSERT INTO match_squads (
@@ -232,7 +265,7 @@ async function insertData1() {
         }
 
         // Additional data handling can be included here for other tables
-    //   }
+      }
     }
     console.log("Data successfully inserted for all matches.");
   } catch (error) {
@@ -261,15 +294,14 @@ async function insertData() {
 
     // Fetch matches from API
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/121877/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    //   "https://rest.entitysport.com/v2/competitions/128414/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+    `https://rest.entitysport.com/v2/teams/${team_id}/matches?status=2&token=73d62591af4b3ccb51986ff5f8af5676&per_page=10`
+
     );
     const matches = response.data.response.items;
-    console.log(matches.status_str,"sfdjfafdfsa")
-    
 
     for (const match of matches) {
       if (match.status_str === "Completed") {
-        console.log("completed")
         // Insert data into Matches, Venues, Teams, and Players as before
         // Assume these insertions are already defined above
 
@@ -389,7 +421,6 @@ async function insertData() {
           }
 
           const fielders = Array.isArray(inning.fielder) ? inning.fielder : [];
-          console.log(fielders, "dsahfdha");
 
           // Insert fielders' performances
           for (const fielder of fielders) {
@@ -430,6 +461,8 @@ async function insertData() {
 }
 
 //data insertion in teams_player from colpetetion squads api
+
+
 async function insertData3() {
   let connection;
   try {
@@ -441,28 +474,42 @@ async function insertData3() {
       port: process.env.DB_PORT,
     });
 
-    // Fetch teams and their squads from API
-    const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/121877/squads?token=73d62591af4b3ccb51986ff5f8af5676"
+    const team_id = 127775; // Ensure to set the correct team_id
+    const response1 = await axios.get(
+      `https://rest.entitysport.com/v2/teams/${team_id}/matches?status=2&token=73d62591af4b3ccb51986ff5f8af5676&per_page=10`
     );
 
-    const teams = response.data.response.squads;
+    const matches = response1.data.response.items;
 
-    // Iterate through each team
-    for (const team of teams) {
-      const teamId = team.team_id;
-      const players = team.players;
+    for (const match of matches) {
+      const response = await axios.get(
+        `https://rest.entitysport.com/v2/competitions/${match.competition.cid}/squads?token=73d62591af4b3ccb51986ff5f8af5676`
+      );
 
-      // Iterate through each player in the team
-      for (const player of players) {
-        const playerId = player.pid;
+      const teams = response.data.response.squads;
 
-        // Insert team and player association into teams_player table
-        await connection.query(
-          `INSERT INTO team_players (team_id, player_id) VALUES (?, ?)
-                     ON DUPLICATE KEY UPDATE team_id = VALUES(team_id), player_id = VALUES(player_id);`,
-          [teamId, playerId]
-        );
+      for (const team of teams) {
+        const teamId = team.team_id;
+
+        // Check if team_id exists in teams table
+        const [rows] = await connection.query('SELECT id FROM teams WHERE id = ?', [teamId]);
+        if (rows.length === 0) {
+          // Insert the team_id into teams table if it does not exist
+          await connection.query('INSERT INTO teams (id, name) VALUES (?, ?)', [teamId, team.name]);
+        }
+
+        const players = team.players;
+
+        for (const player of players) {
+          const playerId = player.pid;
+
+          // Insert team and player association into team_players table
+          await connection.query(
+            `INSERT INTO team_players (team_id, player_id) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE team_id = VALUES(team_id), player_id = VALUES(player_id);`,
+            [teamId, playerId]
+          );
+        }
       }
     }
 
@@ -476,8 +523,6 @@ async function insertData3() {
   }
 }
 
-//data insertion fanatsay points
-
 async function insertFP() {
   let connection;
   try {
@@ -489,11 +534,11 @@ async function insertFP() {
       port: process.env.DB_PORT,
     });
 
-    // Fetch matches from API
-
+    const team_id =127775; // Ensure to set the correct team_id
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/competitions/121877/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+      `https://rest.entitysport.com/v2/teams/${team_id}/matches?status=2&token=73d62591af4b3ccb51986ff5f8af5676&per_page=10`
     );
+
     const matches = response.data.response.items;
 
     for (const match of matches) {
@@ -502,20 +547,27 @@ async function insertFP() {
           `https://rest.entitysport.com/v2/matches/${match.match_id}/newpoint2?token=73d62591af4b3ccb51986ff5f8af5676`
         );
         const matchData = matchDetailsResponse.data.response;
-        console.log(matchData.teama.team_id, "sdvas");
-        // Ensure playing11 is iterable
-        const teamAPlayers = Array.isArray(matchData.points.teama.playing11)
-          ? matchData.points.teama.playing11
-          : [];
-        const teamBPlayers = Array.isArray(matchData.points.teamb.playing11)
-          ? matchData.points.teamb.playing11
-          : [];
+
+        const teamAPlayers = Array.isArray(matchData.points.teama.playing11) ? matchData.points.teama.playing11 : [];
+        const teamBPlayers = Array.isArray(matchData.points.teamb.playing11) ? matchData.points.teamb.playing11 : [];
         const players = [...teamAPlayers, ...teamBPlayers];
-        // console.log(players)
 
         for (const player of players) {
+          const teamId = matchData.teama.team_id || matchData.teamb.team_id;
+
+          // Log the team_id and player_id before insertion
+          console.log(`Inserting data for team_id: ${teamId}, player_id: ${player.pid}`);
+
+          // Check if team_id exists in teams table
+          const [rows] = await connection.query('SELECT id FROM teams WHERE id = ?', [teamId]);
+          if (rows.length === 0) {
+            // Insert the team_id into teams table if it does not exist
+            console.log(`team_id ${teamId} does not exist in teams table. Inserting.`);
+            await connection.query('INSERT INTO teams (id, name) VALUES (?, ?)', [teamId, 'Unknown Team']);
+          }
+
           await connection.query(
-              `
+            `
               INSERT INTO fantasy_points_details (
                   match_id, 
                   player_id, 
@@ -553,30 +605,28 @@ async function insertFP() {
                   rating = VALUES(rating),
                   playing_role = VALUES(playing_role)
               `,
-              [
-                  matchData.match_id,
-                  player.pid,
-                  matchData.teama.team_id || matchData.teamb.team_id,
-                  player.point,
-                  player.run,
-                  player.four,
-                  player.six,
-                  player.catch || 0,
-                  player.wkts || 0,
-                  player.maidenover || 0,
-                  player.sr || 0,
-                  player.fifty || 0,
-                  player.duck || 0,
-                  player.runoutcatcher + player.runoutstumping + player.runoutthrower || 0,
-                  player.stumping || 0,
-                  player.rating || null,
-                  player.role
-              ]
+            [
+              matchData.match_id,
+              player.pid,
+              teamId,
+              player.point,
+              player.run,
+              player.four,
+              player.six,
+              player.catch || 0,
+              player.wkts || 0,
+              player.maidenover || 0,
+              player.sr || 0,
+              player.fifty || 0,
+              player.duck || 0,
+              player.runoutcatcher + player.runoutstumping + player.runoutthrower || 0,
+              player.stumping || 0,
+              player.rating || null,
+              player.role
+            ]
           );
-      }
-        console.log(
-          "Data successfully inserted for all matches and related details."
-        );
+        }
+        console.log("Data successfully inserted for all matches and related details.");
       }
     }
   } catch (error) {
@@ -587,6 +637,9 @@ async function insertFP() {
     }
   }
 }
+
+// insertData3().catch(console.error);
+// insertFP().catch(console.error);
 
 // async function createDreamTeam() {
 //     let connection;
@@ -599,7 +652,7 @@ async function insertFP() {
 //             port: process.env.DB_PORT,
 //         });
 
-//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/121877/matches?token=${process.env.API_TOKEN}&per_page=80`);
+//         const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128414/matches?token=${process.env.API_TOKEN}&per_page=80`);
 //         const matches = response.data.response.items;
 
 //         for (const match of matches) {
@@ -668,8 +721,14 @@ async function createDreamTeam() {
           port: process.env.DB_PORT,
       });
 
-      const response = await axios.get(`https://rest.entitysport.com/v2/competitions/121877/matches?token=${process.env.API_TOKEN}&per_page=80`);
-      const matches = response.data.response.items;
+    //   const response = await axios.get(`https://rest.entitysport.com/v2/competitions/128414/matches?token=${process.env.API_TOKEN}&per_page=80`);
+    //   const matches = response.data.response.items;
+    const response = await axios.get(
+        //   "https://rest.entitysport.com/v2/competitions/128414/matches?token=73d62591af4b3ccb51986ff5f8af5676&per_page=80"
+        `https://rest.entitysport.com/v2/teams/${team_id}/matches?status=2&token=73d62591af4b3ccb51986ff5f8af5676&per_page=10`
+    
+        );
+        const matches = response.data.response.items;
 
       for (const match of matches) {
           if (match.status_str === "Completed") {
@@ -739,11 +798,13 @@ async function createDreamTeam() {
 
 async function runAllFunctions() {
   try {
+    // const matchIds = await fetchMatchIds()
+
     // Call the first function and wait for it to complete
     await insertData1();
     console.log("Data insertion for insertData1 is complete.");
 
-    // Call the second function and wait for it to complete
+    // // Call the second function and wait for it to complete
     await insertData();
     console.log("Data insertion for insertData is complete.");
 
@@ -755,7 +816,7 @@ async function runAllFunctions() {
     await insertFP();
     console.log("Fantasy points insertion is complete.");
 
-    // Call the function to create Dream Teams and wait for it to complete
+    // // Call the function to create Dream Teams and wait for it to complete
     await createDreamTeam();
     console.log("Dream team creation is complete.");
   } catch (error) {
@@ -766,7 +827,10 @@ async function runAllFunctions() {
 // insertFP()
 // insertData1()
 // Call the main function to start all operations
+// for (teams in team_id){
+    // console.log(team_id)
 runAllFunctions();
+// }
 
 async function fetchAndStoreTournamentData() {
   let connection;
@@ -838,7 +902,7 @@ async function fetchAndStoreTournamentData() {
 
 
 // List of tournament IDs to process
-const tournamentIds = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 46, 47, 48, 49, 50, 51];
+const tournamentIds = [1, 5, 6, 7, 8, 5, 10, 11, 12, 7, 14, 15, 16, 17, 18, 19, 20, 19, 22, 127775, 24, 11, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 46, 47, 48, 49, 50, 51];
 
 // Function to process each tournament
 async function processTournaments() {
@@ -881,3 +945,54 @@ async function processDataForTournament(tournamentId) {
 
 // Call the function to start processing
 // processTournaments();
+
+
+
+// async function fetchAndInsertTeams() {
+//     let connection;
+//     try {
+//         connection = await mysql.createConnection({
+//             host: process.env.DB_HOST,
+//             user: process.env.DB_USER,
+//             password: process.env.DB_PASSWORD,
+//             database: process.env.DB_NAME,
+//             port: process.env.DB_PORT,
+//         });
+  
+//         const response = await axios.get(
+//             "https://rest.entitysport.com/v2/competitions/128414/teams?token=73d62591af4b3ccb51986ff5f8af5676"
+//         );
+//         const teams = response.data.response.teams;
+  
+//         for (const team of teams) {
+//             // Validate data before insertion
+//             const teamId = team.team_id || team.tid;
+//             const teamName = team.name || team.title;
+//             const teamLogoUrl = team.logo_url || team.thumb_url;
+//             const teamShortName = team.short_name || team.abbr;
+  
+//             if (!teamId || !teamName) {
+//                 console.warn(`Skipping team due to missing data: ${JSON.stringify(team)}`);
+//                 continue;
+//             }
+  
+//             await connection.query(
+//                 `INSERT INTO teams (id, name, logo_url, short_name)
+//                  VALUES (?, ?, ?, ?)
+//                  ON DUPLICATE KEY UPDATE name = VALUES(name), logo_url = VALUES(logo_url), short_name = VALUES(short_name);`,
+//                 [teamId, teamName, teamLogoUrl, teamShortName]
+//             );
+//         }
+  
+//         console.log("Teams data successfully inserted.");
+//     } catch (error) {
+//         console.error("Failed to insert teams data:", error);
+//     } finally {
+//         if (connection) {
+//             await connection.end();
+//         }
+//     }
+//   }
+  
+//   fetchAndInsertTeams()
+  
