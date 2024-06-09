@@ -2886,7 +2886,7 @@ app.get('/competitions/:tournamentId', async (req, res) => {
 
 // ---------------------------------------api win percentage ------------------------------------------------
 
-app.get('/teams/win-percentage/:teamId1/:teamId2', async (req, res) => {
+app.get('/new/teams/win-percentage/:teamId1/:teamId2', async (req, res) => {
   try {
       const { teamId1, teamId2 } = req.params;
       
@@ -2936,10 +2936,57 @@ app.get('/teams/win-percentage/:teamId1/:teamId2', async (req, res) => {
 // /teams/win-percentage/:teamId1/:teamId2
 
 
+app.get('/new/teams/player-stats/:teamId1/:teamId2', async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
 
+  try {
+      const query = `
+          WITH TeamMatches AS (
+              SELECT 
+                  m.id AS match_id,
+                  m.team_1,
+                  m.team_2,
+                  m.winning_team_id
+              FROM 
+                  matches m
+              WHERE 
+                  (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ),
+          PlayerStats AS (
+              SELECT 
+                  ms.player_id,
+                  COUNT(DISTINCT tm.match_id) AS total_matches,
+                  SUM(CASE WHEN dt.player_id IS NOT NULL THEN 1 ELSE 0 END) AS dream_team_count,
+                  SUM(fp.points) / COUNT(DISTINCT tm.match_id) AS points_per_match
+              FROM 
+                  TeamMatches tm
+                  JOIN match_squads ms ON tm.match_id = ms.match_id
+                  LEFT JOIN DreamTeam_test dt ON tm.match_id = dt.match_id AND ms.player_id = dt.player_id
+                  LEFT JOIN fantasy_points_details fp ON tm.match_id = fp.match_id AND ms.player_id = fp.player_id
+              GROUP BY 
+                  ms.player_id
+              ORDER BY 
+                  total_matches DESC
+          )
+          SELECT 
+              ps.player_id,
+              p.first_name,
+              p.last_name,
+              ps.total_matches,
+              ps.dream_team_count,
+              (ps.dream_team_count / ps.total_matches) * 100 AS dream_team_percentage,
+              ps.points_per_match
+          FROM 
+              PlayerStats ps
+              JOIN players p ON ps.player_id = p.id;
+      `;
 
-
-
+      const [rows] = await pool.query(query,[teamId1, teamId2, teamId2, teamId1]);
+      res.json(rows);
+  } catch (error) {
+      res.status(500).send('Server error: ' + error.message);
+  }
+});
 
 
 
