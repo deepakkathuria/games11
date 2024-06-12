@@ -3115,3 +3115,85 @@ app.get("/new/top-players-stats/:teamId1/:teamId2", async (req, res) => {
       res.status(500).send("Failed to retrieve player data");
   }
 });
+
+
+
+
+
+app.get("/player-stats/:playerId", async (req, res) => {
+  const { playerId } = req.params;
+
+  const battingQuery = `
+    SELECT 
+        p.id AS player_id, 
+        p.first_name, 
+        p.last_name,
+        p.playing_role,
+        p.short_name,
+        COUNT(DISTINCT m.id) AS matches_played, 
+        SUM(fp.points) AS total_fantasy_points,
+        
+        -- Batting statistics
+        AVG(b.runs) AS average_runs,
+        MAX(b.runs) AS max_runs,
+        SUM(b.runs) AS total_runs,
+        AVG(b.balls_faced) AS average_balls_faced,
+        MAX(b.balls_faced) AS max_balls_faced,
+        SUM(b.balls_faced) AS total_balls_faced,
+        SUM(CASE WHEN b.runs >= 100 THEN 1 ELSE 0 END) AS total_hundreds,
+        SUM(CASE WHEN b.runs >= 50 THEN 1 ELSE 0 END) AS total_fifties,
+
+        -- Match IDs
+        GROUP_CONCAT(DISTINCT m.id ORDER BY m.id ASC) AS match_ids
+    FROM players p
+    JOIN fantasy_points_details fp ON p.id = fp.player_id
+    JOIN matches m ON m.id = fp.match_id 
+    LEFT JOIN match_inning_batters_test b ON m.id = b.match_id AND fp.player_id = b.batsman_id
+    WHERE p.id = ?
+    GROUP BY p.id, p.first_name, p.last_name, p.playing_role, p.short_name;
+  `;
+
+  const bowlingQuery = `
+    SELECT 
+        p.id AS player_id, 
+        p.first_name, 
+        p.last_name,
+        p.playing_role,
+        p.short_name,
+        COUNT(DISTINCT m.id) AS matches_played, 
+        SUM(fp.points) AS total_fantasy_points,
+        
+        -- Bowling statistics
+        AVG(bl.overs) AS average_overs_bowled,
+        MAX(bl.overs) AS max_overs_bowled,
+        SUM(bl.overs) AS total_overs_bowled,
+        AVG(bl.runs_conceded) AS average_runs_conceded,
+        MAX(bl.runs_conceded) AS max_runs_conceded,
+        SUM(bl.runs_conceded) AS total_runs_conceded,
+        AVG(bl.wickets) AS average_wickets,
+        MAX(bl.wickets) AS max_wickets,
+        SUM(bl.wickets) AS total_wickets,
+
+        -- Match IDs
+        GROUP_CONCAT(DISTINCT m.id ORDER BY m.id ASC) AS match_ids
+    FROM players p
+    JOIN fantasy_points_details fp ON p.id = fp.player_id
+    JOIN matches m ON m.id = fp.match_id 
+    LEFT JOIN match_inning_bowlers_test bl ON m.id = bl.match_id AND fp.player_id = bl.bowler_id
+    WHERE p.id = ?
+    GROUP BY p.id, p.first_name, p.last_name, p.playing_role, p.short_name;
+  `;
+
+  try {
+    const [battingResults] = await pool.query(battingQuery, [playerId]);
+    const [bowlingResults] = await pool.query(bowlingQuery, [playerId]);
+
+    res.json({
+      batting: battingResults,
+      bowling: bowlingResults
+    });
+  } catch (error) {
+    console.error("Failed to fetch player statistics:", error);
+    res.status(500).send("Failed to retrieve player data");
+  }
+});
