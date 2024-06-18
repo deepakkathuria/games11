@@ -3283,72 +3283,324 @@ app.get("/player-vs-team-stats/:playerId/:teamId", async (req, res) => {
 
 
 
-app.get("/teamdata/:teamId1/:teamId2", async (req, res) => {
+
+//lat match
+app.get("/teamdata/last/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}`);  // Debugging input
+
   const query = `
-      WITH TeamMatches AS (
-          SELECT 
-              m.id AS match_id,
-              m.team_1,
-              m.team_2,
-              m.winning_team_id,
-              mi.batting_team_id,
-              mi.scores
-          FROM 
-              matches m
-          LEFT JOIN match_innings_test mi ON m.id = mi.match_id
-          WHERE 
-              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
-          ORDER BY m.date_start DESC
-          LIMIT 2
-      ),
-      TeamStats AS (
-          SELECT 
-              tm.batting_team_id AS team_id,
-              COUNT(DISTINCT tm.match_id) AS total_matches,
-              SUM(CASE WHEN tm.winning_team_id = tm.batting_team_id THEN 1 ELSE 0 END) AS wins,
-              SUM(CASE WHEN tm.winning_team_id IS NULL THEN 1 ELSE 0 END) AS ties,
-              SUM(CASE WHEN tm.winning_team_id != tm.batting_team_id AND tm.winning_team_id IS NOT NULL THEN 1 ELSE 0 END) AS losses,
-              MAX(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS highest_team_total,
-              AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS avg_runs,
-              AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', -1) AS UNSIGNED)) AS avg_wickets
-          FROM 
-              TeamMatches tm
-          GROUP BY 
-              tm.batting_team_id
-      )
+  WITH TeamMatches AS (
       SELECT 
-          ts.team_id,
-          ts.total_matches,
-          ts.wins,
-          ts.losses,
-          ts.ties,
-          ts.highest_team_total,
-          ts.avg_runs,
-          ts.avg_wickets
+          m.id AS match_id,
+          m.team_1,
+          m.team_2,
+          m.winning_team_id,
+          mi.batting_team_id,
+          mi.scores
       FROM 
-          TeamStats ts;
+          matches m
+      LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+      WHERE 
+          (m.team_1 IN (?, ?) AND m.team_2 IN (?, ?))
+      ORDER BY m.date_start DESC
+      LIMIT 2
+  ),
+  TeamStats AS (
+      SELECT 
+          tm.batting_team_id AS team_id,
+          COUNT(DISTINCT tm.match_id) AS total_matches,
+          SUM(CASE WHEN tm.winning_team_id = tm.batting_team_id THEN 1 ELSE 0 END) AS wins,
+          SUM(CASE WHEN tm.winning_team_id IS NULL THEN 1 ELSE 0 END) AS ties,
+          SUM(CASE WHEN tm.winning_team_id != tm.batting_team_id AND tm.winning_team_id IS NOT NULL THEN 1 ELSE 0 END) AS losses,
+          MAX(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS highest_team_total,
+          AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS avg_runs,
+          AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', -1) AS UNSIGNED)) AS avg_wickets
+      FROM 
+          TeamMatches tm
+      GROUP BY 
+          tm.batting_team_id
+  )
+  SELECT 
+      ts.team_id,
+      ts.total_matches,
+      ts.wins,
+      ts.losses,
+      ts.ties,
+      ts.highest_team_total,
+      ts.avg_runs,
+      ts.avg_wickets
+  FROM 
+      TeamStats ts;
   `;
-
   try {
-      console.log('Executing query with parameters:', [teamId1, teamId2, teamId1, teamId2]);
-
+      console.log(`Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`);
       const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
 
-      console.log('Query results:', results);
+      console.log('Query results:', results);  // Debugging output
 
       if (results.length === 0) {
-          console.log('No matches found for the given team IDs');
-          res.json([]);
+          console.log('No data found for the given parameters.');
+          res.status(404).json({ message: "No data found" });
           return;
       }
 
       res.json(results);
   } catch (error) {
-      console.error("Failed to fetch team statistics:", error);
-      res.status(500).send("Failed to retrieve team statistics");
+      console.error("Error executing the query:", error);
+      res.status(500).send("Failed to retrieve data");
   }
 });
 
 
+
+
+// Endpoint for last 5 matches
+app.get("/teamdata/last5/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}, Scope: last5`);  // Debugging input
+
+  const query = `
+    WITH TeamMatches AS (
+        SELECT 
+            m.id AS match_id,
+            m.team_1,
+            m.team_2,
+            m.winning_team_id,
+            mi.batting_team_id,
+            mi.scores
+        FROM 
+            matches m
+        LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+        WHERE 
+            (m.team_1 IN (?, ?) AND m.team_2 IN (?, ?))
+        ORDER BY m.date_start DESC
+        LIMIT 5
+    ),
+    TeamStats AS (
+        SELECT 
+            tm.batting_team_id AS team_id,
+            COUNT(DISTINCT tm.match_id) AS total_matches,
+            SUM(CASE WHEN tm.winning_team_id = tm.batting_team_id THEN 1 ELSE 0 END) AS wins,
+            SUM(CASE WHEN tm.winning_team_id IS NULL THEN 1 ELSE 0 END) AS ties,
+            SUM(CASE WHEN tm.winning_team_id != tm.batting_team_id AND tm.winning_team_id IS NOT NULL THEN 1 ELSE 0 END) AS losses,
+            MAX(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS highest_team_total,
+            AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS avg_runs,
+            AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', -1) AS UNSIGNED)) AS avg_wickets
+        FROM 
+            TeamMatches tm
+        GROUP BY 
+            tm.batting_team_id
+    )
+    SELECT 
+        ts.team_id,
+        ts.total_matches,
+        ts.wins,
+        ts.losses,
+        ts.ties,
+        ts.highest_team_total,
+        ts.avg_runs,
+        ts.avg_wickets
+    FROM 
+        TeamStats ts;
+  `;
+  
+  try {
+      console.log(`Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`);
+      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
+
+      console.log('Query results:', results);  // Debugging output
+
+      if (results.length === 0) {
+          console.log('No data found for the given parameters.');
+          res.status(404).json({ message: "No data found" });
+          return;
+      }
+
+      res.json(results);
+  } catch (error) {
+      console.error("Error executing the query:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+// Endpoint for overall matches
+app.get("/teamdata/overall/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}, Scope: overall`);  // Debugging input
+
+  const query = `
+    WITH TeamMatches AS (
+        SELECT 
+            m.id AS match_id,
+            m.team_1,
+            m.team_2,
+            m.winning_team_id,
+            mi.batting_team_id,
+            mi.scores
+        FROM 
+            matches m
+        LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+        WHERE 
+            (m.team_1 IN (?, ?) AND m.team_2 IN (?, ?))
+    ),
+    TeamStats AS (
+        SELECT 
+            tm.batting_team_id AS team_id,
+            COUNT(DISTINCT tm.match_id) AS total_matches,
+            SUM(CASE WHEN tm.winning_team_id = tm.batting_team_id THEN 1 ELSE 0 END) AS wins,
+            SUM(CASE WHEN tm.winning_team_id IS NULL THEN 1 ELSE 0 END) AS ties,
+            SUM(CASE WHEN tm.winning_team_id != tm.batting_team_id AND tm.winning_team_id IS NOT NULL THEN 1 ELSE 0 END) AS losses,
+            MAX(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS highest_team_total,
+            AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS avg_runs,
+            AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', -1) AS UNSIGNED)) AS avg_wickets
+        FROM 
+            TeamMatches tm
+        GROUP BY 
+            tm.batting_team_id
+    )
+    SELECT 
+        ts.team_id,
+        ts.total_matches,
+        ts.wins,
+        ts.losses,
+        ts.ties,
+        ts.highest_team_total,
+        ts.avg_runs,
+        ts.avg_wickets
+    FROM 
+        TeamStats ts;
+  `;
+  
+  try {
+      console.log(`Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`);
+      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
+
+      console.log('Query results:', results);  // Debugging output
+
+      if (results.length === 0) {
+          console.log('No data found for the given parameters.');
+          res.status(404).json({ message: "No data found" });
+          return;
+      }
+
+      res.json(results);
+  } catch (error) {
+      console.error("Error executing the query:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+//head to head data match won playeed etc
+app.get("/head-to-head/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}`);  // Debugging input
+
+  const query = `
+    SELECT 
+        COUNT(*) AS matches_played,
+        SUM(CASE WHEN m.winning_team_id = ${teamId1} THEN 1 ELSE 0 END) AS team1_wins,
+        SUM(CASE WHEN m.winning_team_id = ${teamId2} THEN 1 ELSE 0 END) AS team2_wins,
+        SUM(CASE WHEN m.winning_team_id = 0 THEN 1 ELSE 0 END) AS no_results
+    FROM 
+        matches m
+    WHERE 
+        (m.team_1 = ${teamId1} AND m.team_2 = ${teamId2})
+        OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1});
+  `;
+
+  try {
+    const [results] = await pool.query(query);
+    res.json(results);
+  } catch (error) {
+    console.error("Failed to fetch head-to-head data:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+//recent form last 5 match of both the team
+app.get('/recent-form/:teamId', async (req, res) => {
+  const { teamId } = req.params;
+  const query = `
+    SELECT 
+        m.id AS match_id,
+        m.team_1,
+        m.team_2,
+        m.winning_team_id,
+        m.date_start,
+        CASE 
+            WHEN m.winning_team_id = ? THEN 'W'
+            WHEN m.winning_team_id = 0 THEN 'NR'
+            ELSE 'L'
+        END AS result
+    FROM 
+        matches m
+    WHERE 
+        (m.team_1 = ? OR m.team_2 = ?)
+        AND m.format_str = 'T20'
+    ORDER BY 
+        m.date_start DESC
+    LIMIT 5;
+  `;
+  try {
+    const [results] = await pool.query(query, [teamId, teamId, teamId]);
+    res.json(results);
+  } catch (error) {
+    console.error("Failed to fetch recent form:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}`);  // Debugging input
+
+  const query = `
+    SELECT 
+        m.id AS match_id,
+        m.team_1,
+        m.team_2,
+        m.winning_team_id,
+        m.date_start,
+        CASE 
+            WHEN m.winning_team_id = ${teamId1} THEN 'W'
+            WHEN m.winning_team_id = 0 THEN 'NR'
+            ELSE 'L'
+        END AS result_team1,
+        CASE 
+            WHEN m.winning_team_id = ${teamId2} THEN 'W'
+            WHEN m.winning_team_id = 0 THEN 'NR'
+            ELSE 'L'
+        END AS result_team2,
+        (SELECT mi.scores FROM match_innings_test mi WHERE mi.match_id = m.id AND mi.batting_team_id = m.team_1) AS team_1_scores,
+        (SELECT mi.scores FROM match_innings_test mi WHERE mi.match_id = m.id AND mi.batting_team_id = m.team_2) AS team_2_scores
+    FROM 
+        matches m
+    WHERE 
+        (m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR 
+        (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1})
+    ORDER BY 
+        m.date_start DESC
+    LIMIT 5;
+  `;
+
+  try {
+    const [results] = await pool.query(query);
+    res.json(results);
+  } catch (error) {
+    console.error("Failed to fetch recent matches data:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
