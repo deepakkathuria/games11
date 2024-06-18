@@ -3279,3 +3279,76 @@ app.get("/player-vs-team-stats/:playerId/:teamId", async (req, res) => {
     res.status(500).send("Failed to retrieve player vs team data");
   }
 });
+
+
+
+
+app.get("/teamdata/:teamId1/:teamId2", async (req, res) => {
+  const { teamId1, teamId2 } = req.params;
+
+  const query = `
+      WITH TeamMatches AS (
+          SELECT 
+              m.id AS match_id,
+              m.team_1,
+              m.team_2,
+              m.winning_team_id,
+              mi.batting_team_id,
+              mi.scores
+          FROM 
+              matches m
+          LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY m.date_start DESC
+          LIMIT 2
+      ),
+      TeamStats AS (
+          SELECT 
+              tm.batting_team_id AS team_id,
+              COUNT(DISTINCT tm.match_id) AS total_matches,
+              SUM(CASE WHEN tm.winning_team_id = tm.batting_team_id THEN 1 ELSE 0 END) AS wins,
+              SUM(CASE WHEN tm.winning_team_id IS NULL THEN 1 ELSE 0 END) AS ties,
+              SUM(CASE WHEN tm.winning_team_id != tm.batting_team_id AND tm.winning_team_id IS NOT NULL THEN 1 ELSE 0 END) AS losses,
+              MAX(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS highest_team_total,
+              AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', 1) AS UNSIGNED)) AS avg_runs,
+              AVG(CAST(SUBSTRING_INDEX(tm.scores, '/', -1) AS UNSIGNED)) AS avg_wickets
+          FROM 
+              TeamMatches tm
+          GROUP BY 
+              tm.batting_team_id
+      )
+      SELECT 
+          ts.team_id,
+          ts.total_matches,
+          ts.wins,
+          ts.losses,
+          ts.ties,
+          ts.highest_team_total,
+          ts.avg_runs,
+          ts.avg_wickets
+      FROM 
+          TeamStats ts;
+  `;
+
+  try {
+      console.log('Executing query with parameters:', [teamId1, teamId2, teamId1, teamId2]);
+
+      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
+
+      console.log('Query results:', results);
+
+      if (results.length === 0) {
+          console.log('No matches found for the given team IDs');
+          res.json([]);
+          return;
+      }
+
+      res.json(results);
+  } catch (error) {
+      console.error("Failed to fetch team statistics:", error);
+      res.status(500).send("Failed to retrieve team statistics");
+  }
+});
+
+
