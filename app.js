@@ -4327,6 +4327,179 @@ app.get('/x-factor-players', async (req, res) => {
 });
 
 
+app.get("/api/players/top-form", async (req, res) => {
+  const { team1, team2 } = req.query;
+
+  if (!team1 || !team2) {
+    return res.status(400).send("Team IDs are required");
+  }
+
+  try {
+    const sql = `
+      WITH Last3Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 3
+      ),
+      PlayerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name,
+              p.playing_role,
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.points) AS avg_fantasy_points
+          FROM
+              players p
+          JOIN fantasy_points_details fp ON p.id = fp.player_id
+          WHERE
+              fp.match_id IN (SELECT match_id FROM Last3Matches)
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.short_name, p.playing_role
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          short_name,
+          playing_role,
+          total_fantasy_points,
+          avg_fantasy_points
+      FROM
+          PlayerStats
+      ORDER BY
+          avg_fantasy_points DESC
+      LIMIT 20;
+    `;
+
+    const [results] = await pool.query(sql, [team1, team2, team2, team1]);
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching top form players:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+app.get('/api/player/batting-order', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+      return res.status(400).send('Team IDs are required');
+  }
+
+  const query = `
+      WITH LastMatch AS (
+          SELECT 
+              m.id AS match_id,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 1
+      ),
+      Team1BattingOrder AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name,
+              p.playing_role,
+              'India' AS team,
+              ROW_NUMBER() OVER (ORDER BY b.id) AS batting_order
+          FROM
+              match_inning_batters_test b
+          JOIN
+              players p ON b.batsman_id = p.id
+          WHERE
+              b.match_id = (SELECT match_id FROM LastMatch)
+              AND b.inning_number = 1
+      ),
+      Team2BattingOrder AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.short_name,
+              p.playing_role,
+              'Pakistan' AS team,
+              ROW_NUMBER() OVER (ORDER BY b.id) AS batting_order
+          FROM
+              match_inning_batters_test b
+          JOIN
+              players p ON b.batsman_id = p.id
+          WHERE
+              b.match_id = (SELECT match_id FROM LastMatch)
+              AND b.inning_number = 2
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          short_name,
+          playing_role,
+          batting_order,
+          team
+      FROM
+          Team1BattingOrder
+      UNION ALL
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          short_name,
+          playing_role,
+          batting_order,
+          team
+      FROM
+          Team2BattingOrder
+      ORDER BY
+          team, batting_order;
+  `;
+
+  try {
+      const [rows] = await pool.query(query, [team1, team2, team2, team1]);
+      res.json(rows);
+  } catch (err) {
+      console.error(err);
+      res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
