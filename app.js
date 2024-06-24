@@ -2459,96 +2459,196 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
 
 // ------------------------------------playground  stats-------------------------------------------------
 
+// app.get("/api/players/stats", async (req, res) => {
+//   const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
+
+//   let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, p.short_name, t.name, t.short_name';
+
+//   switch (statType) {
+//       case 'TotalFantasyPoints':
+//           selectClause = 'SUM(fp.points) AS total_points, COUNT(DISTINCT fp.match_id) AS match_count';
+//           orderByClause = 'ORDER BY total_points DESC';
+//           break;
+//       case 'DreamTeamAppearances':
+//           selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances, COUNT(DISTINCT dt.match_id) AS match_count';
+//           joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
+//           orderByClause = 'ORDER BY dream_team_appearances DESC';
+//           break;
+//       case 'WicketsTaken':
+//           selectClause = 'SUM(b.wickets) AS wickets_taken, COUNT(DISTINCT b.match_id) AS match_count';
+//           joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
+//           orderByClause = 'ORDER BY wickets_taken DESC';
+//           break;
+//       case 'RunsScored':
+//           selectClause = 'SUM(fb.runs) AS total_runs, COUNT(DISTINCT fb.match_id) AS match_count';
+//           joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
+//           orderByClause = 'ORDER BY total_runs DESC';
+//           break;
+//       case 'StrikeRate':
+//           selectClause = 'AVG(fb.strike_rate) AS average_strike_rate, COUNT(DISTINCT fb.match_id) AS match_count';
+//           joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
+//           orderByClause = 'ORDER BY average_strike_rate DESC';
+//           break;
+//       case 'EconomyRate':
+//           selectClause = 'AVG(b.econ) AS average_economy_rate, COUNT(DISTINCT b.match_id) AS match_count';
+//           joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id';
+//           orderByClause = 'ORDER BY average_economy_rate ASC';
+//           break;
+//       case 'FieldingPoints':
+//           selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points, COUNT(DISTINCT f.match_id) AS match_count';
+//           joinClause = ' JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id';
+//           orderByClause = 'ORDER BY fielding_points DESC';
+//           break;
+//       case 'AverageFantasyPoints':
+//           selectClause = 'AVG(fp.points) AS avg_fantasy_points, COUNT(DISTINCT fp.match_id) AS match_count';
+//           orderByClause = 'ORDER BY avg_fantasy_points DESC';
+//           break;
+//   }
+
+//   if (timeFrame) {
+//       const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
+//       if (days > 0) {
+//           whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
+//       }
+//   }
+
+//   if (venueId) {
+//       whereClause += ` AND m.venue_id = ${venueId}`;
+//   }
+
+//   if (battingScenario) {
+//       const team = battingScenario.split(' ')[0];
+//       const action = battingScenario.split(' ')[1];
+//       const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
+//       whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
+//   }
+
+//   if (teamId1 && teamId2) {
+//       whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
+//   }
+
+//   const sql = `
+//       SELECT p.id, p.first_name, p.short_name, p.last_name, ${selectClause}, t.name AS team_name, t.short_name AS team_short_name
+//       FROM players p
+//       JOIN team_players tp ON p.id = tp.player_id
+//       JOIN teams t ON tp.team_id = t.id
+//       JOIN fantasy_points_details fp ON p.id = fp.player_id
+//       JOIN matches m ON fp.match_id = m.id
+//       ${joinClause}
+//       ${whereClause}
+//       ${groupByClause}
+//       ${orderByClause}
+//       LIMIT 100;
+//   `;
+
+//   try {
+//       const [results] = await pool.query(sql);
+//       res.json(results);
+//   } catch (error) {
+//       console.error("Error fetching player stats:", error);
+//       res.status(500).send("Failed to retrieve data");
+//   }
+// });
+
+
 app.get("/api/players/stats", async (req, res) => {
   const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
 
-  let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, p.short_name, t.name, t.short_name';
+  if (!teamId1 || !teamId2) {
+    return res.status(400).send("Team IDs are required");
+  }
+
+  let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, p.short_name, p.playing_role, t.name, t.short_name';
 
   switch (statType) {
-      case 'TotalFantasyPoints':
-          selectClause = 'SUM(fp.points) AS total_points, COUNT(DISTINCT fp.match_id) AS match_count';
-          orderByClause = 'ORDER BY total_points DESC';
-          break;
-      case 'DreamTeamAppearances':
-          selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances, COUNT(DISTINCT dt.match_id) AS match_count';
-          joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
-          orderByClause = 'ORDER BY dream_team_appearances DESC';
-          break;
-      case 'WicketsTaken':
-          selectClause = 'SUM(b.wickets) AS wickets_taken, COUNT(DISTINCT b.match_id) AS match_count';
-          joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
-          orderByClause = 'ORDER BY wickets_taken DESC';
-          break;
-      case 'RunsScored':
-          selectClause = 'SUM(fb.runs) AS total_runs, COUNT(DISTINCT fb.match_id) AS match_count';
-          joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
-          orderByClause = 'ORDER BY total_runs DESC';
-          break;
-      case 'StrikeRate':
-          selectClause = 'AVG(fb.strike_rate) AS average_strike_rate, COUNT(DISTINCT fb.match_id) AS match_count';
-          joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
-          orderByClause = 'ORDER BY average_strike_rate DESC';
-          break;
-      case 'EconomyRate':
-          selectClause = 'AVG(b.econ) AS average_economy_rate, COUNT(DISTINCT b.match_id) AS match_count';
-          joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id';
-          orderByClause = 'ORDER BY average_economy_rate ASC';
-          break;
-      case 'FieldingPoints':
-          selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points, COUNT(DISTINCT f.match_id) AS match_count';
-          joinClause = ' JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id';
-          orderByClause = 'ORDER BY fielding_points DESC';
-          break;
-      case 'AverageFantasyPoints':
-          selectClause = 'AVG(fp.points) AS avg_fantasy_points, COUNT(DISTINCT fp.match_id) AS match_count';
-          orderByClause = 'ORDER BY avg_fantasy_points DESC';
-          break;
+    case 'TotalFantasyPoints':
+      selectClause = 'SUM(fp.points) AS total_points, COUNT(DISTINCT fp.match_id) AS match_count';
+      orderByClause = 'ORDER BY total_points DESC';
+      break;
+    case 'DreamTeamAppearances':
+      selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances, COUNT(DISTINCT dt.match_id) AS match_count';
+      joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
+      orderByClause = 'ORDER BY dream_team_appearances DESC';
+      break;
+    case 'WicketsTaken':
+      selectClause = 'SUM(b.wickets) AS wickets_taken, COUNT(DISTINCT b.match_id) AS match_count';
+      joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
+      orderByClause = 'ORDER BY wickets_taken DESC';
+      break;
+    case 'RunsScored':
+      selectClause = 'SUM(fb.runs) AS total_runs, COUNT(DISTINCT fb.match_id) AS match_count';
+      joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
+      orderByClause = 'ORDER BY total_runs DESC';
+      break;
+    case 'StrikeRate':
+      selectClause = 'AVG(fb.strike_rate) AS average_strike_rate, COUNT(DISTINCT fb.match_id) AS match_count';
+      joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
+      orderByClause = 'ORDER BY average_strike_rate DESC';
+      break;
+    case 'EconomyRate':
+      selectClause = 'AVG(b.econ) AS average_economy_rate, COUNT(DISTINCT b.match_id) AS match_count';
+      joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id';
+      orderByClause = 'ORDER BY average_economy_rate ASC';
+      break;
+    case 'FieldingPoints':
+      selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points, COUNT(DISTINCT f.match_id) AS match_count';
+      joinClause = ' JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id';
+      orderByClause = 'ORDER BY fielding_points DESC';
+      break;
+    case 'AverageFantasyPoints':
+      selectClause = 'AVG(fp.points) AS avg_fantasy_points, COUNT(DISTINCT fp.match_id) AS match_count';
+      orderByClause = 'ORDER BY avg_fantasy_points DESC';
+      break;
   }
 
   if (timeFrame) {
-      const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
-      if (days > 0) {
-          whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
-      }
+    const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
+    if (days > 0) {
+      whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
+    }
   }
 
   if (venueId) {
-      whereClause += ` AND m.venue_id = ${venueId}`;
+    whereClause += ` AND m.venue_id = ${venueId}`;
   }
 
   if (battingScenario) {
-      const team = battingScenario.split(' ')[0];
-      const action = battingScenario.split(' ')[1];
-      const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
-      whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
+    const team = battingScenario.split(' ')[0];
+    const action = battingScenario.split(' ')[1];
+    const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
+    whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
   }
 
   if (teamId1 && teamId2) {
-      whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
+    whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
   }
 
   const sql = `
-      SELECT p.id, p.first_name, p.short_name, p.last_name, ${selectClause}, t.name AS team_name, t.short_name AS team_short_name
-      FROM players p
-      JOIN team_players tp ON p.id = tp.player_id
-      JOIN teams t ON tp.team_id = t.id
-      JOIN fantasy_points_details fp ON p.id = fp.player_id
-      JOIN matches m ON fp.match_id = m.id
-      ${joinClause}
-      ${whereClause}
-      ${groupByClause}
-      ${orderByClause}
-      LIMIT 100;
+    SELECT p.id, p.first_name, p.short_name, p.last_name, p.playing_role, ${selectClause}, t.name AS team_name, t.short_name AS team_short_name
+    FROM players p
+    JOIN team_players tp ON p.id = tp.player_id
+    JOIN teams t ON tp.team_id = t.id
+    JOIN fantasy_points_details fp ON p.id = fp.player_id
+    JOIN matches m ON fp.match_id = m.id
+    ${joinClause}
+    ${whereClause}
+    ${groupByClause}
+    ${orderByClause}
+    LIMIT 100;
   `;
 
   try {
-      const [results] = await pool.query(sql);
-      res.json(results);
+    const [results] = await pool.query(sql);
+    // Filter results to include only players from teamId1 and teamId2
+    const filteredResults = results.filter(player => player.team_short_name === 'IND' || player.team_short_name === 'PAK');
+    res.json(filteredResults);
   } catch (error) {
-      console.error("Error fetching player stats:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error fetching player stats:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
+
+
 
 
 
@@ -3602,5 +3702,1114 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch recent matches data:", error);
     res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+//batting order wrong thoda byut yaaa
+
+app.get("/teamdata/25/last5matches", async (req, res) => {
+  const teamId = 25;
+
+  const query = `
+      WITH Last5Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? OR m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      TeamPlayers AS (
+          SELECT 
+              tp.player_id
+          FROM 
+              team_players tp
+          WHERE 
+              tp.team_id = ?
+      ),
+      PlayerStats AS (
+          SELECT 
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              fp.match_id,
+              fp.points,
+              fp.runs,
+              fp.wickets
+          FROM 
+              players p
+          JOIN fantasy_points_details fp ON p.id = fp.player_id
+          WHERE 
+              fp.match_id IN (SELECT match_id FROM Last5Matches) 
+              AND fp.player_id IN (SELECT player_id FROM TeamPlayers)
+      ),
+      BattingOrder AS (
+          SELECT
+              b.match_id,
+              b.batsman_id,
+              ROW_NUMBER() OVER (PARTITION BY b.match_id ORDER BY b.position) AS batting_order
+          FROM
+              match_inning_batters_test b
+          WHERE
+              b.match_id IN (SELECT match_id FROM Last5Matches)
+              AND b.batsman_id IN (SELECT player_id FROM TeamPlayers)
+      )
+      SELECT 
+          ps.player_id,
+          ps.first_name,
+          ps.last_name,
+          ps.playing_role,
+          ps.short_name,
+          ps.match_id,
+          ps.points,
+          ps.runs,
+          ps.wickets,
+          COALESCE(bo.batting_order, 'DNB') AS batting_order,
+          lm.date_start
+      FROM 
+          PlayerStats ps
+      LEFT JOIN BattingOrder bo ON ps.match_id = bo.match_id AND ps.player_id = bo.batsman_id
+      JOIN Last5Matches lm ON ps.match_id = lm.match_id
+      ORDER BY 
+          lm.date_start DESC, bo.batting_order;
+  `;
+
+  try {
+      console.log(`Executing query for team ${teamId} last 5 matches`);
+      const [results] = await pool.query(query, [teamId, teamId, teamId]);
+
+      console.log('Query results:', results);  // Debugging output
+
+      if (results.length === 0) {
+          console.log('No data found for the given parameters.');
+          res.status(404).json({ message: "No data found" });
+          return;
+      }
+
+      res.json(results);
+  } catch (error) {
+      console.error("Error executing the query:", error);
+      res.status(500).send("Failed to retrieve data");
+  }
+});
+
+
+
+// batting powrplaye
+
+app.get('/team-top-players-stats/:teamId', async (req, res) => {
+  const { teamId } = req.params;
+
+  const query = `
+    WITH Last5Matches AS (
+        SELECT 
+            m.id AS match_id,
+            m.date_start,
+            m.team_1,
+            m.team_2
+        FROM 
+            matches m
+        WHERE 
+            (m.team_1 = ? OR m.team_2 = ?)
+        ORDER BY 
+            m.date_start DESC
+        LIMIT 5
+    ),
+    TeamPlayers AS (
+        SELECT 
+            tp.player_id
+        FROM 
+            team_players tp
+        WHERE 
+            tp.team_id = ?
+    ),
+    PlayerStats AS (
+        SELECT 
+            p.id AS player_id,
+            p.first_name,
+            p.last_name,
+            p.playing_role,
+            p.short_name,
+            SUM(fp.points) AS total_fantasy_points
+        FROM 
+            players p
+        JOIN fantasy_points_details fp ON p.id = fp.player_id
+        WHERE 
+            fp.match_id IN (SELECT match_id FROM Last5Matches) 
+            AND fp.player_id IN (SELECT player_id FROM TeamPlayers)
+        GROUP BY 
+            p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+        ORDER BY 
+            total_fantasy_points DESC
+        LIMIT 20
+    ),
+    MatchCounts AS (
+        SELECT 
+            b.batsman_id AS player_id,
+            COUNT(DISTINCT b.match_id) AS matches_played
+        FROM 
+            match_inning_batters_test b
+        WHERE 
+            b.match_id IN (SELECT match_id FROM Last5Matches)
+        GROUP BY 
+            b.batsman_id
+    ),
+    BattingStats AS (
+        SELECT
+            b.batsman_id AS player_id,
+            p.first_name,
+            p.last_name,
+            p.playing_role,
+            p.short_name,
+            b.match_id,
+            mc.matches_played,
+            SUM(b.runs) AS runs,
+            SUM(b.fours) AS \`4s\`,
+            SUM(b.sixes) AS \`6s\`,
+            AVG(b.strike_rate) AS SR,
+            SUM(fp.points) AS FPts
+        FROM
+            match_inning_batters_test b
+        JOIN
+            players p ON b.batsman_id = p.id
+        JOIN
+            fantasy_points_details fp ON b.batsman_id = fp.player_id AND b.match_id = fp.match_id
+        JOIN
+            MatchCounts mc ON b.batsman_id = mc.player_id
+        WHERE
+            b.match_id IN (SELECT match_id FROM Last5Matches)
+            AND b.batsman_id IN (SELECT player_id FROM PlayerStats)
+        GROUP BY
+            b.batsman_id, p.first_name, p.last_name, p.playing_role, p.short_name, b.match_id, mc.matches_played
+    )
+    SELECT 
+        bs.player_id,
+        bs.first_name,
+        bs.last_name,
+        bs.playing_role,
+        bs.short_name,
+        bs.match_id,
+        bs.matches_played,
+        bs.runs,
+        bs.\`4s\`,
+        bs.\`6s\`,
+        bs.SR,
+        bs.FPts
+    FROM
+        BattingStats bs
+    ORDER BY
+        bs.match_id DESC, bs.runs DESC;
+  `;
+
+  try {
+    const [results] = await pool.query(query, [teamId, teamId, teamId]);
+    res.json(results);
+  } catch (error) {
+    console.error("Error executing query", error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+
+//bowling death
+
+app.get('/team-top-bowlers-stats/:teamId', async (req, res) => {
+  const { teamId } = req.params;
+
+  const query = `
+    WITH Last5Matches AS (
+        SELECT 
+            m.id AS match_id,
+            m.date_start,
+            m.team_1,
+            m.team_2
+        FROM 
+            matches m
+        WHERE 
+            (m.team_1 = ? OR m.team_2 = ?)
+        ORDER BY 
+            m.date_start DESC
+        LIMIT 5
+    ),
+    TeamPlayers AS (
+        SELECT 
+            tp.player_id
+        FROM 
+            team_players tp
+        WHERE 
+            tp.team_id = ?
+    ),
+    PlayerStats AS (
+        SELECT 
+            p.id AS player_id,
+            p.first_name,
+            p.last_name,
+            p.playing_role,
+            p.short_name,
+            SUM(fp.points) AS total_fantasy_points
+        FROM 
+            players p
+        JOIN fantasy_points_details fp ON p.id = fp.player_id
+        WHERE 
+            fp.match_id IN (SELECT match_id FROM Last5Matches) 
+            AND fp.player_id IN (SELECT player_id FROM TeamPlayers)
+        GROUP BY 
+            p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+        ORDER BY 
+            total_fantasy_points DESC
+        LIMIT 20
+    ),
+    MatchCounts AS (
+        SELECT 
+            b.bowler_id AS player_id,
+            COUNT(DISTINCT b.match_id) AS matches_played
+        FROM 
+            match_inning_bowlers_test b
+        WHERE 
+            b.match_id IN (SELECT match_id FROM Last5Matches)
+        GROUP BY 
+            b.bowler_id
+    ),
+    BowlingStats AS (
+        SELECT
+            b.bowler_id AS player_id,
+            p.first_name,
+            p.last_name,
+            p.playing_role,
+            p.short_name,
+            b.match_id,
+            mc.matches_played,
+            SUM(b.wickets) AS wickets,
+            SUM(b.overs) AS overs,
+            SUM(b.maidens) AS maidens,
+            SUM(b.runs_conceded) AS runs_conceded,
+            AVG(b.econ) AS econ,
+            SUM(fp.points) AS FPts
+        FROM
+            match_inning_bowlers_test b
+        JOIN
+            players p ON b.bowler_id = p.id
+        JOIN
+            fantasy_points_details fp ON b.bowler_id = fp.player_id AND b.match_id = fp.match_id
+        JOIN
+            MatchCounts mc ON b.bowler_id = mc.player_id
+        WHERE
+            b.match_id IN (SELECT match_id FROM Last5Matches)
+            AND b.bowler_id IN (SELECT player_id FROM PlayerStats)
+        GROUP BY
+            b.bowler_id, p.first_name, p.last_name, p.playing_role, p.short_name, b.match_id, mc.matches_played
+    )
+    SELECT 
+        bs.player_id,
+        bs.first_name,
+        bs.last_name,
+        bs.playing_role,
+        bs.short_name,
+        bs.match_id,
+        bs.matches_played,
+        bs.wickets,
+        bs.overs,
+        bs.maidens,
+        bs.runs_conceded,
+        bs.econ,
+        bs.FPts
+    FROM 
+        BowlingStats bs
+    ORDER BY 
+        bs.match_id DESC, bs.wickets DESC;
+  `;
+
+  try {
+    const [results] = await pool.query(query, [teamId, teamId, teamId]);
+    res.json(results);
+  } catch (error) {
+    console.error("Error executing query", error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+
+//key match insight
+//top power play batters 3 with avg fp 
+app.get('/top-powerplay-batters', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+      return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+      const [rows] = await pool.query(`
+          WITH Last5Matches AS (
+              SELECT 
+                  m.id AS match_id,
+                  m.date_start,
+                  m.team_1,
+                  m.team_2
+              FROM 
+                  matches m
+              WHERE 
+                  (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+              ORDER BY 
+                  m.date_start DESC
+              LIMIT 5
+          ),
+          PlayerStats AS (
+              SELECT
+                  p.id AS player_id,
+                  p.first_name,
+                  p.last_name,
+                  p.playing_role,
+                  p.short_name,
+                  SUM(fp.points) AS total_fantasy_points,
+                  AVG(fp.points) AS avg_fantasy_points
+              FROM
+                  match_inning_batters_test b
+              JOIN
+                  players p ON b.batsman_id = p.id
+              JOIN
+                  fantasy_points_details fp ON b.batsman_id = fp.player_id AND b.match_id = fp.match_id
+              WHERE
+                  b.match_id IN (SELECT match_id FROM Last5Matches)
+              GROUP BY
+                  p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+          )
+          SELECT 
+              player_id,
+              first_name,
+              last_name,
+              playing_role,
+              short_name,
+              total_fantasy_points,
+              avg_fantasy_points
+          FROM
+              PlayerStats
+          WHERE
+              playing_role = 'bat'
+          ORDER BY
+              avg_fantasy_points DESC
+          LIMIT 3;
+      `, [team1, team2, team2, team1]);
+      res.json(rows);
+  } catch (err) {
+      console.error(err);
+      res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
+// top powerplay bowlers 3 with avg fp 
+app.get('/top-powerplay-bowlers', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+      return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+      const [rows] = await pool.query(`
+          WITH Last5Matches AS (
+              SELECT 
+                  m.id AS match_id,
+                  m.date_start,
+                  m.team_1,
+                  m.team_2
+              FROM 
+                  matches m
+              WHERE 
+                  (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+              ORDER BY 
+                  m.date_start DESC
+              LIMIT 5
+          ),
+          BowlerStats AS (
+              SELECT
+                  p.id AS player_id,
+                  p.first_name,
+                  p.last_name,
+                  p.playing_role,
+                  p.short_name,
+                  SUM(fp.points) AS total_fantasy_points,
+                  AVG(fp.points) AS avg_fantasy_points
+              FROM
+                  match_inning_bowlers_test b
+              JOIN
+                  players p ON b.bowler_id = p.id
+              JOIN
+                  fantasy_points_details fp ON b.bowler_id = fp.player_id AND b.match_id = fp.match_id
+              WHERE
+                  b.match_id IN (SELECT match_id FROM Last5Matches)
+              GROUP BY
+                  p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+          )
+          SELECT 
+              player_id,
+              first_name,
+              last_name,
+              playing_role,
+              short_name,
+              total_fantasy_points,
+              avg_fantasy_points
+          FROM
+              BowlerStats
+          WHERE
+              playing_role = 'bowl'
+          ORDER BY
+              avg_fantasy_points DESC
+          LIMIT 3;
+      `, [team1, team2, team2, team1]);
+      res.json(rows);
+  } catch (err) {
+      console.error(err);
+      res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+//death over bolwers
+app.get('/top-death-over-bowlers', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH Last5Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      DeathOverBowlers AS (
+          SELECT
+              b.bowler_id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              b.match_id,
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.points) AS avg_fantasy_points
+          FROM
+              match_inning_bowlers_test b
+          JOIN
+              players p ON b.bowler_id = p.id
+          JOIN
+              fantasy_points_details fp ON b.bowler_id = fp.player_id AND b.match_id = fp.match_id
+          WHERE
+              b.match_id IN (SELECT match_id FROM Last5Matches)
+          GROUP BY
+              b.bowler_id, p.first_name, p.last_name, p.playing_role, p.short_name, b.match_id
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          playing_role,
+          short_name,
+          total_fantasy_points,
+          avg_fantasy_points
+      FROM
+          DeathOverBowlers
+      WHERE
+          playing_role = 'bowl'
+      ORDER BY
+          avg_fantasy_points DESC
+      LIMIT 3;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+//x factor player 
+
+app.get('/x-factor-players', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH Last5Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      PlayerPerformance AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.points) AS avg_fantasy_points,
+              COUNT(DISTINCT fp.match_id) AS matches_played
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          WHERE
+              fp.match_id IN (SELECT match_id FROM Last5Matches)
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          playing_role,
+          short_name,
+          total_fantasy_points,
+          avg_fantasy_points,
+          matches_played
+      FROM
+          PlayerPerformance
+      WHERE
+          matches_played >= 2 -- Ensure players have played at least 2 matches
+      ORDER BY
+          avg_fantasy_points DESC
+      LIMIT 5; -- Get top 5 players with highest average fantasy points
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
+
+//all player overview 
+app.get('/last-match-player-stats', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH LastMatch AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 1
+      ),
+      PlayerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.points) AS avg_fantasy_points,
+              AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bat_first,
+              AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bat_second,
+              COUNT(DISTINCT dt.player_id) AS in_dream_team
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          JOIN
+              LastMatch lm ON fp.match_id = lm.match_id
+          LEFT JOIN
+              DreamTeam_test dt ON fp.match_id = dt.match_id AND fp.player_id = dt.player_id
+          LEFT JOIN
+              matches m ON fp.match_id = m.id
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+      ),
+      RankedStats AS (
+          SELECT
+              ps.*,
+              ROW_NUMBER() OVER (ORDER BY ps.total_fantasy_points DESC) AS player_rank,
+              ROW_NUMBER() OVER (ORDER BY ps.total_fantasy_points ASC) AS player_bottom_rank
+          FROM
+              PlayerStats ps
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          playing_role,
+          short_name,
+          total_fantasy_points,
+          avg_fantasy_points,
+          avg_fp_bat_first,
+          avg_fp_bat_second,
+          in_dream_team,
+          player_rank,
+          player_bottom_rank,
+          (SELECT AVG(player_rank) FROM RankedStats) AS avg_position_rank,
+          (SELECT AVG(player_bottom_rank) FROM RankedStats) AS avg_team_rank
+      FROM
+          RankedStats
+      ORDER BY
+          avg_fantasy_points DESC;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// API for Last 5 Matches Player Stats
+app.get('/last-5-matches-player-stats', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH Last5Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      PlayerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.points) AS avg_fantasy_points,
+              AVG(CASE WHEN m.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bat_first,
+              AVG(CASE WHEN m.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bat_second,
+              COUNT(DISTINCT dt.player_id) AS in_dream_team
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          JOIN
+              matches m ON fp.match_id = m.id
+          LEFT JOIN
+              DreamTeam_test dt ON fp.match_id = dt.match_id AND fp.player_id = dt.player_id
+          WHERE
+              fp.match_id IN (SELECT match_id FROM Last5Matches)
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+      ),
+      RankedStats AS (
+          SELECT
+              ps.*,
+              ROW_NUMBER() OVER (ORDER BY ps.total_fantasy_points DESC) AS player_rank,
+              ROW_NUMBER() OVER (ORDER BY ps.total_fantasy_points ASC) AS player_bottom_rank
+          FROM
+              PlayerStats ps
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          playing_role,
+          short_name,
+          total_fantasy_points,
+          avg_fantasy_points,
+          avg_fp_bat_first,
+          avg_fp_bat_second,
+          in_dream_team,
+          player_rank,
+          player_bottom_rank,
+          (SELECT AVG(player_rank) FROM RankedStats) AS avg_position_rank,
+          (SELECT AVG(player_bottom_rank) FROM RankedStats) AS avg_team_rank
+      FROM
+          RankedStats
+      ORDER BY
+          avg_fantasy_points DESC;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// API for Overall Player Stats Between Two Teams
+app.get('/overall-player-stats', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH AllMatches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+      ),
+      PlayerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.playing_role,
+              p.short_name,
+              SUM(fp.points) AS total_fantasy_points,
+              AVG(fp.points) AS avg_fantasy_points,
+              AVG(CASE WHEN m.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bat_first,
+              AVG(CASE WHEN m.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bat_second,
+              COUNT(DISTINCT dt.player_id) AS in_dream_team
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          JOIN
+              matches m ON fp.match_id = m.id
+          LEFT JOIN
+              DreamTeam_test dt ON fp.match_id = dt.match_id AND fp.player_id = dt.player_id
+          WHERE
+              fp.match_id IN (SELECT match_id FROM AllMatches)
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.playing_role, p.short_name
+      ),
+      RankedStats AS (
+          SELECT
+              ps.*,
+              ROW_NUMBER() OVER (ORDER BY ps.total_fantasy_points DESC) AS player_rank,
+              ROW_NUMBER() OVER (ORDER BY ps.total_fantasy_points ASC) AS player_bottom_rank
+          FROM
+              PlayerStats ps
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          playing_role,
+          short_name,
+          total_fantasy_points,
+          avg_fantasy_points,
+          avg_fp_bat_first,
+          avg_fp_bat_second,
+          in_dream_team,
+          player_rank,
+          player_bottom_rank,
+          (SELECT AVG(player_rank) FROM RankedStats) AS avg_position_rank,
+          (SELECT AVG(player_bottom_rank) FROM RankedStats) AS avg_team_rank
+      FROM
+          RankedStats
+      ORDER BY
+          avg_fantasy_points DESC;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
+
+
+
+//bowler corner 
+
+app.get('/bowler-stats-last-match', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH LastMatch AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2,
+              m.venue_id
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 1
+      ),
+      BowlerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.bowling_style,
+              AVG(fp.points) AS avg_fantasy_points,
+              AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bowling_first,
+              AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bowling_second,
+              SUM(b.wickets) AS total_wickets,
+              SUM(b.overs) AS total_overs,
+              AVG(CASE WHEN m.venue_id = lm.venue_id THEN fp.points END) AS avg_fp_at_venue
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          JOIN
+              LastMatch lm ON fp.match_id = lm.match_id
+          LEFT JOIN
+              match_inning_bowlers_test b ON fp.player_id = b.bowler_id AND fp.match_id = b.match_id
+          LEFT JOIN
+              matches m ON fp.match_id = m.id
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.bowling_style
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          bowling_style,
+          avg_fantasy_points,
+          avg_fp_bowling_first,
+          avg_fp_bowling_second,
+          total_wickets,
+          total_overs,
+          avg_fp_at_venue
+      FROM
+          BowlerStats
+      ORDER BY
+          avg_fantasy_points DESC;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+app.get('/bowler-stats-last-5-matches', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH Last5Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2,
+              m.venue_id
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      BowlerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.bowling_style,
+              AVG(fp.points) AS avg_fantasy_points,
+              AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bowling_first,
+              AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bowling_second,
+              SUM(b.wickets) AS total_wickets,
+              SUM(b.overs) AS total_overs,
+              AVG(CASE WHEN m.venue_id = lm.venue_id THEN fp.points END) AS avg_fp_at_venue
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          JOIN
+              Last5Matches lm ON fp.match_id = lm.match_id
+          LEFT JOIN
+              match_inning_bowlers_test b ON fp.player_id = b.bowler_id AND fp.match_id = b.match_id
+          LEFT JOIN
+              matches m ON fp.match_id = m.id
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.bowling_style
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          bowling_style,
+          avg_fantasy_points,
+          avg_fp_bowling_first,
+          avg_fp_bowling_second,
+          total_wickets,
+          total_overs,
+          avg_fp_at_venue
+      FROM
+          BowlerStats
+      ORDER BY
+          avg_fantasy_points DESC;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+app.get('/bowler-stats-overall', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      WITH AllMatches AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2,
+              m.venue_id
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+      ),
+      BowlerStats AS (
+          SELECT
+              p.id AS player_id,
+              p.first_name,
+              p.last_name,
+              p.bowling_style,
+              AVG(fp.points) AS avg_fantasy_points,
+              AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bowling_first,
+              AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bowling_second,
+              SUM(b.wickets) AS total_wickets,
+              SUM(b.overs) AS total_overs,
+              AVG(CASE WHEN m.venue_id = lm.venue_id THEN fp.points END) AS avg_fp_at_venue
+          FROM
+              fantasy_points_details fp
+          JOIN
+              players p ON fp.player_id = p.id
+          JOIN
+              AllMatches lm ON fp.match_id = lm.match_id
+          LEFT JOIN
+              match_inning_bowlers_test b ON fp.player_id = b.bowler_id AND fp.match_id = b.match_id
+          LEFT JOIN
+              matches m ON fp.match_id = m.id
+          GROUP BY
+              p.id, p.first_name, p.last_name, p.bowling_style
+      )
+      SELECT 
+          player_id,
+          first_name,
+          last_name,
+          bowling_style,
+          avg_fantasy_points,
+          avg_fp_bowling_first,
+          avg_fp_bowling_second,
+          total_wickets,
+          total_overs,
+          avg_fp_at_venue
+      FROM
+          BowlerStats
+      ORDER BY
+          avg_fantasy_points DESC;
+    `, [team1, team2, team2, team1]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
   }
 });
