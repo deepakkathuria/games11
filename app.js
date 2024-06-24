@@ -2550,7 +2550,6 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
 //   }
 // });
 
-
 app.get("/api/players/stats", async (req, res) => {
   const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
 
@@ -2619,9 +2618,7 @@ app.get("/api/players/stats", async (req, res) => {
     whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
   }
 
-  if (teamId1 && teamId2) {
-    whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1}))`;
-  }
+  whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1})) AND (tp.team_id = ${teamId1} OR tp.team_id = ${teamId2})`;
 
   const sql = `
     SELECT p.id, p.first_name, p.short_name, p.last_name, p.playing_role, ${selectClause}, t.name AS team_name, t.short_name AS team_short_name
@@ -2639,9 +2636,7 @@ app.get("/api/players/stats", async (req, res) => {
 
   try {
     const [results] = await pool.query(sql);
-    // Filter results to include only players from teamId1 and teamId2
-    const filteredResults = results.filter(player => player.team_short_name === 'IND' || player.team_short_name === 'PAK');
-    res.json(filteredResults);
+    res.json(results);
   } catch (error) {
     console.error("Error fetching player stats:", error);
     res.status(500).send("Failed to retrieve data");
