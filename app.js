@@ -3712,99 +3712,204 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
 
 //batting order wrong thoda byut yaaa
 
-app.get("/teamdata/25/last5matches", async (req, res) => {
-  const teamId = 25;
+// app.get("/teamdata/25/last5matches", async (req, res) => {
+//   const teamId = 25;
+
+//   const query = `
+//       WITH Last5Matches AS (
+//           SELECT 
+//               m.id AS match_id,
+//               m.date_start,
+//               m.team_1,
+//               m.team_2
+//           FROM 
+//               matches m
+//           WHERE 
+//               (m.team_1 = ? OR m.team_2 = ?)
+//           ORDER BY 
+//               m.date_start DESC
+//           LIMIT 5
+//       ),
+//       TeamPlayers AS (
+//           SELECT 
+//               tp.player_id
+//           FROM 
+//               team_players tp
+//           WHERE 
+//               tp.team_id = ?
+//       ),
+//       PlayerStats AS (
+//           SELECT 
+//               p.id AS player_id,
+//               p.first_name,
+//               p.last_name,
+//               p.playing_role,
+//               p.short_name,
+//               fp.match_id,
+//               fp.points,
+//               fp.runs,
+//               fp.wickets
+//           FROM 
+//               players p
+//           JOIN fantasy_points_details fp ON p.id = fp.player_id
+//           WHERE 
+//               fp.match_id IN (SELECT match_id FROM Last5Matches) 
+//               AND fp.player_id IN (SELECT player_id FROM TeamPlayers)
+//       ),
+//       BattingOrder AS (
+//           SELECT
+//               b.match_id,
+//               b.batsman_id,
+//               ROW_NUMBER() OVER (PARTITION BY b.match_id ORDER BY b.position) AS batting_order
+//           FROM
+//               match_inning_batters_test b
+//           WHERE
+//               b.match_id IN (SELECT match_id FROM Last5Matches)
+//               AND b.batsman_id IN (SELECT player_id FROM TeamPlayers)
+//       )
+//       SELECT 
+//           ps.player_id,
+//           ps.first_name,
+//           ps.last_name,
+//           ps.playing_role,
+//           ps.short_name,
+//           ps.match_id,
+//           ps.points,
+//           ps.runs,
+//           ps.wickets,
+//           COALESCE(bo.batting_order, 'DNB') AS batting_order,
+//           lm.date_start
+//       FROM 
+//           PlayerStats ps
+//       LEFT JOIN BattingOrder bo ON ps.match_id = bo.match_id AND ps.player_id = bo.batsman_id
+//       JOIN Last5Matches lm ON ps.match_id = lm.match_id
+//       ORDER BY 
+//           lm.date_start DESC, bo.batting_order;
+//   `;
+
+//   try {
+//       console.log(`Executing query for team ${teamId} last 5 matches`);
+//       const [results] = await pool.query(query, [teamId, teamId, teamId]);
+
+//       console.log('Query results:', results);  // Debugging output
+
+//       if (results.length === 0) {
+//           console.log('No data found for the given parameters.');
+//           res.status(404).json({ message: "No data found" });
+//           return;
+//       }
+
+//       res.json(results);
+//   } catch (error) {
+//       console.error("Error executing the query:", error);
+//       res.status(500).send("Failed to retrieve data");
+//   }
+// });
+
+app.get('/teams/:teamId/last5matches/battingorder', async (req, res) => {
+  const { teamId } = req.params;
 
   const query = `
-      WITH Last5Matches AS (
-          SELECT 
-              m.id AS match_id,
-              m.date_start,
-              m.team_1,
-              m.team_2
-          FROM 
-              matches m
-          WHERE 
-              (m.team_1 = ? OR m.team_2 = ?)
-          ORDER BY 
-              m.date_start DESC
-          LIMIT 5
-      ),
-      TeamPlayers AS (
-          SELECT 
-              tp.player_id
-          FROM 
-              team_players tp
-          WHERE 
-              tp.team_id = ?
-      ),
-      PlayerStats AS (
-          SELECT 
-              p.id AS player_id,
-              p.first_name,
-              p.last_name,
-              p.playing_role,
-              p.short_name,
-              fp.match_id,
-              fp.points,
-              fp.runs,
-              fp.wickets
-          FROM 
-              players p
-          JOIN fantasy_points_details fp ON p.id = fp.player_id
-          WHERE 
-              fp.match_id IN (SELECT match_id FROM Last5Matches) 
-              AND fp.player_id IN (SELECT player_id FROM TeamPlayers)
-      ),
-      BattingOrder AS (
-          SELECT
-              b.match_id,
-              b.batsman_id,
-              ROW_NUMBER() OVER (PARTITION BY b.match_id ORDER BY b.position) AS batting_order
-          FROM
-              match_inning_batters_test b
-          WHERE
-              b.match_id IN (SELECT match_id FROM Last5Matches)
-              AND b.batsman_id IN (SELECT player_id FROM TeamPlayers)
-      )
-      SELECT 
-          ps.player_id,
-          ps.first_name,
-          ps.last_name,
-          ps.playing_role,
-          ps.short_name,
-          ps.match_id,
-          ps.points,
-          ps.runs,
-          ps.wickets,
-          COALESCE(bo.batting_order, 'DNB') AS batting_order,
-          lm.date_start
-      FROM 
-          PlayerStats ps
-      LEFT JOIN BattingOrder bo ON ps.match_id = bo.match_id AND ps.player_id = bo.batsman_id
-      JOIN Last5Matches lm ON ps.match_id = lm.match_id
-      ORDER BY 
-          lm.date_start DESC, bo.batting_order;
+    WITH Last5Matches AS (
+        SELECT 
+            m.id AS match_id,
+            m.date_start
+        FROM 
+            matches m
+        WHERE 
+            m.team_1 = ? OR m.team_2 = ?
+        ORDER BY 
+            m.date_start DESC
+        LIMIT 5
+    ),
+    TeamPlayers AS (
+        SELECT 
+            tp.player_id,
+            p.first_name,
+            p.last_name,
+            p.playing_role,
+            p.short_name,
+            tp.team_id,
+            t.name AS team_name
+        FROM 
+            team_players tp
+        JOIN 
+            players p ON tp.player_id = p.id
+        JOIN
+            teams t ON tp.team_id = t.id
+        WHERE 
+            tp.team_id = ?
+    ),
+    PlayerBattingOrder AS (
+        SELECT
+            p.player_id,
+            p.first_name,
+            p.last_name,
+            p.short_name,
+            p.playing_role,
+            p.team_id,
+            p.team_name,
+            b.match_id,
+            ROW_NUMBER() OVER (PARTITION BY b.match_id ORDER BY b.id) AS batting_order
+        FROM
+            match_inning_batters_test b
+        JOIN
+            TeamPlayers p ON b.batsman_id = p.player_id
+        WHERE
+            b.match_id IN (SELECT match_id FROM Last5Matches)
+    )
+    SELECT 
+        pbo.player_id,
+        pbo.first_name,
+        pbo.last_name,
+        pbo.short_name,
+        pbo.playing_role,
+        pbo.team_id,
+        pbo.team_name,
+        pbo.match_id,
+        pbo.batting_order
+    FROM 
+        PlayerBattingOrder pbo
+    ORDER BY 
+        pbo.player_id, pbo.match_id;
   `;
 
   try {
-      console.log(`Executing query for team ${teamId} last 5 matches`);
       const [results] = await pool.query(query, [teamId, teamId, teamId]);
 
-      console.log('Query results:', results);  // Debugging output
+      const players = {};
 
-      if (results.length === 0) {
-          console.log('No data found for the given parameters.');
-          res.status(404).json({ message: "No data found" });
-          return;
-      }
+      results.forEach(row => {
+          if (!players[row.player_id]) {
+              players[row.player_id] = {
+                  player_id: row.player_id,
+                  first_name: row.first_name,
+                  last_name: row.last_name,
+                  short_name: row.short_name,
+                  playing_role: row.playing_role,
+                  team_id: row.team_id,
+                  team_name: row.team_name,
+                  matches: []
+              };
+          }
+          players[row.player_id].matches.push({
+              match_id: row.match_id,
+              batting_order: row.batting_order
+          });
+      });
 
-      res.json(results);
+      res.json({ status: "ok", response: Object.values(players) });
   } catch (error) {
       console.error("Error executing the query:", error);
       res.status(500).send("Failed to retrieve data");
   }
 });
+
+
+
+
+
+
 
 
 
