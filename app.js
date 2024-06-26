@@ -4899,6 +4899,9 @@ app.get('/bowler-stats-last-match', async (req, res) => {
               p.first_name,
               p.last_name,
               p.bowling_style,
+              p.playing_role,
+              tp.team_id,
+              t.name AS team_name,
               AVG(fp.points) AS avg_fantasy_points,
               AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bowling_first,
               AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bowling_second,
@@ -4910,19 +4913,26 @@ app.get('/bowler-stats-last-match', async (req, res) => {
           JOIN
               players p ON fp.player_id = p.id
           JOIN
+              team_players tp ON p.id = tp.player_id
+          JOIN
+              teams t ON tp.team_id = t.id
+          JOIN
               LastMatch lm ON fp.match_id = lm.match_id
           LEFT JOIN
               match_inning_bowlers_test b ON fp.player_id = b.bowler_id AND fp.match_id = b.match_id
           LEFT JOIN
               matches m ON fp.match_id = m.id
           GROUP BY
-              p.id, p.first_name, p.last_name, p.bowling_style
+              p.id, p.first_name, p.last_name, p.bowling_style, p.playing_role, tp.team_id, t.name
       )
       SELECT 
           player_id,
           first_name,
           last_name,
           bowling_style,
+          playing_role,
+          team_id,
+          team_name,
           avg_fantasy_points,
           avg_fp_bowling_first,
           avg_fp_bowling_second,
@@ -4940,6 +4950,8 @@ app.get('/bowler-stats-last-match', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
+
 
 
 
@@ -4974,6 +4986,9 @@ app.get('/bowler-stats-last-5-matches', async (req, res) => {
               p.first_name,
               p.last_name,
               p.bowling_style,
+              p.playing_role,
+              tp.team_id,
+              t.name AS team_name,
               AVG(fp.points) AS avg_fantasy_points,
               AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bowling_first,
               AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bowling_second,
@@ -4985,19 +5000,26 @@ app.get('/bowler-stats-last-5-matches', async (req, res) => {
           JOIN
               players p ON fp.player_id = p.id
           JOIN
+              team_players tp ON p.id = tp.player_id
+          JOIN
+              teams t ON tp.team_id = t.id
+          JOIN
               Last5Matches lm ON fp.match_id = lm.match_id
           LEFT JOIN
               match_inning_bowlers_test b ON fp.player_id = b.bowler_id AND fp.match_id = b.match_id
           LEFT JOIN
               matches m ON fp.match_id = m.id
           GROUP BY
-              p.id, p.first_name, p.last_name, p.bowling_style
+              p.id, p.first_name, p.last_name, p.bowling_style, p.playing_role, tp.team_id, t.name
       )
       SELECT 
           player_id,
           first_name,
           last_name,
           bowling_style,
+          playing_role,
+          team_id,
+          team_name,
           avg_fantasy_points,
           avg_fp_bowling_first,
           avg_fp_bowling_second,
@@ -5015,6 +5037,8 @@ app.get('/bowler-stats-last-5-matches', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
+
 
 
 app.get('/bowler-stats-overall', async (req, res) => {
@@ -5045,6 +5069,9 @@ app.get('/bowler-stats-overall', async (req, res) => {
               p.first_name,
               p.last_name,
               p.bowling_style,
+              p.playing_role,
+              tp.team_id,
+              t.name AS team_name,
               AVG(fp.points) AS avg_fantasy_points,
               AVG(CASE WHEN lm.team_1 = fp.team_id THEN fp.points END) AS avg_fp_bowling_first,
               AVG(CASE WHEN lm.team_2 = fp.team_id THEN fp.points END) AS avg_fp_bowling_second,
@@ -5056,19 +5083,26 @@ app.get('/bowler-stats-overall', async (req, res) => {
           JOIN
               players p ON fp.player_id = p.id
           JOIN
+              team_players tp ON p.id = tp.player_id
+          JOIN
+              teams t ON tp.team_id = t.id
+          JOIN
               AllMatches lm ON fp.match_id = lm.match_id
           LEFT JOIN
               match_inning_bowlers_test b ON fp.player_id = b.bowler_id AND fp.match_id = b.match_id
           LEFT JOIN
               matches m ON fp.match_id = m.id
           GROUP BY
-              p.id, p.first_name, p.last_name, p.bowling_style
+              p.id, p.first_name, p.last_name, p.bowling_style, p.playing_role, tp.team_id, t.name
       )
       SELECT 
           player_id,
           first_name,
           last_name,
           bowling_style,
+          playing_role,
+          team_id,
+          team_name,
           avg_fantasy_points,
           avg_fp_bowling_first,
           avg_fp_bowling_second,
@@ -5086,3 +5120,4 @@ app.get('/bowler-stats-overall', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
