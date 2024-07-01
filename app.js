@@ -5121,3 +5121,282 @@ app.get('/bowler-stats-overall', async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+
+
+// pl labs
+app.get('/team-stats', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const query = `
+      WITH Last5MatchesTeam1 AS (
+          SELECT 
+              m.id AS match_id,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result
+          FROM 
+              matches m
+          WHERE 
+              m.team_1 = ? OR m.team_2 = ?
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      Last5MatchesTeam2 AS (
+          SELECT 
+              m.id AS match_id,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result
+          FROM 
+              matches m
+          WHERE 
+              m.team_1 = ? OR m.team_2 = ?
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      )
+      SELECT 
+          'Team1' AS team,
+          GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches
+      FROM Last5MatchesTeam1
+      UNION ALL
+      SELECT 
+          'Team2' AS team,
+          GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches
+      FROM Last5MatchesTeam2;
+    `;
+
+    const [rows] = await pool.query(query, [
+      team1, team1, team1,
+      team2, team2, team2
+    ]);
+
+    // Format the response
+    const formattedResponse = {
+      team1: rows.find(row => row.team === 'Team1')?.last_5_matches?.split(',') || [],
+      team2: rows.find(row => row.team === 'Team2')?.last_5_matches?.split(',') || []
+    };
+
+    res.json(formattedResponse);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.get('/matches-against-each-other', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const query = `
+      WITH MatchesAgainstEachOther AS (
+          SELECT 
+              m.id AS match_id,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result_team1,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result_team2
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      )
+      SELECT 
+          'AgainstEachOtherTeam1' AS team,
+          GROUP_CONCAT(result_team1 ORDER BY match_id) AS matches_against_each_other
+      FROM MatchesAgainstEachOther
+      UNION ALL
+      SELECT 
+          'AgainstEachOtherTeam2' AS team,
+          GROUP_CONCAT(result_team2 ORDER BY match_id) AS matches_against_each_other
+      FROM MatchesAgainstEachOther;
+    `;
+
+    const [rows] = await pool.query(query, [
+      team1, team2, team1, team2, team1, team2, team2, team1
+    ]);
+
+    // Format the response
+    const formattedResponse = {
+      againstEachOther: {
+        team1: rows.find(row => row.team === 'AgainstEachOtherTeam1')?.matches_against_each_other?.split(',') || [],
+        team2: rows.find(row => row.team === 'AgainstEachOtherTeam2')?.matches_against_each_other?.split(',') || []
+      }
+    };
+
+    res.json(formattedResponse);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+
+
+
+
+
+
+app.get('/team-stats-and-prediction', async (req, res) => {
+  const team1 = req.query.team1;
+  const team2 = req.query.team2;
+
+  if (!team1 || !team2) {
+    return res.status(400).send('Team IDs are required');
+  }
+
+  try {
+    const teamLast5MatchesQuery = `
+      WITH Last5MatchesTeam1 AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', 1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_1) AS team_1_runs,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', 1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_2) AS team_2_runs,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', -1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_1) AS team_1_wickets,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', -1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_2) AS team_2_wickets
+          FROM 
+              matches m
+          WHERE 
+              m.team_1 = ? OR m.team_2 = ?
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      Last5MatchesTeam2 AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.team_1,
+              m.team_2,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', 1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_1) AS team_1_runs,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', 1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_2) AS team_2_runs,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', -1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_1) AS team_1_wickets,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', -1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = m.team_2) AS team_2_wickets
+          FROM 
+              matches m
+          WHERE 
+              m.team_1 = ? OR m.team_2 = ?
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      ),
+      MatchesAgainstEachOther AS (
+          SELECT 
+              m.id AS match_id,
+              m.date_start,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result_team1,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result_team2,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', 1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = ?) AS team_1_runs,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', 1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = ?) AS team_2_runs,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', -1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = ?) AS team_1_wickets,
+              (SELECT SUM(CAST(SUBSTRING_INDEX(scores, '/', -1) AS UNSIGNED)) FROM match_innings_test WHERE match_id = m.id AND batting_team_id = ?) AS team_2_wickets
+          FROM 
+              matches m
+          WHERE 
+              (m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?)
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      )
+      SELECT 
+          'Team1' AS team,
+          GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches,
+          AVG(team_1_runs) AS avg_runs,
+          AVG(team_1_wickets) AS avg_wickets,
+          NULL AS matches_against_each_other_team1,
+          NULL AS matches_against_each_other_team2
+      FROM Last5MatchesTeam1
+      UNION ALL
+      SELECT 
+          'Team2' AS team,
+          GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches,
+          AVG(team_2_runs) AS avg_runs,
+          AVG(team_2_wickets) AS avg_wickets,
+          NULL AS matches_against_each_other_team1,
+          NULL AS matches_against_each_other_team2
+      FROM Last5MatchesTeam2
+      UNION ALL
+      SELECT 
+          'AgainstEachOther' AS team,
+          GROUP_CONCAT(result_team1 ORDER BY match_id) AS last_5_matches,
+          AVG(team_1_runs) AS avg_runs,
+          AVG(team_1_wickets) AS avg_wickets,
+          GROUP_CONCAT(result_team1 ORDER BY match_id) AS matches_against_each_other_team1,
+          GROUP_CONCAT(result_team2 ORDER BY match_id) AS matches_against_each_other_team2
+      FROM MatchesAgainstEachOther;
+    `;
+
+    const [rows] = await pool.query(teamLast5MatchesQuery, [
+      team1, team1, team1,
+      team2, team2, team2,
+      team1, team1, team2, team2, team1, team2,
+      team1, team2, team1, team2, team2, team1, team2, team1
+    ]);
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
