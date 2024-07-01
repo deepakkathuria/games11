@@ -5131,7 +5131,7 @@ app.get('/bowler-stats-overall', async (req, res) => {
 
 
 // pl labs
-app.get('/team-stats', async (req, res) => {
+app.get('/new/team-stats', async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
@@ -5202,7 +5202,7 @@ app.get('/team-stats', async (req, res) => {
   }
 });
 
-app.get('/matches-against-each-other', async (req, res) => {
+app.get('/new/matches-against-each-other', async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
@@ -5274,7 +5274,7 @@ app.listen(port, () => {
 
 
 
-app.get('/team-stats-and-prediction', async (req, res) => {
+app.get('/new/team-stats-and-prediction', async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
