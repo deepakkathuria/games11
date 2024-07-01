@@ -5148,9 +5148,11 @@ app.get('/new/team-stats', async (req, res) => {
               CASE 
                   WHEN m.winning_team_id = ? THEN 'W'
                   ELSE 'L'
-              END AS result
+              END AS result,
+              t1.name AS team_name
           FROM 
               matches m
+          JOIN teams t1 ON m.team_1 = t1.id OR m.team_2 = t1.id
           WHERE 
               m.team_1 = ? OR m.team_2 = ?
           ORDER BY 
@@ -5164,9 +5166,11 @@ app.get('/new/team-stats', async (req, res) => {
               CASE 
                   WHEN m.winning_team_id = ? THEN 'W'
                   ELSE 'L'
-              END AS result
+              END AS result,
+              t2.name AS team_name
           FROM 
               matches m
+          JOIN teams t2 ON m.team_1 = t2.id OR m.team_2 = t2.id
           WHERE 
               m.team_1 = ? OR m.team_2 = ?
           ORDER BY 
@@ -5174,14 +5178,16 @@ app.get('/new/team-stats', async (req, res) => {
           LIMIT 5
       )
       SELECT 
-          'Team1' AS team,
+          team_name,
           GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches
       FROM Last5MatchesTeam1
+      GROUP BY team_name
       UNION ALL
       SELECT 
-          'Team2' AS team,
+          team_name,
           GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches
-      FROM Last5MatchesTeam2;
+      FROM Last5MatchesTeam2
+      GROUP BY team_name;
     `;
 
     const [rows] = await pool.query(query, [
@@ -5190,10 +5196,10 @@ app.get('/new/team-stats', async (req, res) => {
     ]);
 
     // Format the response
-    const formattedResponse = {
-      team1: rows.find(row => row.team === 'Team1')?.last_5_matches?.split(',') || [],
-      team2: rows.find(row => row.team === 'Team2')?.last_5_matches?.split(',') || []
-    };
+    const formattedResponse = rows.reduce((acc, row) => {
+      acc[row.team_name] = row.last_5_matches?.split(',') || [];
+      return acc;
+    }, {});
 
     res.json(formattedResponse);
   } catch (err) {
@@ -5408,4 +5414,65 @@ app.get('/new/team-stats-and-prediction', async (req, res) => {
 
 
 
+
+
+
+app.get('/team-last-5-matches', async (req, res) => {
+  const teamId = req.query.teamId;
+
+  if (!teamId) {
+    return res.status(400).send('Team ID is required');
+  }
+
+  try {
+    const query = `
+      WITH Last5Matches AS (
+          SELECT 
+              m.id AS match_id,
+              m.winning_team_id,
+              CASE 
+                  WHEN m.winning_team_id = ? THEN 'W'
+                  ELSE 'L'
+              END AS result,
+              CASE 
+                  WHEN m.team_1 = ? THEN t1.name
+                  ELSE t2.name
+              END AS team_name,
+              m.team_1_score,
+              m.team_2_score
+          FROM 
+              matches m
+          JOIN teams t1 ON m.team_1 = t1.id
+          JOIN teams t2 ON m.team_2 = t2.id
+          WHERE 
+              m.team_1 = ? OR m.team_2 = ?
+          ORDER BY 
+              m.date_start DESC
+          LIMIT 5
+      )
+      SELECT 
+          team_name,
+          GROUP_CONCAT(result ORDER BY match_id) AS last_5_matches,
+          GROUP_CONCAT(team_1_score ORDER BY match_id) AS team_1_scores,
+          GROUP_CONCAT(team_2_score ORDER BY match_id) AS team_2_scores
+      FROM Last5Matches
+      GROUP BY team_name;
+    `;
+
+    const [rows] = await pool.query(query, [teamId, teamId, teamId, teamId]);
+
+    // Format the response
+    const formattedResponse = {
+      team_name: rows[0]?.team_name || '',
+      last_5_matches: rows[0]?.last_5_matches?.split(',') || [],
+      team_1_scores: rows[0]?.team_1_scores?.split(',') || [],
+      team_2_scores: rows[0]?.team_2_scores?.split(',') || []
+    };
+
+    res.json(formattedResponse);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
