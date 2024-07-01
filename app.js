@@ -5263,19 +5263,19 @@ app.get('/new/matches-against-each-other', async (req, res) => {
 });
 
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-});
+// const port = process.env.PORT || 3000;
+// app.listen(port, () => {
+//     console.log(`Server running on port ${port}`);
+// });
 
-process.on('uncaughtException', (err) => {
-    if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use`);
-        process.exit(1);
-    } else {
-        throw err;
-    }
-});
+// process.on('uncaughtException', (err) => {
+//     if (err.code === 'EADDRINUSE') {
+//         console.error(`Port ${port} is already in use`);
+//         process.exit(1);
+//     } else {
+//         throw err;
+//     }
+// });
 
 // comment
 
