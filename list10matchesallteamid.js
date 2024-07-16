@@ -918,7 +918,7 @@ async function runAllFunctions() {
 // insertFP()
 // insertData1()
 // Call the main function to start all operations
-runAllFunctions();
+// runAllFunctions();
 
 async function fetchAndStoreTournamentData() {
   let connection;
@@ -1036,50 +1036,117 @@ async function processDataForTournament(tournamentId) {
 
 
 
+// async function fetchAndInsertTeams() {
+//   let connection;
+//   try {
+//       connection = await mysql.createConnection({
+//           host: process.env.DB_HOST,
+//           user: process.env.DB_USER,
+//           password: process.env.DB_PASSWORD,
+//           database: process.env.DB_NAME,
+//           port: process.env.DB_PORT,
+//       });
+
+//       const response = await axios.get(
+//           "https://rest.entitysport.com/v2/competitions/121881/teams?token=73d62591af4b3ccb51986ff5f8af5676"
+//       );
+//       const teams = response.data.response.teams;
+
+//       for (const team of teams) {
+//           // Validate data before insertion
+//           const teamId = team.team_id || team.tid;
+//           const teamName = team.name || team.title;
+//           const teamLogoUrl = team.logo_url || team.thumb_url;
+//           const teamShortName = team.short_name || team.abbr;
+
+//           if (!teamId || !teamName) {
+//               console.warn(`Skipping team due to missing data: ${JSON.stringify(team)}`);
+//               continue;
+//           }
+
+//           await connection.query(
+//               `INSERT INTO teams (id, name, logo_url, short_name)
+//                VALUES (?, ?, ?, ?)
+//                ON DUPLICATE KEY UPDATE name = VALUES(name), logo_url = VALUES(logo_url), short_name = VALUES(short_name);`,
+//               [teamId, teamName, teamLogoUrl, teamShortName]
+//           );
+//       }
+
+//       console.log("Teams data successfully inserted.");
+//   } catch (error) {
+//       console.error("Failed to insert teams data:", error);
+//   } finally {
+//       if (connection) {
+//           await connection.end();
+//       }
+//   }
+// }
+
+// // fetchAndInsertTeams()
+
 async function fetchAndInsertTeams() {
   let connection;
-  try {
-      connection = await mysql.createConnection({
-          host: process.env.DB_HOST,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-          port: process.env.DB_PORT,
-      });
+  const perPage = 80; // Number of items per page as specified in the API
+  let currentPage = 1;
+  let totalPages = 1; // Initialize with 1, will be updated with actual total pages
 
+  try {
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT,
+    });
+
+    while (currentPage <= totalPages) {
       const response = await axios.get(
-          "https://rest.entitysport.com/v2/competitions/121881/teams?token=73d62591af4b3ccb51986ff5f8af5676"
+        `https://rest.entitysport.com/v2/teams?token=73d62591af4b3ccb51986ff5f8af5676&per_page=${perPage}&paged=${currentPage}`
       );
-      const teams = response.data.response.teams;
+
+      const teams = response.data.response.items;
+      totalPages = response.data.response.total_pages; // Update the total pages from the response
+
+      console.log(`Processing page ${currentPage} of ${totalPages}`);
 
       for (const team of teams) {
-          // Validate data before insertion
-          const teamId = team.team_id || team.tid;
-          const teamName = team.name || team.title;
-          const teamLogoUrl = team.logo_url || team.thumb_url;
-          const teamShortName = team.short_name || team.abbr;
+        // Validate data before insertion
+        const teamId = team.tid;
+        const teamName = team.title;
+        const teamLogoUrl = team.logo_url;
+        const teamShortName = team.abbr;
 
-          if (!teamId || !teamName) {
-              console.warn(`Skipping team due to missing data: ${JSON.stringify(team)}`);
-              continue;
-          }
+        if (!teamId || !teamName) {
+          console.warn(`Skipping team due to missing data: ${JSON.stringify(team)}`);
+          continue;
+        }
 
-          await connection.query(
-              `INSERT INTO teams (id, name, logo_url, short_name)
-               VALUES (?, ?, ?, ?)
-               ON DUPLICATE KEY UPDATE name = VALUES(name), logo_url = VALUES(logo_url), short_name = VALUES(short_name);`,
-              [teamId, teamName, teamLogoUrl, teamShortName]
-          );
+        await connection.query(
+          `INSERT INTO teams (id, name, logo_url, short_name)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE name = VALUES(name), logo_url = VALUES(logo_url), short_name = VALUES(short_name);`,
+          [
+            teamId,
+            teamName,
+            teamLogoUrl,
+            teamShortName
+          ]
+        );
       }
 
-      console.log("Teams data successfully inserted.");
+      console.log(`Teams data successfully inserted for page ${currentPage}.`);
+      currentPage++;
+    }
+
+    console.log("All teams data successfully inserted.");
   } catch (error) {
-      console.error("Failed to insert teams data:", error);
+    console.error("Failed to insert teams data:", error);
   } finally {
-      if (connection) {
-          await connection.end();
-      }
+    if (connection) {
+      await connection.end();
+    }
   }
 }
 
-// fetchAndInsertTeams()
+// Call the function to start fetching and inserting teams
+fetchAndInsertTeams();
