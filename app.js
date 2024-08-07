@@ -29,7 +29,7 @@ app.use(cors());
 
 app.use(authRoutes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 sequelize
 
   .sync({ force: false })
@@ -1726,7 +1726,6 @@ app.get("/match/:matchId/scorecard", async (req, res) => {
 
 app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
   const { venueId, teamId1, teamId2 } = req.params;
-  const competitionId = 128471; // Static competition ID for IPL 2023
 
   try {
     const query = `
@@ -1739,11 +1738,15 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
         COUNT(DISTINCT fp.match_id) AS match_count
       FROM players p
       JOIN fantasy_points_details fp ON p.id = fp.player_id
-      JOIN teams t ON fp.team_id = t.id
+      JOIN team_players tp ON p.id = tp.player_id
+      JOIN teams t ON tp.team_id = t.id
       JOIN matches m ON fp.match_id = m.id
-      WHERE (m.team_1 = ? OR m.team_2 = ? OR m.team_1 = ? OR m.team_2 = ?) 
+      WHERE 
+        (m.team_1 = ? OR m.team_2 = ?) 
+        AND (m.team_1 = ? OR m.team_2 = ?) 
         AND m.venue_id = ?
-      GROUP BY p.id, p.playing_role, t.name       
+        AND (tp.team_id = m.team_1 OR tp.team_id = m.team_2)
+      GROUP BY p.id, p.playing_role, t.name
       ORDER BY total_fantasy_points DESC
       LIMIT 10;
     `;
@@ -1753,12 +1756,12 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
 
     // Execute the query
     const [players] = await pool.query(query, params);
-    
+
     // Check if players data is found
     if (players.length === 0) {
       return res.status(404).send('No players found');
     }
-    
+
     // Respond with the players data
     res.json(players);
   } catch (error) {
@@ -1766,6 +1769,9 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
     res.status(500).send("Failed to retrieve data");
   }
 });
+
+
+
 
 
 // app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
@@ -5510,7 +5516,7 @@ app.get('/new/matches-against-each-other', async (req, res) => {
 });
 
 
-// const port = process.env.PORT || 3000;
+// const port = process.env.PORT || 8000;
 // app.listen(port, () => {
 //     console.log(`Server running on port ${port}`);
 // });
