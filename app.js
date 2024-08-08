@@ -2121,11 +2121,11 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     // Fetch the last five matches at the specified venue
     const [matches] = await pool.query(
       `
-          SELECT id AS match_id, status_note
-          FROM matches
-          WHERE venue_id = ? 
-          ORDER BY date_start DESC
-          LIMIT 5
+        SELECT id AS match_id, status_note
+        FROM matches
+        WHERE venue_id = ? 
+        ORDER BY date_start DESC
+        LIMIT 5
       `,
       [venueId]
     );
@@ -2138,24 +2138,25 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     const playerQueries = matches.map((match) =>
       pool.query(
         `
-              SELECT 
-                  p.id AS player_id,
-                  p.playing_role,
-                  p.short_name AS player_short_name,
-                  CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-                  t.name AS team_name,
-                  t.short_name AS team_short_name,
-                  fp.points AS fantasy_points,
-                  m.id AS match_id
-              FROM fantasy_points_details fp
-              JOIN players p ON fp.player_id = p.id
-              JOIN team_players tp ON p.id = tp.player_id
-              JOIN teams t ON tp.team_id = t.id
-              JOIN matches m ON fp.match_id = m.id
-              WHERE fp.match_id = ?
-              ORDER BY fp.points DESC
-              LIMIT 5
-          `,
+          SELECT 
+              p.id AS player_id,
+              p.playing_role,
+              p.short_name AS player_short_name,
+              CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+              t.name AS team_name,
+              t.short_name AS team_short_name,
+              fp.points AS fantasy_points,
+              m.id AS match_id
+          FROM fantasy_points_details fp
+          JOIN players p ON fp.player_id = p.id
+          JOIN team_players tp ON p.id = tp.player_id
+          JOIN teams t ON tp.team_id = t.id
+          JOIN matches m ON fp.match_id = m.id
+          WHERE fp.match_id = ?
+            AND (m.team_1 = t.id OR m.team_2 = t.id)
+          ORDER BY fp.points DESC
+          LIMIT 5
+        `,
         [match.match_id]
       )
     );
@@ -2184,6 +2185,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
+
 
 // ---------------------------------------------CHEAT SHEET---------------------------------------
 
