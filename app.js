@@ -929,8 +929,8 @@ app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
 });
 
 //avg wicket score last 5 matches
-app.get("/stats/venue/:venueId", async (req, res) => {
-  const { venueId } = req.params;
+app.get("/stats/venue/:venueId/:team1Id/:team2Id", async (req, res) => {
+  const { venueId, team1Id, team2Id } = req.params;
   const competitionId = 128471; // Static competition ID for IPL 2024
 
   const query = `
@@ -947,7 +947,8 @@ app.get("/stats/venue/:venueId", async (req, res) => {
           FROM matches m
           JOIN match_innings_test mi ON m.id = mi.match_id AND mi.inning_number = 1
           LEFT JOIN match_inning_bowlers_test b ON m.id = b.match_id AND b.inning_number = 1
-          WHERE m.venue_id = ?
+          WHERE m.venue_id = ? 
+          AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
           GROUP BY m.id
           ORDER BY m.date_start DESC
           LIMIT 5
@@ -955,7 +956,7 @@ app.get("/stats/venue/:venueId", async (req, res) => {
   `;
 
   try {
-    const [results] = await pool.query(query, [venueId]);
+    const [results] = await pool.query(query, [venueId, team1Id, team2Id, team2Id, team1Id]);
     if (results.length) {
       res.json(results[0]); // Return the first result in a structured format
     } else {
@@ -966,6 +967,7 @@ app.get("/stats/venue/:venueId", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
+
 
 app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   const { venueId, teamId } = req.params;
@@ -2065,51 +2067,51 @@ app.get("/venue-stats-last-five/:venueId", async (req, res) => {
 
 app.get("/venue/:venueId/stats", async (req, res) => {
   const { venueId } = req.params;
-  const competitionId = 128471; // Assuming competition ID for IPL 2023 is 128471
+  const { teamIdA, teamIdB } = req.query; // Get team IDs from query parameters
 
   try {
-    // Query to get various statistics
-    const query = `
-      SELECT 
-        COUNT(*) AS total_matches,
-        SUM(CASE WHEN m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_after_winning_toss,
-        SUM(CASE WHEN m.toss_winner != m.winning_team_id THEN 1 ELSE 0 END) AS wins_after_losing_toss,
-        SUM(CASE WHEN m.toss_decision = 1 AND m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_batting_first_after_winning_toss,
-        SUM(CASE WHEN m.toss_decision = 2 AND m.toss_winner = m.winning_team_id THEN 1 ELSE 0 END) AS wins_bowling_first_after_winning_toss,
-        SUM(CASE WHEN m.toss_decision = 1 THEN 1 ELSE 0 END) AS chose_to_bat_first,
-        SUM(CASE WHEN m.toss_decision = 2 THEN 1 ELSE 0 END) AS chose_to_bowl_first,
-        GROUP_CONCAT(DISTINCT m.id) AS match_ids,
-        SUM(CASE WHEN (m.team_1 = m.winning_team_id AND mi.inning_number = 1) OR
-                        (m.team_2 = m.winning_team_id AND mi.inning_number = 2) THEN 1 ELSE 0 END) AS wins_batting_first,
-        SUM(CASE WHEN (m.team_2 = m.winning_team_id AND mi.inning_number = 1) OR
-                        (m.team_1 = m.winning_team_id AND mi.inning_number = 2) THEN 1 ELSE 0 END) AS wins_chasing
-      FROM matches m
-      LEFT JOIN match_innings_test mi ON m.id = mi.match_id
-      WHERE m.venue_id = ? 
-      GROUP BY m.venue_id;
-    `;
+      const query = `
+          WITH unique_matches AS (
+              SELECT 
+                  m.id AS match_id,
+                  m.toss_winner,
+                  m.winning_team_id,
+                  m.toss_decision,
+                  MAX(mi.inning_number) AS max_inning_number
+              FROM matches m
+              LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+              WHERE m.venue_id = ? 
+                AND ((m.team_1 = ? AND m.team_2 = ?) OR (m.team_1 = ? AND m.team_2 = ?))
+              GROUP BY m.id
+          )
+          SELECT 
+              COUNT(match_id) AS total_matches,
+              SUM(CASE WHEN toss_winner = winning_team_id THEN 1 ELSE 0 END) AS wins_after_winning_toss,
+              SUM(CASE WHEN toss_winner != winning_team_id THEN 1 ELSE 0 END) AS wins_after_losing_toss,
+              SUM(CASE WHEN toss_decision = 1 AND toss_winner = winning_team_id THEN 1 ELSE 0 END) AS wins_batting_first_after_winning_toss,
+              SUM(CASE WHEN toss_decision = 2 AND toss_winner = winning_team_id THEN 1 ELSE 0 END) AS wins_bowling_first_after_winning_toss,
+              SUM(CASE WHEN toss_decision = 1 THEN 1 ELSE 0 END) AS chose_to_bat_first,
+              SUM(CASE WHEN toss_decision = 2 THEN 1 ELSE 0 END) AS chose_to_bowl_first,
+              SUM(CASE WHEN max_inning_number = 1 AND winning_team_id = toss_winner THEN 1 ELSE 0 END) AS wins_batting_first,
+              SUM(CASE WHEN max_inning_number = 2 AND winning_team_id != toss_winner THEN 1 ELSE 0 END) AS wins_chasing
+          FROM unique_matches;
+      `;
 
-    const [results] = await pool.query(query, [venueId]);
-    if (results.length === 0) {
-      return res.status(404).send("No matches found");
-    }
+      const [results] = await pool.query(query, [venueId, teamIdA, teamIdB, teamIdA, teamIdB]);
 
-    const stats = results[0];
-    stats.wins_without_toss_consideration = {
-      batting_first: stats.wins_batting_first,
-      chasing: stats.wins_chasing
-    };
+      if (results.length === 0) {
+          return res.status(404).send("No matches found");
+      }
 
-    // Remove the redundant fields to clean up the JSON response
-    delete stats.wins_batting_first;
-    delete stats.wins_chasing;
-
-    res.json(stats); // Return the combined statistics as JSON
+      res.json(results[0]); // Return the statistics as JSON
   } catch (error) {
-    console.error("Error fetching venue statistics:", error);
-    res.status(500).send("Failed to retrieve data");
+      console.error("Error fetching venue statistics:", error);
+      res.status(500).send("Failed to retrieve data");
   }
 });
+
+
+
 
 
 // matches and there top player  accoording to last 5 matches at this venue
