@@ -2118,7 +2118,7 @@ app.get("/venue/:venueId/stats", async (req, res) => {
 
 app.get("/venue/:venueId/top-players", async (req, res) => {
   const { venueId } = req.params;
-  const { teamIdA, teamIdB } = req.query; // Get team IDs from query parameters
+  const { teamIdA, teamIdB } = req.query;
 
   try {
     // Fetch the last five matches at the specified venue between the two teams
@@ -2138,40 +2138,40 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
       return res.status(404).send("No matches found at this venue between these teams.");
     }
 
-    // For each match, fetch the top 5 players along with their team and player short names
-    const playerQueries = matches.map((match) =>
-      pool.query(
-        `
-          SELECT 
-              p.id AS player_id,
-              p.playing_role,
-              p.short_name AS player_short_name,
-              CONCAT(p.first_name, ' ', p.last_name) AS player_name,
-              t.name AS team_name,
-              t.short_name AS team_short_name,
-              fp.points AS fantasy_points,
-              m.id AS match_id
-          FROM fantasy_points_details fp
-          JOIN players p ON fp.player_id = p.id
-          JOIN team_players tp ON p.id = tp.player_id 
-          JOIN teams t ON tp.team_id = t.id
-          WHERE fp.match_id = ?
-            AND (m.team_1 = t.id OR m.team_2 = t.id)
-          ORDER BY fp.points DESC
-          LIMIT 5
-        `,
-        [match.match_id]
+    // Use the correct SQL query to fetch top players for each match
+    const results = await Promise.all(
+      matches.map(match =>
+        pool.query(
+          `
+            SELECT 
+                p.id AS player_id,
+                p.playing_role,
+                p.short_name AS player_short_name,
+                CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+                t.name AS team_name,
+                t.short_name AS team_short_name,
+                fp.points AS fantasy_points,
+                m.id AS match_id
+            FROM fantasy_points_details fp
+            JOIN players p ON fp.player_id = p.id
+            JOIN team_players tp ON p.id = tp.player_id 
+            JOIN teams t ON tp.team_id = t.id
+            JOIN matches m ON m.id = fp.match_id
+            WHERE m.id = ?
+              AND (m.team_1 = t.id OR m.team_2 = t.id)
+            ORDER BY fp.points DESC
+            LIMIT 5
+          `,
+          [match.match_id]
+        )
       )
     );
-
-    // Execute all player queries for each match
-    const results = await Promise.all(playerQueries);
 
     // Structure the final response with match and player details
     const detailedMatches = matches.map((match, index) => ({
       match_id: match.match_id,
       status_note: match.status_note,
-      top_players: results[index][0].map((player) => ({
+      top_players: results[index][0].map(player => ({
         player_id: player.player_id,
         player_role: player.playing_role,
         player_name: player.player_name,
@@ -2188,6 +2188,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
+
 
 
 
