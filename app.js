@@ -2118,22 +2118,24 @@ app.get("/venue/:venueId/stats", async (req, res) => {
 
 app.get("/venue/:venueId/top-players", async (req, res) => {
   const { venueId } = req.params;
+  const { teamIdA, teamIdB } = req.query; // Get team IDs from query parameters
 
   try {
-    // Fetch the last five matches at the specified venue
+    // Fetch the last five matches at the specified venue between the two teams
     const [matches] = await pool.query(
       `
         SELECT id AS match_id, status_note
         FROM matches
         WHERE venue_id = ? 
+          AND ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
         ORDER BY date_start DESC
         LIMIT 5
       `,
-      [venueId]
+      [venueId, teamIdA, teamIdB, teamIdB, teamIdA]
     );
 
     if (matches.length === 0) {
-      return res.status(404).send("No matches found at this venue.");
+      return res.status(404).send("No matches found at this venue between these teams.");
     }
 
     // For each match, fetch the top 5 players along with their team and player short names
@@ -2151,9 +2153,8 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
               m.id AS match_id
           FROM fantasy_points_details fp
           JOIN players p ON fp.player_id = p.id
-          JOIN team_players tp ON p.id = tp.player_id
+          JOIN team_players tp ON p.id = tp.player_id 
           JOIN teams t ON tp.team_id = t.id
-          JOIN matches m ON fp.match_id = m.id
           WHERE fp.match_id = ?
             AND (m.team_1 = t.id OR m.team_2 = t.id)
           ORDER BY fp.points DESC
@@ -2187,6 +2188,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
+
 
 
 // ---------------------------------------------CHEAT SHEET---------------------------------------
