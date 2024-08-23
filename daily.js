@@ -14,7 +14,7 @@ async function insertData1() {
     });
     
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-16_2024-08-17&per_page=80"
+      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-22_2024-08-23&per_page=80"
     );
     const matches = response.data.response.items;
     for (const match of matches) {
@@ -243,7 +243,7 @@ async function insertData() {
     });
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-16_2024-08-17&per_page=80"
+      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-22_2024-08-23&per_page=80"
     );
     const matches = response.data.response.items;
     console.log(matches.status_str, "sfdjfafdfsa");
@@ -446,6 +446,11 @@ async function insertData() {
 // }
 
 async function insertData3() {
+  let apiHitCount = 0;
+
+  apiHitCount++; // Increment the counter each time the function is called
+  console.log(`Players API has been hit ${apiHitCount} times`);
+
     let connection;
     try {
       connection = await mysql.createConnection({
@@ -458,7 +463,7 @@ async function insertData3() {
   
       // Fetch all match IDs first
       const matchResponse = await axios.get(
-        "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-16_2024-08-17&per_page=80"
+        "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-22_2024-08-23&per_page=80"
       );
       const matches = matchResponse.data.response.items;
   
@@ -514,7 +519,7 @@ async function insertFP() {
     });
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-16_2024-08-17&per_page=80"
+      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-22_2024-08-23&per_page=80"
     );
     const matches = response.data.response.items;
 
@@ -621,7 +626,7 @@ async function createDreamTeam() {
     });
 
     const response = await axios.get(
-      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-16_2024-08-17&per_page=80"
+      "https://rest.entitysport.com/v2/matches/?token=73d62591af4b3ccb51986ff5f8af5676&date=2024-08-22_2024-08-23&per_page=80"
     );
     const matches = response.data.response.items;
 
