@@ -790,7 +790,6 @@ app.get("/team-stats/:teamId/:venueId", async (req, res) => {
   }
 });
 
-
 // top player using team at particular venue overall
 app.get("/top-players/:teamId/:venueId", async (req, res) => {
   const { teamId, venueId } = req.params;
@@ -829,7 +828,6 @@ app.get("/top-players/:teamId/:venueId", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
-
 
 // top players batting first using team and venue
 
@@ -879,7 +877,6 @@ app.get("/top-players/batting-first/:teamId/:venueId", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
-
 
 // top player bowling first using team and venue
 app.get("/top-players/bowling-first/:teamId/:venueId", async (req, res) => {
@@ -956,7 +953,13 @@ app.get("/stats/venue/:venueId/:team1Id/:team2Id", async (req, res) => {
   `;
 
   try {
-    const [results] = await pool.query(query, [venueId, team1Id, team2Id, team2Id, team1Id]);
+    const [results] = await pool.query(query, [
+      venueId,
+      team1Id,
+      team2Id,
+      team2Id,
+      team1Id,
+    ]);
     if (results.length) {
       res.json(results[0]); // Return the first result in a structured format
     } else {
@@ -967,7 +970,6 @@ app.get("/stats/venue/:venueId/:team1Id/:team2Id", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
-
 
 app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
   const { venueId, teamId } = req.params;
@@ -986,7 +988,7 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
       [teamId, teamId, venueId]
     );
 
-    const matchIds = matches.map(match => match.match_id);
+    const matchIds = matches.map((match) => match.match_id);
     if (matchIds.length === 0) {
       return res.status(404).send("No matches found");
     }
@@ -1137,17 +1139,19 @@ app.get("/venue/:venueId/team/:teamId/match-details", async (req, res) => {
     ]);
 
     // Organize data by match_id
-    const detailedMatches = matches.map(match => ({
+    const detailedMatches = matches.map((match) => ({
       match_id: match.match_id,
       short_title: match.short_title,
       status_note: match.status_note,
       date_start: match.date_start,
-      innings: inningScores[0].filter(i => i.match_id === match.match_id),
-      batting: battingDetails[0].filter(b => b.match_id === match.match_id),
-      bowling: bowlingDetails[0].filter(b => b.match_id === match.match_id),
-      fielding: fieldingDetails[0].filter(f => f.match_id === match.match_id),
-      fantasyPoints: fantasyPoints[0].filter(fp => fp.match_id === match.match_id),
-      dreamTeam: dreamTeams[0].filter(dt => dt.match_id === match.match_id),
+      innings: inningScores[0].filter((i) => i.match_id === match.match_id),
+      batting: battingDetails[0].filter((b) => b.match_id === match.match_id),
+      bowling: bowlingDetails[0].filter((b) => b.match_id === match.match_id),
+      fielding: fieldingDetails[0].filter((f) => f.match_id === match.match_id),
+      fantasyPoints: fantasyPoints[0].filter(
+        (fp) => fp.match_id === match.match_id
+      ),
+      dreamTeam: dreamTeams[0].filter((dt) => dt.match_id === match.match_id),
     }));
 
     res.json(detailedMatches);
@@ -1162,122 +1166,137 @@ app.get("/venue1/:venueId/team/:teamId/match-details", async (req, res) => {
   const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
 
   try {
-      const [matches] = await pool.query(
-          `
+    const [matches] = await pool.query(
+      `
           SELECT id AS match_id, date_start, short_title, status_note
           FROM matches
           WHERE (team_1 = ? OR team_2 = ?) AND venue_id = ? 
           ORDER BY date_start DESC
           LIMIT 5
           `,
-          [teamId, teamId, venueId]
-      );
+      [teamId, teamId, venueId]
+    );
 
-      const matchIds = matches.map(match => match.match_id);
-      if (matchIds.length === 0) {
-          return res.status(404).send("No matches found");
-      }
+    const matchIds = matches.map((match) => match.match_id);
+    if (matchIds.length === 0) {
+      return res.status(404).send("No matches found");
+    }
 
-      // Adjusted queries
-      const [
-          [batters],
-          [bowlers],
-          [fielders],
-          [inningsDetails]
-      ] = await Promise.all([
-          pool.query(
-              `SELECT b.*, p.first_name, p.last_name, p.short_name AS player_short_name
+    // Adjusted queries
+    const [[batters], [bowlers], [fielders], [inningsDetails]] =
+      await Promise.all([
+        pool.query(
+          `SELECT b.*, p.first_name, p.last_name, p.short_name AS player_short_name
               FROM match_inning_batters_test b
               JOIN players p ON b.batsman_id = p.id
-              WHERE b.match_id IN (?)`, [matchIds]
-          ),
-          pool.query(
-              `SELECT bl.*, p.first_name, p.last_name, p.short_name AS player_short_name
+              WHERE b.match_id IN (?)`,
+          [matchIds]
+        ),
+        pool.query(
+          `SELECT bl.*, p.first_name, p.last_name, p.short_name AS player_short_name
               FROM match_inning_bowlers_test bl
               JOIN players p ON bl.bowler_id = p.id
-              WHERE bl.match_id IN (?)`, [matchIds]
-          ),
-          pool.query(
-              `SELECT f.*, p.first_name, p.last_name, p.short_name AS player_short_name
+              WHERE bl.match_id IN (?)`,
+          [matchIds]
+        ),
+        pool.query(
+          `SELECT f.*, p.first_name, p.last_name, p.short_name AS player_short_name
               FROM match_inning_fielders_test f
               JOIN players p ON f.fielder_id = p.id
-              WHERE f.match_id IN (?)`, [matchIds]
-          ),
-          pool.query(
-              `SELECT mi.*, t.name AS team_name
+              WHERE f.match_id IN (?)`,
+          [matchIds]
+        ),
+        pool.query(
+          `SELECT mi.*, t.name AS team_name
               FROM match_innings_test mi
               JOIN teams t ON mi.batting_team_id = t.id
-              WHERE mi.match_id IN (?) ORDER BY inning_number`, [matchIds]
-          )
+              WHERE mi.match_id IN (?) ORDER BY inning_number`,
+          [matchIds]
+        ),
       ]);
 
-      const detailedMatches = matches.map(match => {
-          const matchInnings = inningsDetails
-              .filter(i => i.match_id === match.match_id)
-              .map(inning => {
-                  const inningNumber = inning.inning_number;
-                  return {
-                      inning_number: inningNumber,
-                      name: inning.name,
-                      scores: inning.scores,
-                      scores_full: inning.scores_full || `${inning.scores} (${inning.max_over} ov)`,
-                      team_name: inning.team_name,
-                      batsmen: batters.filter(b => b.match_id === match.match_id && b.inning_number === inningNumber),
-                      bowlers: bowlers.filter(b => b.match_id === match.match_id && b.inning_number === inningNumber),
-                      fielders: fielders.filter(f => f.match_id === match.match_id && f.inning_number === inningNumber)
-                  };
-              });
-
+    const detailedMatches = matches.map((match) => {
+      const matchInnings = inningsDetails
+        .filter((i) => i.match_id === match.match_id)
+        .map((inning) => {
+          const inningNumber = inning.inning_number;
           return {
-              match_id: match.match_id,
-              title: match.short_title,
-              status_note: match.status_note,
-              date_start: match.date_start,
-              innings: matchInnings
+            inning_number: inningNumber,
+            name: inning.name,
+            scores: inning.scores,
+            scores_full:
+              inning.scores_full || `${inning.scores} (${inning.max_over} ov)`,
+            team_name: inning.team_name,
+            batsmen: batters.filter(
+              (b) =>
+                b.match_id === match.match_id &&
+                b.inning_number === inningNumber
+            ),
+            bowlers: bowlers.filter(
+              (b) =>
+                b.match_id === match.match_id &&
+                b.inning_number === inningNumber
+            ),
+            fielders: fielders.filter(
+              (f) =>
+                f.match_id === match.match_id &&
+                f.inning_number === inningNumber
+            ),
           };
-      });
+        });
 
-      res.json({ status: "ok", response: detailedMatches });
+      return {
+        match_id: match.match_id,
+        title: match.short_title,
+        status_note: match.status_note,
+        date_start: match.date_start,
+        innings: matchInnings,
+      };
+    });
+
+    res.json({ status: "ok", response: detailedMatches });
   } catch (error) {
-      console.error("Error fetching match details:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error fetching match details:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
 
 //DREAM TEAM VENUE
-app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (req, res) => {
-  const { venueId, team1Id, team2Id } = req.params;
-  const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
+app.get(
+  "/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details",
+  async (req, res) => {
+    const { venueId, team1Id, team2Id } = req.params;
+    const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
 
-  try {
-    // Fetch the last five matches for a specific venue and between two teams within a competition
-    const [matches] = await pool.query(
-      `
+    try {
+      // Fetch the last five matches for a specific venue and between two teams within a competition
+      const [matches] = await pool.query(
+        `
           SELECT id AS match_id, date_start, short_title, status_note
           FROM matches
           WHERE (team_1 = ? AND team_2 = ? OR team_1 = ? AND team_2 = ?) AND venue_id = ?
           ORDER BY date_start DESC
           LIMIT 5
       `,
-      [team1Id, team2Id, team2Id, team1Id, venueId]
-    );
+        [team1Id, team2Id, team2Id, team1Id, venueId]
+      );
 
-    const matchIds = matches.map(match => match.match_id);
-    if (matchIds.length === 0) {
-      return res.status(404).send("No matches found");
-    }
+      const matchIds = matches.map((match) => match.match_id);
+      if (matchIds.length === 0) {
+        return res.status(404).send("No matches found");
+      }
 
-    // Query for batting, bowling, fielding details, fantasy points, dream teams, and inning scores
-    const [
-      battingDetails,
-      bowlingDetails,
-      fieldingDetails,
-      fantasyPoints,
-      dreamTeams,
-      inningScores,
-    ] = await Promise.all([
-      pool.query(
-        `
+      // Query for batting, bowling, fielding details, fantasy points, dream teams, and inning scores
+      const [
+        battingDetails,
+        bowlingDetails,
+        fieldingDetails,
+        fantasyPoints,
+        dreamTeams,
+        inningScores,
+      ] = await Promise.all([
+        pool.query(
+          `
           SELECT 
               b.match_id,
               p.id as player_id,
@@ -1300,10 +1319,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE b.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               bl.match_id,
               p.id as player_id,
@@ -1324,10 +1343,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE bl.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               f.match_id,
               p.id as player_id,
@@ -1349,10 +1368,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE f.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               fp.match_id,
               p.id as player_id,
@@ -1370,10 +1389,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE fp.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               dt.match_id,
               p.id as player_id,
@@ -1392,10 +1411,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE dt.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT
               mi.match_id,
               mi.inning_number,
@@ -1408,73 +1427,82 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           LEFT JOIN teams t ON (mi.batting_team_id = t.id)
           WHERE mi.match_id IN (?) AND (mi.batting_team_id = ? OR mi.batting_team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-    ]);
+          [matchIds, team1Id, team2Id]
+        ),
+      ]);
 
-    // Organize data by match_id
-    const detailedMatches = matches.map(match => ({
-      match_id: match.match_id,
-      short_title: match.short_title,
-      status_note: match.status_note,
-      date_start: match.date_start,
-      innings: inningScores[0].filter(i => i.match_id === match.match_id),
-      batting: battingDetails[0].filter(b => b.match_id === match.match_id),
-      bowling: bowlingDetails[0].filter(b => b.match_id === match.match_id),
-      fielding: fieldingDetails[0].filter(f => f.match_id === match.match_id),
-      fantasyPoints: fantasyPoints[0].filter(fp => fp.match_id === match.match_id),
-      dreamTeam: dreamTeams[0].filter(dt => dt.match_id === match.match_id),
-    }));
+      // Organize data by match_id
+      const detailedMatches = matches.map((match) => ({
+        match_id: match.match_id,
+        short_title: match.short_title,
+        status_note: match.status_note,
+        date_start: match.date_start,
+        innings: inningScores[0].filter((i) => i.match_id === match.match_id),
+        batting: battingDetails[0].filter((b) => b.match_id === match.match_id),
+        bowling: bowlingDetails[0].filter((b) => b.match_id === match.match_id),
+        fielding: fieldingDetails[0].filter(
+          (f) => f.match_id === match.match_id
+        ),
+        fantasyPoints: fantasyPoints[0].filter(
+          (fp) => fp.match_id === match.match_id
+        ),
+        dreamTeam: dreamTeams[0].filter((dt) => dt.match_id === match.match_id),
+      }));
 
-    res.json(detailedMatches);
-  } catch (error) {
-    console.error("Error fetching match details:", error);
-    res.status(500).send("Failed to retrieve data");
+      res.json(detailedMatches);
+    } catch (error) {
+      console.error("Error fetching match details:", error);
+      res.status(500).send("Failed to retrieve data");
+    }
   }
-});
-
+);
 
 //////////////////////////copy of above to tackle things
-app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (req, res) => {
-  const { venueId, team1Id, team2Id } = req.params;
-  const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
+app.get(
+  "/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details",
+  async (req, res) => {
+    const { venueId, team1Id, team2Id } = req.params;
+    const competitionId = 128471; // Assuming competition ID for IPL 2024 is 128471
 
-  try {
-    // Fetch the last five matches for a specific venue and between two teams within a competition
-    const [matches] = await pool.query(
-      `
+    try {
+      // Fetch the last five matches for a specific venue and between two teams within a competition
+      const [matches] = await pool.query(
+        `
           SELECT id AS match_id, date_start, short_title, status_note, completed
           FROM matches
           WHERE (team_1 = ? AND team_2 = ? OR team_1 = ? AND team_2 = ?) AND venue_id = ?
           ORDER BY date_start DESC
           LIMIT 5
       `,
-      [team1Id, team2Id, team2Id, team1Id, venueId]
-    );
+        [team1Id, team2Id, team2Id, team1Id, venueId]
+      );
 
-    const matchIds = matches.map(match => match.match_id);
-    if (matchIds.length === 0) {
-      return res.status(404).send("No matches found");
-    }
+      const matchIds = matches.map((match) => match.match_id);
+      if (matchIds.length === 0) {
+        return res.status(404).send("No matches found");
+      }
 
-    // Check if the latest match is completed
-    const latestMatch = matches[0];
-    const usePreviousMatchForFantasy = latestMatch.completed === 0;
+      // Check if the latest match is completed
+      const latestMatch = matches[0];
+      const usePreviousMatchForFantasy = latestMatch.completed === 0;
 
-    // Get the previous match id if the latest match is not completed
-    const previousMatchId = usePreviousMatchForFantasy && matches.length > 1 ? matches[1].match_id : latestMatch.match_id;
+      // Get the previous match id if the latest match is not completed
+      const previousMatchId =
+        usePreviousMatchForFantasy && matches.length > 1
+          ? matches[1].match_id
+          : latestMatch.match_id;
 
-    // Query for batting, bowling, fielding details, fantasy points, dream teams, and inning scores
-    const [
-      battingDetails,
-      bowlingDetails,
-      fieldingDetails,
-      fantasyPoints,
-      dreamTeams,
-      inningScores,
-    ] = await Promise.all([
-      pool.query(
-        `
+      // Query for batting, bowling, fielding details, fantasy points, dream teams, and inning scores
+      const [
+        battingDetails,
+        bowlingDetails,
+        fieldingDetails,
+        fantasyPoints,
+        dreamTeams,
+        inningScores,
+      ] = await Promise.all([
+        pool.query(
+          `
           SELECT 
               b.match_id,
               p.id as player_id,
@@ -1497,10 +1525,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE b.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               bl.match_id,
               p.id as player_id,
@@ -1521,10 +1549,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE bl.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               f.match_id,
               p.id as player_id,
@@ -1546,10 +1574,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE f.match_id IN (?) AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [matchIds, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               fp.match_id,
               p.id as player_id,
@@ -1567,10 +1595,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE fp.match_id = ? AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [previousMatchId, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [previousMatchId, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT 
               dt.match_id,
               p.id as player_id,
@@ -1589,10 +1617,10 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           JOIN teams t ON tp.team_id = t.id
           WHERE dt.match_id = ? AND (tp.team_id = ? OR tp.team_id = ?)
         `,
-        [previousMatchId, team1Id, team2Id]
-      ),
-      pool.query(
-        `
+          [previousMatchId, team1Id, team2Id]
+        ),
+        pool.query(
+          `
           SELECT
               mi.match_id,
               mi.inning_number,
@@ -1605,132 +1633,146 @@ app.get("/venue/:venueId/team1/:team1Id/team2/:team2Id/match-details", async (re
           LEFT JOIN teams t ON (mi.batting_team_id = t.id)
           WHERE mi.match_id IN (?) AND (mi.batting_team_id = ? OR mi.batting_team_id = ?)
         `,
-        [matchIds, team1Id, team2Id]
-      ),
-    ]);
+          [matchIds, team1Id, team2Id]
+        ),
+      ]);
 
-    // Organize data by match_id
-    const detailedMatches = matches.map(match => ({
-      match_id: match.match_id,
-      short_title: match.short_title,
-      status_note: match.status_note,
-      date_start: match.date_start,
-      innings: inningScores[0].filter(i => i.match_id === match.match_id),
-      batting: battingDetails[0].filter(b => b.match_id === match.match_id),
-      bowling: bowlingDetails[0].filter(b => b.match_id === match.match_id),
-      fielding: fieldingDetails[0].filter(f => f.match_id === match.match_id),
-      fantasyPoints: fantasyPoints[0].filter(fp => fp.match_id === (match.match_id === latestMatch.match_id && !usePreviousMatchForFantasy ? latestMatch.match_id : previousMatchId)),
-      dreamTeam: dreamTeams[0].filter(dt => dt.match_id === (match.match_id === latestMatch.match_id && !usePreviousMatchForFantasy ? latestMatch.match_id : previousMatchId)),
-    }));
+      // Organize data by match_id
+      const detailedMatches = matches.map((match) => ({
+        match_id: match.match_id,
+        short_title: match.short_title,
+        status_note: match.status_note,
+        date_start: match.date_start,
+        innings: inningScores[0].filter((i) => i.match_id === match.match_id),
+        batting: battingDetails[0].filter((b) => b.match_id === match.match_id),
+        bowling: bowlingDetails[0].filter((b) => b.match_id === match.match_id),
+        fielding: fieldingDetails[0].filter(
+          (f) => f.match_id === match.match_id
+        ),
+        fantasyPoints: fantasyPoints[0].filter(
+          (fp) =>
+            fp.match_id ===
+            (match.match_id === latestMatch.match_id &&
+            !usePreviousMatchForFantasy
+              ? latestMatch.match_id
+              : previousMatchId)
+        ),
+        dreamTeam: dreamTeams[0].filter(
+          (dt) =>
+            dt.match_id ===
+            (match.match_id === latestMatch.match_id &&
+            !usePreviousMatchForFantasy
+              ? latestMatch.match_id
+              : previousMatchId)
+        ),
+      }));
 
-    res.json(detailedMatches);
-  } catch (error) {
-    console.error("Error fetching match details:", error);
-    res.status(500).send("Failed to retrieve data");
+      res.json(detailedMatches);
+    } catch (error) {
+      console.error("Error fetching match details:", error);
+      res.status(500).send("Failed to retrieve data");
+    }
   }
-});
-
+);
 
 //scoore card
 app.get("/match/:matchId/scorecard", async (req, res) => {
   const { matchId } = req.params;
-   console.log(matchId,"params")
+  console.log(matchId, "params");
   try {
-      // Fetch match details
-      const [[match]] = await pool.query(
-          `
+    // Fetch match details
+    const [[match]] = await pool.query(
+      `
           SELECT id AS match_id, title, short_title, date_start, status_note
           FROM matches
           WHERE id = ?
           `,
-          [matchId]
-      );
+      [matchId]
+    );
 
-      if (!match) {
-          return res.status(404).send("Match not found");
-      }
+    if (!match) {
+      return res.status(404).send("Match not found");
+    }
 
-      // Fetch all related details
-      const [
-          [batters],
-          [bowlers],
-          [fielders],
-          [inningsDetails]
-      ] = await Promise.all([
-          pool.query(
-              `SELECT b.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
+    // Fetch all related details
+    const [[batters], [bowlers], [fielders], [inningsDetails]] =
+      await Promise.all([
+        pool.query(
+          `SELECT b.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
               FROM match_inning_batters_test b
               JOIN players p ON b.batsman_id = p.id
               JOIN match_innings_test mi ON mi.match_id = b.match_id AND mi.inning_number = b.inning_number
               JOIN teams t ON mi.batting_team_id = t.id
-              WHERE b.match_id = ?`, [matchId]
-          ),
-          pool.query(
-              `SELECT bl.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
+              WHERE b.match_id = ?`,
+          [matchId]
+        ),
+        pool.query(
+          `SELECT bl.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
               FROM match_inning_bowlers_test bl
               JOIN players p ON bl.bowler_id = p.id
               JOIN match_innings_test mi ON mi.match_id = bl.match_id AND mi.inning_number = bl.inning_number
               JOIN teams t ON mi.fielding_team_id = t.id
-              WHERE bl.match_id = ?`, [matchId]
-          ),
-          pool.query(
-              `SELECT f.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
+              WHERE bl.match_id = ?`,
+          [matchId]
+        ),
+        pool.query(
+          `SELECT f.*, p.first_name, p.last_name, p.short_name AS player_short_name, t.short_name AS team_short_name
               FROM match_inning_fielders_test f
               JOIN players p ON f.fielder_id = p.id
               JOIN match_innings_test mi ON mi.match_id = f.match_id AND mi.inning_number = f.inning_number
               JOIN teams t ON mi.fielding_team_id = t.id
-              WHERE f.match_id = ?`, [matchId]
-          ),
-          pool.query(
-              `SELECT mi.*, t.name AS team_name
+              WHERE f.match_id = ?`,
+          [matchId]
+        ),
+        pool.query(
+          `SELECT mi.*, t.name AS team_name
               FROM match_innings_test mi
               JOIN teams t ON mi.batting_team_id = t.id
-              WHERE mi.match_id = ? ORDER BY inning_number`, [matchId]
-          )
+              WHERE mi.match_id = ? ORDER BY inning_number`,
+          [matchId]
+        ),
       ]);
 
-      // Structure innings with batsmen, bowlers, and fielders
-      const matchInnings = inningsDetails.map(inning => {
-          const inningNumber = inning.inning_number;
-          return {
-              inning_number: inningNumber,
-              name: inning.name,
-              scores: inning.scores,
-              scores_full: inning.scores_full || `${inning.scores} (${inning.max_over} ov)`,
-              team_name: inning.team_name,
-              batsmen: batters.filter(b => b.inning_number === inningNumber),
-              bowlers: bowlers.filter(b => b.inning_number === inningNumber),
-              fielders: fielders.filter(f => f.inning_number === inningNumber)
-          };
-      });
-
-      // Construct the final response
-      const response = {
-          match_id: match.match_id,
-          title: match.title,
-          short_title: match.short_title,
-          date_start: match.date_start,
-          status_note: match.status_note,
-          innings: matchInnings
+    // Structure innings with batsmen, bowlers, and fielders
+    const matchInnings = inningsDetails.map((inning) => {
+      const inningNumber = inning.inning_number;
+      return {
+        inning_number: inningNumber,
+        name: inning.name,
+        scores: inning.scores,
+        scores_full:
+          inning.scores_full || `${inning.scores} (${inning.max_over} ov)`,
+        team_name: inning.team_name,
+        batsmen: batters.filter((b) => b.inning_number === inningNumber),
+        bowlers: bowlers.filter((b) => b.inning_number === inningNumber),
+        fielders: fielders.filter((f) => f.inning_number === inningNumber),
       };
+    });
 
-      res.json({ status: "ok", response });
+    // Construct the final response
+    const response = {
+      match_id: match.match_id,
+      title: match.title,
+      short_title: match.short_title,
+      date_start: match.date_start,
+      status_note: match.status_note,
+      innings: matchInnings,
+    };
+
+    res.json({ status: "ok", response });
   } catch (error) {
-      console.error("Error fetching scorecard details:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error fetching scorecard details:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
 
+app.get(
+  "/top-players/venue/:venueId/teams/:teamId1/:teamId2",
+  async (req, res) => {
+    const { venueId, teamId1, teamId2 } = req.params;
 
-
-
-
-
-app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
-  const { venueId, teamId1, teamId2 } = req.params;
-
-  try {
-    const query = `
+    try {
+      const query = `
       SELECT 
         p.id AS player_id,
         p.playing_role, 
@@ -1753,41 +1795,38 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
       LIMIT 10;
     `;
 
-    // Binding the parameters to avoid SQL injection
-    const params = [teamId1, teamId2, teamId1, teamId2, venueId];
+      // Binding the parameters to avoid SQL injection
+      const params = [teamId1, teamId2, teamId1, teamId2, venueId];
 
-    // Execute the query
-    const [players] = await pool.query(query, params);
+      // Execute the query
+      const [players] = await pool.query(query, params);
 
-    // Check if players data is found
-    if (players.length === 0) {
-      return res.status(404).send('No players found');
+      // Check if players data is found
+      if (players.length === 0) {
+        return res.status(404).send("No players found");
+      }
+
+      // Respond with the players data
+      res.json(players);
+    } catch (error) {
+      console.error("Error fetching top players by fantasy points:", error);
+      res.status(500).send("Failed to retrieve data");
     }
-
-    // Respond with the players data
-    res.json(players);
-  } catch (error) {
-    console.error("Error fetching top players by fantasy points:", error);
-    res.status(500).send("Failed to retrieve data");
   }
-});
-
-
-
-
+);
 
 // app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
 //   const { venueId, teamId1, teamId2 } = req.params;
 
 //   try {
 //     const query = `
-//       SELECT 
+//       SELECT
 //         dt.player_id,
 //         p.first_name,
 //         p.last_name,
 //         p.playing_role,
 //         t.name AS team_name,
-//         t.short_name AS team_short_name, 
+//         t.short_name AS team_short_name,
 //         SUM(CASE WHEN dt.role = 'Captain' THEN 1 ELSE 0 END) AS times_captain,
 //         SUM(CASE WHEN dt.role = 'Vice Captain' THEN 1 ELSE 0 END) AS times_vice_captain,
 //         GROUP_CONCAT(DISTINCT dt.match_id ORDER BY dt.match_id) AS match_ids,
@@ -1811,11 +1850,13 @@ app.get("/top-players/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) 
 //   }
 // });
 
-app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, res) => {
-  const { venueId, teamId1, teamId2 } = req.params;
+app.get(
+  "/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2",
+  async (req, res) => {
+    const { venueId, teamId1, teamId2 } = req.params;
 
-  try {
-    const query = `
+    try {
+      const query = `
       SELECT 
         dt.player_id,
         p.first_name,
@@ -1839,19 +1880,25 @@ app.get("/frequent-leaders/venue/:venueId/teams/:teamId1/:teamId2", async (req, 
       ORDER BY times_captain DESC, times_vice_captain DESC;
     `;
 
-    const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2, venueId, teamId1, teamId2]);
-    res.json(results);
-  } catch (error) {
-    console.error("Error fetching frequent captains and vice captains:", error);
-    res.status(500).send("Failed to retrieve data");
+      const [results] = await pool.query(query, [
+        teamId1,
+        teamId2,
+        teamId1,
+        teamId2,
+        venueId,
+        teamId1,
+        teamId2,
+      ]);
+      res.json(results);
+    } catch (error) {
+      console.error(
+        "Error fetching frequent captains and vice captains:",
+        error
+      );
+      res.status(500).send("Failed to retrieve data");
+    }
   }
-});
-
-
-
-
-
-
+);
 
 app.get("/match-stats/:venueId/:teamId", async (req, res) => {
   const { venueId, teamId } = req.params;
@@ -2070,7 +2117,7 @@ app.get("/venue/:venueId/stats", async (req, res) => {
   const { teamIdA, teamIdB } = req.query; // Get team IDs from query parameters
 
   try {
-      const query = `
+    const query = `
           WITH unique_matches AS (
               SELECT 
                   m.id AS match_id,
@@ -2097,22 +2144,24 @@ app.get("/venue/:venueId/stats", async (req, res) => {
           FROM unique_matches;
       `;
 
-      const [results] = await pool.query(query, [venueId, teamIdA, teamIdB, teamIdA, teamIdB]);
+    const [results] = await pool.query(query, [
+      venueId,
+      teamIdA,
+      teamIdB,
+      teamIdA,
+      teamIdB,
+    ]);
 
-      if (results.length === 0) {
-          return res.status(404).send("No matches found");
-      }
+    if (results.length === 0) {
+      return res.status(404).send("No matches found");
+    }
 
-      res.json(results[0]); // Return the statistics as JSON
+    res.json(results[0]); // Return the statistics as JSON
   } catch (error) {
-      console.error("Error fetching venue statistics:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error fetching venue statistics:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
-
-
-
-
 
 // matches and there top player  accoording to last 5 matches at this venue
 
@@ -2135,12 +2184,14 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     );
 
     if (matches.length === 0) {
-      return res.status(404).send("No matches found at this venue between these teams.");
+      return res
+        .status(404)
+        .send("No matches found at this venue between these teams.");
     }
 
     // Use the correct SQL query to fetch top players for each match
     const results = await Promise.all(
-      matches.map(match =>
+      matches.map((match) =>
         pool.query(
           `
             SELECT 
@@ -2171,7 +2222,7 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
     const detailedMatches = matches.map((match, index) => ({
       match_id: match.match_id,
       status_note: match.status_note,
-      top_players: results[index][0].map(player => ({
+      top_players: results[index][0].map((player) => ({
         player_id: player.player_id,
         player_role: player.playing_role,
         player_name: player.player_name,
@@ -2189,9 +2240,6 @@ app.get("/venue/:venueId/top-players", async (req, res) => {
   }
 });
 
-
-
-
 // ---------------------------------------------CHEAT SHEET---------------------------------------
 
 // overall  top 5 player according to fp  (last match , last 5 match, all) BETWEEN TWO TEAMS
@@ -2201,15 +2249,20 @@ app.get("/match-stats/teams/:teamId1/:teamId2", async (req, res) => {
 
   try {
     // Get the IDs of the last five and all matches between the two teams.
-    const [matches] = await pool.query(`
+    const [matches] = await pool.query(
+      `
       SELECT id FROM matches
       WHERE (team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)
       ORDER BY date_start DESC
-    `, [teamId1, teamId2, teamId2, teamId1, competitionId]);
+    `,
+      [teamId1, teamId2, teamId2, teamId1, competitionId]
+    );
 
-    const matchIds = matches.map(match => match.id);
+    const matchIds = matches.map((match) => match.id);
     if (matchIds.length === 0) {
-      return res.status(404).send("No matches found between the specified teams.");
+      return res
+        .status(404)
+        .send("No matches found between the specified teams.");
     }
 
     const lastMatchId = matchIds[0]; // ID of the most recent match
@@ -2217,7 +2270,8 @@ app.get("/match-stats/teams/:teamId1/:teamId2", async (req, res) => {
 
     // Define a function to fetch top player stats
     const fetchTopPlayers = async (matchIdArray) => {
-      return pool.query(`
+      return pool.query(
+        `
         SELECT 
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
@@ -2232,29 +2286,32 @@ app.get("/match-stats/teams/:teamId1/:teamId2", async (req, res) => {
         GROUP BY p.id, t.id
         ORDER BY total_fantasy_points DESC
         LIMIT 10
-      `, [matchIdArray]);
+      `,
+        [matchIdArray]
+      );
     };
 
     // Fetch player stats for last match, last five matches, and all matches
-    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] = await Promise.all([
-      fetchTopPlayers([lastMatchId]),
-      fetchTopPlayers(lastFiveMatchIds),
-      fetchTopPlayers(matchIds)
-    ]);
+    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] =
+      await Promise.all([
+        fetchTopPlayers([lastMatchId]),
+        fetchTopPlayers(lastFiveMatchIds),
+        fetchTopPlayers(matchIds),
+      ]);
 
     res.json({
       last_match: {
         match_id: lastMatchId,
-        players: playersLastMatch[0]
+        players: playersLastMatch[0],
       },
       last_five_matches: {
         match_ids: lastFiveMatchIds,
-        players: playersLastFiveMatches[0]
+        players: playersLastFiveMatches[0],
       },
       all_matches: {
         match_ids: matchIds,
-        players: playersAllMatches[0]
-      }
+        players: playersAllMatches[0],
+      },
     });
   } catch (error) {
     console.error("Error fetching match statistics and top players:", error);
@@ -2262,29 +2319,37 @@ app.get("/match-stats/teams/:teamId1/:teamId2", async (req, res) => {
   }
 });
 
-app.get("/match-stats/teams/:teamId1/:teamId2/:specificTeamId", async (req, res) => {
-  const { teamId1, teamId2, specificTeamId } = req.params;
-  const competitionId = 128471; // Example competition ID
+app.get(
+  "/match-stats/teams/:teamId1/:teamId2/:specificTeamId",
+  async (req, res) => {
+    const { teamId1, teamId2, specificTeamId } = req.params;
+    const competitionId = 128471; // Example competition ID
 
-  try {
-    // Get the IDs of the last five and all matches between the two teams.
-    const [matches] = await pool.query(`
+    try {
+      // Get the IDs of the last five and all matches between the two teams.
+      const [matches] = await pool.query(
+        `
       SELECT id FROM matches
       WHERE (team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?)
       ORDER BY date_start DESC
-    `, [teamId1, teamId2, teamId2, teamId1]);
+    `,
+        [teamId1, teamId2, teamId2, teamId1]
+      );
 
-    const matchIds = matches.map(match => match.id);
-    if (matchIds.length === 0) {
-      return res.status(404).send("No matches found between the specified teams.");
-    }
+      const matchIds = matches.map((match) => match.id);
+      if (matchIds.length === 0) {
+        return res
+          .status(404)
+          .send("No matches found between the specified teams.");
+      }
 
-    const lastMatchId = matchIds[0]; // ID of the most recent match
-    const lastFiveMatchIds = matchIds.slice(0, 5);
+      const lastMatchId = matchIds[0]; // ID of the most recent match
+      const lastFiveMatchIds = matchIds.slice(0, 5);
 
-    // Define a function to fetch top player stats
-    const fetchTopPlayers = async (matchIdArray, teamId) => {
-      return pool.query(`
+      // Define a function to fetch top player stats
+      const fetchTopPlayers = async (matchIdArray, teamId) => {
+        return pool.query(
+          `
         SELECT 
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
@@ -2300,35 +2365,42 @@ app.get("/match-stats/teams/:teamId1/:teamId2/:specificTeamId", async (req, res)
         GROUP BY p.id, t.id
         ORDER BY total_fantasy_points DESC
         LIMIT 10
-      `, [matchIdArray, teamId]);
-    };
+      `,
+          [matchIdArray, teamId]
+        );
+      };
 
-    // Fetch player stats for last match, last five matches, and all matches for the specific team
-    const [playersLastMatchSpecificTeam, playersLastFiveMatchesSpecificTeam, playersAllMatchesSpecificTeam] = await Promise.all([
-      fetchTopPlayers([lastMatchId], specificTeamId),
-      fetchTopPlayers(lastFiveMatchIds, specificTeamId),
-      fetchTopPlayers(matchIds, specificTeamId)
-    ]);
+      // Fetch player stats for last match, last five matches, and all matches for the specific team
+      const [
+        playersLastMatchSpecificTeam,
+        playersLastFiveMatchesSpecificTeam,
+        playersAllMatchesSpecificTeam,
+      ] = await Promise.all([
+        fetchTopPlayers([lastMatchId], specificTeamId),
+        fetchTopPlayers(lastFiveMatchIds, specificTeamId),
+        fetchTopPlayers(matchIds, specificTeamId),
+      ]);
 
-    res.json({
-      last_match_specific_team: {
-        match_id: lastMatchId,
-        players: playersLastMatchSpecificTeam[0]
-      },
-      last_five_matches_specific_team: {
-        match_ids: lastFiveMatchIds,
-        players: playersLastFiveMatchesSpecificTeam[0]
-      },
-      all_matches_specific_team: {
-        match_ids: matchIds,
-        players: playersAllMatchesSpecificTeam[0]
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching match statistics and top players:", error);
-    res.status(500).send("Failed to retrieve data");
+      res.json({
+        last_match_specific_team: {
+          match_id: lastMatchId,
+          players: playersLastMatchSpecificTeam[0],
+        },
+        last_five_matches_specific_team: {
+          match_ids: lastFiveMatchIds,
+          players: playersLastFiveMatchesSpecificTeam[0],
+        },
+        all_matches_specific_team: {
+          match_ids: matchIds,
+          players: playersAllMatchesSpecificTeam[0],
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching match statistics and top players:", error);
+      res.status(500).send("Failed to retrieve data");
+    }
   }
-});
+);
 
 app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
@@ -2341,10 +2413,15 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
         SELECT id FROM matches
         WHERE ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
         ORDER BY date_start DESC
-        ${limit ? `LIMIT ${limit}` : ''}
+        ${limit ? `LIMIT ${limit}` : ""}
       `;
-      const [matches] = await pool.query(query, [teamId1, teamId2, teamId2, teamId1]);
-      return matches.map(m => m.id);
+      const [matches] = await pool.query(query, [
+        teamId1,
+        teamId2,
+        teamId2,
+        teamId1,
+      ]);
+      return matches.map((m) => m.id);
     };
 
     // Fetch match IDs
@@ -2355,7 +2432,8 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
     // Helper function to get dream team occurrences
     const getDreamTeamOccurrences = async (matchIds) => {
       if (matchIds.length === 0) return [];
-      const [occurrences] = await pool.query(`
+      const [occurrences] = await pool.query(
+        `
         SELECT 
           dt.player_id, 
           p.first_name, 
@@ -2370,7 +2448,9 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
         GROUP BY dt.player_id
         ORDER BY occurrences DESC, total_points DESC
         LIMIT 11
-      `, [matchIds]);
+      `,
+        [matchIds]
+      );
       return occurrences;
     };
 
@@ -2378,23 +2458,21 @@ app.get("/dream-team-stats/:teamId1/:teamId2", async (req, res) => {
     const dreamTeamStats = {
       lastMatch: await getDreamTeamOccurrences(lastMatchIds),
       lastFiveMatches: await getDreamTeamOccurrences(lastFiveMatchIds),
-      overall: await getDreamTeamOccurrences(allMatchIds)
+      overall: await getDreamTeamOccurrences(allMatchIds),
     };
 
     res.json({
       dream_team_stats: {
         last_match: dreamTeamStats.lastMatch,
         last_five_matches: dreamTeamStats.lastFiveMatches,
-        overall: dreamTeamStats.overall
-      }
+        overall: dreamTeamStats.overall,
+      },
     });
   } catch (error) {
     console.error("Error fetching dream team statistics:", error);
     res.status(500).send("Failed to retrieve data");
   }
 });
-
-
 
 //TEAM RANK
 
@@ -2404,13 +2482,16 @@ app.get("/team-performance/:teamId", async (req, res) => {
 
   try {
     // Fetch the IDs of the last five and all matches for this team in the competition.
-    const [matches] = await pool.query(`
+    const [matches] = await pool.query(
+      `
       SELECT id, date_start FROM matches
       WHERE (team_1 = ? OR team_2 = ?) 
       ORDER BY date_start DESC
-    `, [teamId, teamId]);
+    `,
+      [teamId, teamId]
+    );
 
-    const matchIds = matches.map(match => match.id);
+    const matchIds = matches.map((match) => match.id);
     if (matchIds.length === 0) {
       return res.status(404).send("No matches found for the specified team.");
     }
@@ -2420,7 +2501,8 @@ app.get("/team-performance/:teamId", async (req, res) => {
 
     // Define a function to fetch top player stats for specific matches
     const fetchTopPlayers = async (matchIdArray) => {
-      return pool.query(`
+      return pool.query(
+        `
         SELECT 
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
@@ -2437,21 +2519,24 @@ app.get("/team-performance/:teamId", async (req, res) => {
         GROUP BY p.id, t.id
         ORDER BY total_fantasy_points DESC
         LIMIT 5
-      `, [matchIdArray, teamId]);
+      `,
+        [matchIdArray, teamId]
+      );
     };
 
     // Fetch top player stats for the last match, last five matches, and all matches
-    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] = await Promise.all([
-      fetchTopPlayers([lastMatchId]),
-      fetchTopPlayers(lastFiveMatchIds),
-      fetchTopPlayers(matchIds)
-    ]);
+    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] =
+      await Promise.all([
+        fetchTopPlayers([lastMatchId]),
+        fetchTopPlayers(lastFiveMatchIds),
+        fetchTopPlayers(matchIds),
+      ]);
 
     res.json({
       team_id: teamId,
       last_match: playersLastMatch[0],
       last_five_matches: playersLastFiveMatches[0],
-      all_matches: playersAllMatches[0]
+      all_matches: playersAllMatches[0],
     });
   } catch (error) {
     console.error("Error fetching top players and team performance:", error);
@@ -2459,14 +2544,11 @@ app.get("/team-performance/:teamId", async (req, res) => {
   }
 });
 
-
-
-
-// POSITION RANK  
+// POSITION RANK
 
 app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
   const { teamId, position } = req.params;
-  const validPositions = ['WK', 'BAT', 'AR', 'BOW'];
+  const validPositions = ["WK", "BAT", "AR", "BOW"];
   const competitionId = 128471; // Assuming a specific competition ID for context
 
   if (!validPositions.includes(position)) {
@@ -2475,15 +2557,22 @@ app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
 
   try {
     // Fetch all match IDs for this team in the competition, ordered by date.
-    const [matches] = await pool.query(`
+    const [matches] = await pool.query(
+      `
       SELECT id FROM matches
       WHERE (team_1 = ? OR team_2 = ?) 
       ORDER BY date_start DESC
-    `, [teamId, teamId]);
+    `,
+      [teamId, teamId]
+    );
 
-    const matchIds = matches.map(match => match.id);
+    const matchIds = matches.map((match) => match.id);
     if (matchIds.length === 0) {
-      return res.status(404).send("No matches found for the specified team in the specified competition.");
+      return res
+        .status(404)
+        .send(
+          "No matches found for the specified team in the specified competition."
+        );
     }
 
     const lastMatchIds = [matchIds[0]];
@@ -2491,7 +2580,8 @@ app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
 
     // Define a function to fetch top players for given match IDs
     const fetchTopPlayers = async (matchIdArray) => {
-      return pool.query(`
+      return pool.query(
+        `
         SELECT 
           p.id AS player_id,
           CONCAT(p.first_name, ' ', p.last_name) AS player_name,
@@ -2504,22 +2594,25 @@ app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
         GROUP BY p.id
         ORDER BY total_fantasy_points DESC
         LIMIT 5
-      `, [matchIdArray, teamId, position]);
+      `,
+        [matchIdArray, teamId, position]
+      );
     };
 
     // Fetch top player stats for the last match, last five matches, and all matches
-    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] = await Promise.all([
-      fetchTopPlayers(lastMatchIds),
-      fetchTopPlayers(lastFiveMatchIds),
-      fetchTopPlayers(matchIds)
-    ]);
+    const [playersLastMatch, playersLastFiveMatches, playersAllMatches] =
+      await Promise.all([
+        fetchTopPlayers(lastMatchIds),
+        fetchTopPlayers(lastFiveMatchIds),
+        fetchTopPlayers(matchIds),
+      ]);
 
     res.json({
       team_id: teamId,
       position: position,
       last_match: playersLastMatch[0],
       last_five_matches: playersLastFiveMatches[0],
-      all_matches: playersAllMatches[0]
+      all_matches: playersAllMatches[0],
     });
   } catch (error) {
     console.error("Error fetching top players by position:", error);
@@ -2527,10 +2620,7 @@ app.get("/top-players-by-position/:teamId/:position", async (req, res) => {
   }
 });
 
-
-
-
-// MOST VALUABLE PLAYER 
+// MOST VALUABLE PLAYER
 
 app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
   const { teamA, teamB } = req.params;
@@ -2538,15 +2628,20 @@ app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
 
   try {
     // Fetch all match IDs for the specified teams in the competition, ordered by date.
-    const [matches] = await pool.query(`
+    const [matches] = await pool.query(
+      `
       SELECT id FROM matches
       WHERE (team_1 IN (?, ?) AND team_2 IN (?, ?))
       ORDER BY date_start DESC
-    `, [ teamA, teamB, teamA, teamB]);
+    `,
+      [teamA, teamB, teamA, teamB]
+    );
 
-    const matchIds = matches.map(match => match.id);
+    const matchIds = matches.map((match) => match.id);
     if (matchIds.length === 0) {
-      return res.status(404).send("No matches found for the specified teams in this competition.");
+      return res
+        .status(404)
+        .send("No matches found for the specified teams in this competition.");
     }
 
     const lastMatchIds = [matchIds[0]]; // Most recent match
@@ -2581,7 +2676,10 @@ app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
         LIMIT 5
       `;
 
-      return pool.query(query, teamId ? [matchIdArray, teamId] : [matchIdArray]);
+      return pool.query(
+        query,
+        teamId ? [matchIdArray, teamId] : [matchIdArray]
+      );
     };
 
     // Fetch top player stats for the last match, last five matches, and all matches
@@ -2594,7 +2692,7 @@ app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
       fetchValuablePlayers(matchIds, teamA),
       fetchValuablePlayers(lastMatchIds, teamB),
       fetchValuablePlayers(lastFiveMatchIds, teamB),
-      fetchValuablePlayers(matchIds, teamB)
+      fetchValuablePlayers(matchIds, teamB),
     ]);
 
     res.json({
@@ -2602,18 +2700,18 @@ app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
       last_match: {
         both_teams: results[0][0],
         team_a: results[3][0],
-        team_b: results[6][0]
+        team_b: results[6][0],
       },
       last_five_matches: {
         both_teams: results[1][0],
         team_a: results[4][0],
-        team_b: results[7][0]
+        team_b: results[7][0],
       },
       all_matches: {
         both_teams: results[2][0],
         team_a: results[5][0],
-        team_b: results[8][0]
-      }
+        team_b: results[8][0],
+      },
     });
   } catch (error) {
     console.error("Error fetching the most valuable players:", error);
@@ -2621,22 +2719,26 @@ app.get("/most-valuable-players/:teamA/:teamB", async (req, res) => {
   }
 });
 
-
 app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
   const { teamA, teamB } = req.params;
   const competitionId = 128471; // Static competition ID
 
   try {
     // Fetch all match IDs for the specified teams in the competition, ordered by date.
-    const [matches] = await pool.query(`
+    const [matches] = await pool.query(
+      `
       SELECT id FROM matches
       WHERE ((team_1 = ? AND team_2 = ?) OR (team_1 = ? AND team_2 = ?))
       ORDER BY date_start DESC
-    `, [ teamA, teamB, teamB, teamA]);
+    `,
+      [teamA, teamB, teamB, teamA]
+    );
 
-    const matchIds = matches.map(match => match.id);
+    const matchIds = matches.map((match) => match.id);
     if (matchIds.length === 0) {
-      return res.status(404).send("No matches found for the specified teams in this competition.");
+      return res
+        .status(404)
+        .send("No matches found for the specified teams in this competition.");
     }
 
     // Function to fetch bottom players based on performance relative to potential.
@@ -2669,21 +2771,24 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
         LIMIT 3
       `;
 
-      return pool.query(query, teamId ? [matchIdArray, teamId] : [matchIdArray]);
+      return pool.query(
+        query,
+        teamId ? [matchIdArray, teamId] : [matchIdArray]
+      );
     };
 
     // Fetch bottom player stats for both teams combined, and each team individually
     const [playersBothTeams, playersTeamA, playersTeamB] = await Promise.all([
       fetchBottomPlayers(matchIds),
       fetchBottomPlayers(matchIds, teamA),
-      fetchBottomPlayers(matchIds, teamB)
+      fetchBottomPlayers(matchIds, teamB),
     ]);
 
     res.json({
       competition_id: competitionId,
       both_teams: playersBothTeams[0],
       team_a: playersTeamA[0],
-      team_b: playersTeamB[0]
+      team_b: playersTeamB[0],
     });
   } catch (error) {
     console.error("Error fetching the bottom players:", error);
@@ -2691,22 +2796,7 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
 // -----------------------------------CHEATSHEET-----------------------------------------------
-
-
-
-
-
-
-
-
-
 
 // ------------------------------------playground  stats-------------------------------------------------
 
@@ -2802,57 +2892,82 @@ app.get("/bottom-players/:teamA/:teamB", async (req, res) => {
 // });
 
 app.get("/api/players/stats", async (req, res) => {
-  const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } = req.query;
+  const { statType, timeFrame, venueId, battingScenario, teamId1, teamId2 } =
+    req.query;
 
   if (!teamId1 || !teamId2) {
     return res.status(400).send("Team IDs are required");
   }
 
-  let selectClause, joinClause = '', whereClause = 'WHERE 1=1', orderByClause = '', groupByClause = 'GROUP BY p.id, p.first_name, p.last_name, p.short_name, p.playing_role, t.name, t.short_name';
+  let selectClause,
+    joinClause = "",
+    whereClause = "WHERE 1=1",
+    orderByClause = "",
+    groupByClause =
+      "GROUP BY p.id, p.first_name, p.last_name, p.short_name, p.playing_role, t.name, t.short_name";
 
   switch (statType) {
-    case 'TotalFantasyPoints':
-      selectClause = 'SUM(fp.points) AS total_points, COUNT(DISTINCT fp.match_id) AS match_count';
-      orderByClause = 'ORDER BY total_points DESC';
+    case "TotalFantasyPoints":
+      selectClause =
+        "SUM(fp.points) AS total_points, COUNT(DISTINCT fp.match_id) AS match_count";
+      orderByClause = "ORDER BY total_points DESC";
       break;
-    case 'DreamTeamAppearances':
-      selectClause = 'COUNT(DISTINCT dt.id) AS dream_team_appearances, COUNT(DISTINCT dt.match_id) AS match_count';
-      joinClause = ' LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id';
-      orderByClause = 'ORDER BY dream_team_appearances DESC';
+    case "DreamTeamAppearances":
+      selectClause =
+        "COUNT(DISTINCT dt.id) AS dream_team_appearances, COUNT(DISTINCT dt.match_id) AS match_count";
+      joinClause =
+        " LEFT JOIN DreamTeam_test dt ON p.id = dt.player_id AND fp.match_id = dt.match_id";
+      orderByClause = "ORDER BY dream_team_appearances DESC";
       break;
-    case 'WicketsTaken':
-      selectClause = 'SUM(b.wickets) AS wickets_taken, COUNT(DISTINCT b.match_id) AS match_count';
-      joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id';
-      orderByClause = 'ORDER BY wickets_taken DESC';
+    case "WicketsTaken":
+      selectClause =
+        "SUM(b.wickets) AS wickets_taken, COUNT(DISTINCT b.match_id) AS match_count";
+      joinClause =
+        " JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND fp.match_id = b.match_id";
+      orderByClause = "ORDER BY wickets_taken DESC";
       break;
-    case 'RunsScored':
-      selectClause = 'SUM(fb.runs) AS total_runs, COUNT(DISTINCT fb.match_id) AS match_count';
-      joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
-      orderByClause = 'ORDER BY total_runs DESC';
+    case "RunsScored":
+      selectClause =
+        "SUM(fb.runs) AS total_runs, COUNT(DISTINCT fb.match_id) AS match_count";
+      joinClause =
+        " JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id";
+      orderByClause = "ORDER BY total_runs DESC";
       break;
-    case 'StrikeRate':
-      selectClause = 'AVG(fb.strike_rate) AS average_strike_rate, COUNT(DISTINCT fb.match_id) AS match_count';
-      joinClause = ' JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id';
-      orderByClause = 'ORDER BY average_strike_rate DESC';
+    case "StrikeRate":
+      selectClause =
+        "AVG(fb.strike_rate) AS average_strike_rate, COUNT(DISTINCT fb.match_id) AS match_count";
+      joinClause =
+        " JOIN match_inning_batters_test fb ON p.id = fb.batsman_id AND fb.match_id = fp.match_id";
+      orderByClause = "ORDER BY average_strike_rate DESC";
       break;
-    case 'EconomyRate':
-      selectClause = 'AVG(b.econ) AS average_economy_rate, COUNT(DISTINCT b.match_id) AS match_count';
-      joinClause = ' JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id';
-      orderByClause = 'ORDER BY average_economy_rate ASC';
+    case "EconomyRate":
+      selectClause =
+        "AVG(b.econ) AS average_economy_rate, COUNT(DISTINCT b.match_id) AS match_count";
+      joinClause =
+        " JOIN match_inning_bowlers_test b ON p.id = b.bowler_id AND b.match_id = fp.match_id";
+      orderByClause = "ORDER BY average_economy_rate ASC";
       break;
-    case 'FieldingPoints':
-      selectClause = 'SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points, COUNT(DISTINCT f.match_id) AS match_count';
-      joinClause = ' JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id';
-      orderByClause = 'ORDER BY fielding_points DESC';
+    case "FieldingPoints":
+      selectClause =
+        "SUM(f.catches * 10 + f.runout_thrower * 10 + f.runout_catcher * 10 + f.runout_direct_hit * 20 + f.stumping * 15) AS fielding_points, COUNT(DISTINCT f.match_id) AS match_count";
+      joinClause =
+        " JOIN match_inning_fielders_test f ON p.id = f.fielder_id AND f.match_id = fp.match_id";
+      orderByClause = "ORDER BY fielding_points DESC";
       break;
-    case 'AverageFantasyPoints':
-      selectClause = 'AVG(fp.points) AS avg_fantasy_points, COUNT(DISTINCT fp.match_id) AS match_count';
-      orderByClause = 'ORDER BY avg_fantasy_points DESC';
+    case "AverageFantasyPoints":
+      selectClause =
+        "AVG(fp.points) AS avg_fantasy_points, COUNT(DISTINCT fp.match_id) AS match_count";
+      orderByClause = "ORDER BY avg_fantasy_points DESC";
       break;
   }
 
   if (timeFrame) {
-    const days = timeFrame === 'Last5Matches' ? 35 : timeFrame === 'Last10Matches' ? 70 : 0;
+    const days =
+      timeFrame === "Last5Matches"
+        ? 35
+        : timeFrame === "Last10Matches"
+        ? 70
+        : 0;
     if (days > 0) {
       whereClause += ` AND m.date_start >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
     }
@@ -2863,10 +2978,12 @@ app.get("/api/players/stats", async (req, res) => {
   }
 
   if (battingScenario) {
-    const team = battingScenario.split(' ')[0];
-    const action = battingScenario.split(' ')[1];
+    const team = battingScenario.split(" ")[0];
+    const action = battingScenario.split(" ")[1];
     const teamIdClause = `(SELECT id FROM teams WHERE short_name = '${team}')`;
-    whereClause += ` AND ${action === 'first' ? 'm.team_1 = ' : 'm.team_2 = '} ${teamIdClause}`;
+    whereClause += ` AND ${
+      action === "first" ? "m.team_1 = " : "m.team_2 = "
+    } ${teamIdClause}`;
   }
 
   whereClause += ` AND ((m.team_1 = ${teamId1} AND m.team_2 = ${teamId2}) OR (m.team_1 = ${teamId2} AND m.team_2 = ${teamId1})) AND (tp.team_id = ${teamId1} OR tp.team_id = ${teamId2})`;
@@ -2894,30 +3011,19 @@ app.get("/api/players/stats", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ---------------------------------------------TEAM HEAD TO HEAD--------------------------------------
 
-app.get('/api/match/stats', async (req, res) => {
+app.get("/api/match/stats", async (req, res) => {
   const { team1Id, team2Id } = req.query;
   const competitionId = 128471; // Static competition ID
 
   // Validate input
   if (!team1Id || !team2Id) {
-      return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+    return res
+      .status(400)
+      .json({
+        error: "Both team1Id and team2Id query parameters are required.",
+      });
   }
 
   // SQL query
@@ -2945,33 +3051,35 @@ app.get('/api/match/stats', async (req, res) => {
   `;
 
   try {
-      const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
-      const [results] = await pool.query(query, params);
+    const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
+    const [results] = await pool.query(query, params);
 
-      // Format the response
-      const formattedResults = results.map(result => ({
-          team_name: result.team_name,
-          total_matches: parseInt(result.total_matches, 10),
-          total_wins: parseInt(result.total_wins, 10),
-          avg_runs: parseInt(result.avg_runs, 10),
-          max_runs: parseInt(result.max_runs, 10),
-          min_runs: parseInt(result.min_runs, 10)
-      }));
+    // Format the response
+    const formattedResults = results.map((result) => ({
+      team_name: result.team_name,
+      total_matches: parseInt(result.total_matches, 10),
+      total_wins: parseInt(result.total_wins, 10),
+      avg_runs: parseInt(result.avg_runs, 10),
+      max_runs: parseInt(result.max_runs, 10),
+      min_runs: parseInt(result.min_runs, 10),
+    }));
 
-      res.json(formattedResults);
+    res.json(formattedResults);
   } catch (error) {
-      console.error('Database query failed:', error);
-      res.status(500).json({ error: 'Database query failed' });
+    console.error("Database query failed:", error);
+    res.status(500).json({ error: "Database query failed" });
   }
 });
 
-
-
-app.get('/api/match/stats/batting-first', async (req, res) => {
+app.get("/api/match/stats/batting-first", async (req, res) => {
   const { team1Id, team2Id } = req.query;
 
   if (!team1Id || !team2Id) {
-    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+    return res
+      .status(400)
+      .json({
+        error: "Both team1Id and team2Id query parameters are required.",
+      });
   }
 
   const query = `
@@ -3003,28 +3111,33 @@ app.get('/api/match/stats/batting-first', async (req, res) => {
   try {
     const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
     const [results] = await pool.query(query, params);
-    res.json(results.map(result => ({
-      team_id: result.team_id,
-      team_name: result.team_name,
-      batting_order: result.batting_order,
-      total_matches: result.total_matches,
-      wins: result.wins,
-      avg_runs: result.avg_runs,
-      max_runs: result.max_runs,
-      min_runs: result.min_runs
-    })));
+    res.json(
+      results.map((result) => ({
+        team_id: result.team_id,
+        team_name: result.team_name,
+        batting_order: result.batting_order,
+        total_matches: result.total_matches,
+        wins: result.wins,
+        avg_runs: result.avg_runs,
+        max_runs: result.max_runs,
+        min_runs: result.min_runs,
+      }))
+    );
   } catch (error) {
-    console.error('Database query failed:', error);
-    res.status(500).json({ error: 'Database query failed' });
+    console.error("Database query failed:", error);
+    res.status(500).json({ error: "Database query failed" });
   }
 });
 
-
-app.get('/api/match/stats/bowling-first', async (req, res) => {
+app.get("/api/match/stats/bowling-first", async (req, res) => {
   const { team1Id, team2Id } = req.query;
 
   if (!team1Id || !team2Id) {
-    return res.status(400).json({ error: "Both team1Id and team2Id query parameters are required." });
+    return res
+      .status(400)
+      .json({
+        error: "Both team1Id and team2Id query parameters are required.",
+      });
   }
 
   const query = `
@@ -3055,32 +3168,36 @@ app.get('/api/match/stats/bowling-first', async (req, res) => {
   try {
     const params = [team1Id, team2Id, team2Id, team1Id, team1Id, team2Id];
     const [results] = await pool.query(query, params);
-    res.json(results.map(result => ({
-      team_id: result.team_id,
-      team_name: result.team_name,
-      total_matches: result.total_matches,
-      wins: result.wins,
-      avg_runs: result.avg_runs,
-      max_runs: result.max_runs,
-      min_runs: result.min_runs
-    })));
+    res.json(
+      results.map((result) => ({
+        team_id: result.team_id,
+        team_name: result.team_name,
+        total_matches: result.total_matches,
+        wins: result.wins,
+        avg_runs: result.avg_runs,
+        max_runs: result.max_runs,
+        min_runs: result.min_runs,
+      }))
+    );
   } catch (error) {
-    console.error('Database query failed:', error);
-    res.status(500).json({ error: 'Database query failed' });
+    console.error("Database query failed:", error);
+    res.status(500).json({ error: "Database query failed" });
   }
 });
 
-
-app.get('/api/playerstastofteam', async (req, res) => {
+app.get("/api/playerstastofteam", async (req, res) => {
   const { team1, team2 } = req.query;
 
   // Validate query parameters
   if (!team1 || !team2) {
-      return res.status(400).json({ error: 'Both team1 and team2 query parameters are required' });
+    return res
+      .status(400)
+      .json({ error: "Both team1 and team2 query parameters are required" });
   }
 
   try {
-      const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
           SELECT 
               p.first_name AS Player,
               t.name AS Team,
@@ -3100,17 +3217,16 @@ app.get('/api/playerstastofteam', async (req, res) => {
           GROUP BY p.id, t.name
           ORDER BY Runs DESC
           LIMIT 0, 10000;
-      `, [team1, team2, team2, team1]);
+      `,
+      [team1, team2, team2, team1]
+    );
 
-      res.json(rows);
+    res.json(rows);
   } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Internal Server Error' });
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-
-
 
 // ------------------------------------------------TEAM STATS-------------------------------------------------------
 app.get("/api/player/stats1", async (req, res) => {
@@ -3132,8 +3248,14 @@ app.get("/api/player/stats1", async (req, res) => {
   `;
 
   try {
-    const [matchIdsResults] = await pool.query(matchIdsSql, [team1, team2, team2, team1, limit]);
-    const matchIds = matchIdsResults.map(row => row.id);
+    const [matchIdsResults] = await pool.query(matchIdsSql, [
+      team1,
+      team2,
+      team2,
+      team1,
+      limit,
+    ]);
+    const matchIds = matchIdsResults.map((row) => row.id);
 
     if (matchIds.length === 0) {
       return res.json({ player_stats: [] });
@@ -3166,19 +3288,17 @@ app.get("/api/player/stats1", async (req, res) => {
       ORDER BY fantasy_points DESC;
     `;
 
-    const [playerStats] = await pool.query(playerStatsSql, [matchIds, team1, team2]);
+    const [playerStats] = await pool.query(playerStatsSql, [
+      matchIds,
+      team1,
+      team2,
+    ]);
     res.json({ player_stats: playerStats });
   } catch (error) {
     console.error("Error fetching player stats:", error);
     res.status(500).send("Failed to retrieve data");
   }
 });
-
-
-
-
-
-
 
 //  --------------------------------------------MY DB INSERTION APIS-------------------------------------------------------
 
@@ -3212,31 +3332,26 @@ app.get("/api/fetch-matches", async (req, res) => {
   }
 });
 
-
-app.get('/competitions/:tournamentId', async (req, res) => {
+app.get("/competitions/:tournamentId", async (req, res) => {
   try {
-      const { tournamentId } = req.params;
-      const [rows] = await pool.query(
-          'SELECT * FROM competitions WHERE tournament_id = ?',
-          [tournamentId]
-      );
-      res.json(rows);
+    const { tournamentId } = req.params;
+    const [rows] = await pool.query(
+      "SELECT * FROM competitions WHERE tournament_id = ?",
+      [tournamentId]
+    );
+    res.json(rows);
   } catch (error) {
-      res.status(500).send('Server error: ' + error.message);
+    res.status(500).send("Server error: " + error.message);
   }
 });
 
-
-
-
-
 // ---------------------------------------api win percentage ------------------------------------------------
 
-app.get('/new/teams/win-percentage/:teamId1/:teamId2', async (req, res) => {
+app.get("/new/teams/win-percentage/:teamId1/:teamId2", async (req, res) => {
   try {
-      const { teamId1, teamId2 } = req.params;
-      
-      const query = `
+    const { teamId1, teamId2 } = req.params;
+
+    const query = `
           WITH TeamMatches AS (
               SELECT 
                   m.id AS match_id,
@@ -3272,21 +3387,29 @@ app.get('/new/teams/win-percentage/:teamId1/:teamId2', async (req, res) => {
               TeamStats;
       `;
 
-      const [rows] = await pool.query(query, [teamId1, teamId2, teamId2, teamId1, teamId1, teamId1, teamId2, teamId2]);
-      res.json(rows);
+    const [rows] = await pool.query(query, [
+      teamId1,
+      teamId2,
+      teamId2,
+      teamId1,
+      teamId1,
+      teamId1,
+      teamId2,
+      teamId2,
+    ]);
+    res.json(rows);
   } catch (error) {
-      res.status(500).send('Server error: ' + error.message);
+    res.status(500).send("Server error: " + error.message);
   }
 });
 
 // /teams/win-percentage/:teamId1/:teamId2
 
-
-app.get('/new/teams/player-stats/:teamId1/:teamId2', async (req, res) => {
+app.get("/new/teams/player-stats/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
   try {
-      const query = `
+    const query = `
           WITH TeamMatches AS (
               SELECT 
                   m.id AS match_id,
@@ -3327,21 +3450,17 @@ app.get('/new/teams/player-stats/:teamId1/:teamId2', async (req, res) => {
               JOIN players p ON ps.player_id = p.id;
       `;
 
-      const [rows] = await pool.query(query,[teamId1, teamId2, teamId2, teamId1]);
-      res.json(rows);
+    const [rows] = await pool.query(query, [
+      teamId1,
+      teamId2,
+      teamId2,
+      teamId1,
+    ]);
+    res.json(rows);
   } catch (error) {
-      res.status(500).send('Server error: ' + error.message);
+    res.status(500).send("Server error: " + error.message);
   }
 });
-
-
-
-
-
-
-
-
-
 
 // -----------------------------------------------------new design apis ---------------------------------------------------
 
@@ -3380,7 +3499,7 @@ app.get("/new/top-players-stats/:teamId1/:teamId2", async (req, res) => {
       [teamId1, teamId2, teamId2, teamId1]
     );
 
-    const playerIdsArray = players.map(player => player.player_id);
+    const playerIdsArray = players.map((player) => player.player_id);
 
     if (playerIdsArray.length === 0) {
       return res.json([]);
@@ -3429,11 +3548,13 @@ app.get("/new/top-players-stats/:teamId1/:teamId2", async (req, res) => {
     );
 
     // Combine top players with their stats
-    const topPlayersWithStats = players.map(player => {
-      const stats = playerStats.find(stat => stat.player_id === player.player_id);
+    const topPlayersWithStats = players.map((player) => {
+      const stats = playerStats.find(
+        (stat) => stat.player_id === player.player_id
+      );
       return {
         ...player,
-        match_ids: stats.match_ids.split(',').map(id => parseInt(id)),
+        match_ids: stats.match_ids.split(",").map((id) => parseInt(id)),
         stats: {
           matches_played: stats.matches_played,
           total_points: stats.total_points,
@@ -3453,7 +3574,7 @@ app.get("/new/top-players-stats/:teamId1/:teamId2", async (req, res) => {
           total_catches: stats.total_catches,
           total_runouts: stats.total_runouts,
           total_stumpings: stats.total_stumpings,
-        }
+        },
       };
     });
 
@@ -3463,11 +3584,6 @@ app.get("/new/top-players-stats/:teamId1/:teamId2", async (req, res) => {
     res.status(500).send("Failed to retrieve player data");
   }
 });
-
-
-
-
-
 
 app.get("/player-stats/:playerId", async (req, res) => {
   const { playerId } = req.params;
@@ -3539,17 +3655,13 @@ app.get("/player-stats/:playerId", async (req, res) => {
 
     res.json({
       batting: battingResults,
-      bowling: bowlingResults
+      bowling: bowlingResults,
     });
   } catch (error) {
     console.error("Failed to fetch player statistics:", error);
     res.status(500).send("Failed to retrieve player data");
   }
 });
-
-
-
-
 
 app.get("/player-vs-team-stats/:playerId/:teamId", async (req, res) => {
   const { playerId, teamId } = req.params;
@@ -3616,12 +3728,20 @@ app.get("/player-vs-team-stats/:playerId/:teamId", async (req, res) => {
   `;
 
   try {
-    const [battingResults] = await pool.query(battingQuery, [playerId, teamId, teamId]);
-    const [bowlingResults] = await pool.query(bowlingQuery, [playerId, teamId, teamId]);
+    const [battingResults] = await pool.query(battingQuery, [
+      playerId,
+      teamId,
+      teamId,
+    ]);
+    const [bowlingResults] = await pool.query(bowlingQuery, [
+      playerId,
+      teamId,
+      teamId,
+    ]);
 
     res.json({
       batting: battingResults,
-      bowling: bowlingResults
+      bowling: bowlingResults,
     });
   } catch (error) {
     console.error("Failed to fetch player vs team statistics:", error);
@@ -3629,15 +3749,11 @@ app.get("/player-vs-team-stats/:playerId/:teamId", async (req, res) => {
   }
 });
 
-
-
-
-
 //lat match
 app.get("/teamdata/last/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
-  console.log(`Received team IDs: ${teamId1}, ${teamId2}`);  // Debugging input
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}`); // Debugging input
 
   const query = `
   WITH TeamMatches AS (
@@ -3684,32 +3800,36 @@ app.get("/teamdata/last/:teamId1/:teamId2", async (req, res) => {
       TeamStats ts;
   `;
   try {
-      console.log(`Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`);
-      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
+    console.log(
+      `Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`
+    );
+    const [results] = await pool.query(query, [
+      teamId1,
+      teamId2,
+      teamId1,
+      teamId2,
+    ]);
 
-      console.log('Query results:', results);  // Debugging output
+    console.log("Query results:", results); // Debugging output
 
-      if (results.length === 0) {
-          console.log('No data found for the given parameters.');
-          res.status(404).json({ message: "No data found" });
-          return;
-      }
+    if (results.length === 0) {
+      console.log("No data found for the given parameters.");
+      res.status(404).json({ message: "No data found" });
+      return;
+    }
 
-      res.json(results);
+    res.json(results);
   } catch (error) {
-      console.error("Error executing the query:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error executing the query:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
-
-
-
 
 // Endpoint for last 5 matches
 app.get("/teamdata/last5/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
-  console.log(`Received team IDs: ${teamId1}, ${teamId2}, Scope: last5`);  // Debugging input
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}, Scope: last5`); // Debugging input
 
   const query = `
     WITH TeamMatches AS (
@@ -3755,23 +3875,30 @@ app.get("/teamdata/last5/:teamId1/:teamId2", async (req, res) => {
     FROM 
         TeamStats ts;
   `;
-  
+
   try {
-      console.log(`Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`);
-      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
+    console.log(
+      `Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`
+    );
+    const [results] = await pool.query(query, [
+      teamId1,
+      teamId2,
+      teamId1,
+      teamId2,
+    ]);
 
-      console.log('Query results:', results);  // Debugging output
+    console.log("Query results:", results); // Debugging output
 
-      if (results.length === 0) {
-          console.log('No data found for the given parameters.');
-          res.status(404).json({ message: "No data found" });
-          return;
-      }
+    if (results.length === 0) {
+      console.log("No data found for the given parameters.");
+      res.status(404).json({ message: "No data found" });
+      return;
+    }
 
-      res.json(results);
+    res.json(results);
   } catch (error) {
-      console.error("Error executing the query:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error executing the query:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
 
@@ -3779,7 +3906,7 @@ app.get("/teamdata/last5/:teamId1/:teamId2", async (req, res) => {
 app.get("/teamdata/overall/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
-  console.log(`Received team IDs: ${teamId1}, ${teamId2}, Scope: overall`);  // Debugging input
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}, Scope: overall`); // Debugging input
 
   const query = `
     WITH TeamMatches AS (
@@ -3823,33 +3950,38 @@ app.get("/teamdata/overall/:teamId1/:teamId2", async (req, res) => {
     FROM 
         TeamStats ts;
   `;
-  
+
   try {
-      console.log(`Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`);
-      const [results] = await pool.query(query, [teamId1, teamId2, teamId1, teamId2]);
+    console.log(
+      `Executing query with params: [${teamId1}, ${teamId2}, ${teamId1}, ${teamId2}]`
+    );
+    const [results] = await pool.query(query, [
+      teamId1,
+      teamId2,
+      teamId1,
+      teamId2,
+    ]);
 
-      console.log('Query results:', results);  // Debugging output
+    console.log("Query results:", results); // Debugging output
 
-      if (results.length === 0) {
-          console.log('No data found for the given parameters.');
-          res.status(404).json({ message: "No data found" });
-          return;
-      }
+    if (results.length === 0) {
+      console.log("No data found for the given parameters.");
+      res.status(404).json({ message: "No data found" });
+      return;
+    }
 
-      res.json(results);
+    res.json(results);
   } catch (error) {
-      console.error("Error executing the query:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error executing the query:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
-
-
 
 //head to head data match won playeed etc
 app.get("/head-to-head/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
-  console.log(`Received team IDs: ${teamId1}, ${teamId2}`);  // Debugging input
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}`); // Debugging input
 
   const query = `
     SELECT 
@@ -3873,14 +4005,11 @@ app.get("/head-to-head/:teamId1/:teamId2", async (req, res) => {
   }
 });
 
-
-
-
 //recent form last 5 match of both the team
-app.get('/recent-form/:teamId', async (req, res) => {
+app.get("/recent-form/:teamId", async (req, res) => {
   const { teamId } = req.params;
   console.log("params", teamId);
-  
+
   const query = `
     SELECT 
         m.id AS match_id,
@@ -3901,7 +4030,7 @@ app.get('/recent-form/:teamId', async (req, res) => {
         m.date_start DESC
     LIMIT 5;
   `;
-  
+
   try {
     const [results] = await pool.query(query, [teamId, teamId, teamId]);
     res.json(results);
@@ -3911,13 +4040,10 @@ app.get('/recent-form/:teamId', async (req, res) => {
   }
 });
 
-
-
-
 app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
   const { teamId1, teamId2 } = req.params;
 
-  console.log(`Received team IDs: ${teamId1}, ${teamId2}`);  // Debugging input
+  console.log(`Received team IDs: ${teamId1}, ${teamId2}`); // Debugging input
 
   const query = `
     SELECT 
@@ -3957,16 +4083,6 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
 //batting order wrong thoda byut yaaa
 
 // app.get("/teamdata/25/last5matches", async (req, res) => {
@@ -3974,29 +4090,29 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
 
 //   const query = `
 //       WITH Last5Matches AS (
-//           SELECT 
+//           SELECT
 //               m.id AS match_id,
 //               m.date_start,
 //               m.team_1,
 //               m.team_2
-//           FROM 
+//           FROM
 //               matches m
-//           WHERE 
+//           WHERE
 //               (m.team_1 = ? OR m.team_2 = ?)
-//           ORDER BY 
+//           ORDER BY
 //               m.date_start DESC
 //           LIMIT 5
 //       ),
 //       TeamPlayers AS (
-//           SELECT 
+//           SELECT
 //               tp.player_id
-//           FROM 
+//           FROM
 //               team_players tp
-//           WHERE 
+//           WHERE
 //               tp.team_id = ?
 //       ),
 //       PlayerStats AS (
-//           SELECT 
+//           SELECT
 //               p.id AS player_id,
 //               p.first_name,
 //               p.last_name,
@@ -4006,11 +4122,11 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
 //               fp.points,
 //               fp.runs,
 //               fp.wickets
-//           FROM 
+//           FROM
 //               players p
 //           JOIN fantasy_points_details fp ON p.id = fp.player_id
-//           WHERE 
-//               fp.match_id IN (SELECT match_id FROM Last5Matches) 
+//           WHERE
+//               fp.match_id IN (SELECT match_id FROM Last5Matches)
 //               AND fp.player_id IN (SELECT player_id FROM TeamPlayers)
 //       ),
 //       BattingOrder AS (
@@ -4024,7 +4140,7 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
 //               b.match_id IN (SELECT match_id FROM Last5Matches)
 //               AND b.batsman_id IN (SELECT player_id FROM TeamPlayers)
 //       )
-//       SELECT 
+//       SELECT
 //           ps.player_id,
 //           ps.first_name,
 //           ps.last_name,
@@ -4036,11 +4152,11 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
 //           ps.wickets,
 //           COALESCE(bo.batting_order, 'DNB') AS batting_order,
 //           lm.date_start
-//       FROM 
+//       FROM
 //           PlayerStats ps
 //       LEFT JOIN BattingOrder bo ON ps.match_id = bo.match_id AND ps.player_id = bo.batsman_id
 //       JOIN Last5Matches lm ON ps.match_id = lm.match_id
-//       ORDER BY 
+//       ORDER BY
 //           lm.date_start DESC, bo.batting_order;
 //   `;
 
@@ -4063,7 +4179,7 @@ app.get("/recent-matches/:teamId1/:teamId2", async (req, res) => {
 //   }
 // });
 
-app.get('/teams/:teamId/last5matches/battingorder', async (req, res) => {
+app.get("/teams/:teamId/last5matches/battingorder", async (req, res) => {
   const { teamId } = req.params;
 
   const query = `
@@ -4132,47 +4248,39 @@ app.get('/teams/:teamId/last5matches/battingorder', async (req, res) => {
   `;
 
   try {
-      const [results] = await pool.query(query, [teamId, teamId, teamId]);
+    const [results] = await pool.query(query, [teamId, teamId, teamId]);
 
-      const players = {};
+    const players = {};
 
-      results.forEach(row => {
-          if (!players[row.player_id]) {
-              players[row.player_id] = {
-                  player_id: row.player_id,
-                  first_name: row.first_name,
-                  last_name: row.last_name,
-                  short_name: row.short_name,
-                  playing_role: row.playing_role,
-                  team_id: row.team_id,
-                  team_name: row.team_name,
-                  matches: []
-              };
-          }
-          players[row.player_id].matches.push({
-              match_id: row.match_id,
-              batting_order: row.batting_order
-          });
+    results.forEach((row) => {
+      if (!players[row.player_id]) {
+        players[row.player_id] = {
+          player_id: row.player_id,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          short_name: row.short_name,
+          playing_role: row.playing_role,
+          team_id: row.team_id,
+          team_name: row.team_name,
+          matches: [],
+        };
+      }
+      players[row.player_id].matches.push({
+        match_id: row.match_id,
+        batting_order: row.batting_order,
       });
+    });
 
-      res.json({ status: "ok", response: Object.values(players) });
+    res.json({ status: "ok", response: Object.values(players) });
   } catch (error) {
-      console.error("Error executing the query:", error);
-      res.status(500).send("Failed to retrieve data");
+    console.error("Error executing the query:", error);
+    res.status(500).send("Failed to retrieve data");
   }
 });
 
-
-
-
-
-
-
-
-
 // batting powrplaye
 
-app.get('/team-top-players-stats/:teamId', async (req, res) => {
+app.get("/team-top-players-stats/:teamId", async (req, res) => {
   const { teamId } = req.params;
 
   const query = `
@@ -4281,15 +4389,13 @@ app.get('/team-top-players-stats/:teamId', async (req, res) => {
     res.json(results);
   } catch (error) {
     console.error("Error executing query", error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
-
 //bowling death
 
-app.get('/team-top-bowlers-stats/:teamId', async (req, res) => {
+app.get("/team-top-bowlers-stats/:teamId", async (req, res) => {
   const { teamId } = req.params;
 
   const query = `
@@ -4400,24 +4506,23 @@ app.get('/team-top-bowlers-stats/:teamId', async (req, res) => {
     res.json(results);
   } catch (error) {
     console.error("Error executing query", error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
-
 //key match insight
-//top power play batters 3 with avg fp 
-app.get('/top-powerplay-batters', async (req, res) => {
+//top power play batters 3 with avg fp
+app.get("/top-powerplay-batters", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-      return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-      const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
           WITH Last5Matches AS (
               SELECT 
                   m.id AS match_id,
@@ -4467,28 +4572,28 @@ app.get('/top-powerplay-batters', async (req, res) => {
           ORDER BY
               avg_fantasy_points DESC
           LIMIT 3;
-      `, [team1, team2, team2, team1]);
-      res.json(rows);
+      `,
+      [team1, team2, team2, team1]
+    );
+    res.json(rows);
   } catch (err) {
-      console.error(err);
-      res.status(500).send('Internal Server Error');
+    console.error(err);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
-
-// top powerplay bowlers 3 with avg fp 
-app.get('/top-powerplay-bowlers', async (req, res) => {
+// top powerplay bowlers 3 with avg fp
+app.get("/top-powerplay-bowlers", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-      return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-      const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
           WITH Last5Matches AS (
               SELECT 
                   m.id AS match_id,
@@ -4538,27 +4643,28 @@ app.get('/top-powerplay-bowlers', async (req, res) => {
           ORDER BY
               avg_fantasy_points DESC
           LIMIT 3;
-      `, [team1, team2, team2, team1]);
-      res.json(rows);
+      `,
+      [team1, team2, team2, team1]
+    );
+    res.json(rows);
   } catch (err) {
-      console.error(err);
-      res.status(500).send('Internal Server Error');
+    console.error(err);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
 //death over bolwers
-app.get('/top-death-over-bowlers', async (req, res) => {
+app.get("/top-death-over-bowlers", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH Last5Matches AS (
           SELECT 
               m.id AS match_id,
@@ -4609,28 +4715,29 @@ app.get('/top-death-over-bowlers', async (req, res) => {
       ORDER BY
           avg_fantasy_points DESC
       LIMIT 3;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
+//x factor player
 
-
-//x factor player 
-
-app.get('/x-factor-players', async (req, res) => {
+app.get("/x-factor-players", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH Last5Matches AS (
           SELECT 
               m.id AS match_id,
@@ -4680,14 +4787,15 @@ app.get('/x-factor-players', async (req, res) => {
       ORDER BY
           avg_fantasy_points DESC
       LIMIT 5; -- Get top 5 players with highest average fantasy points
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
-
 
 app.get("/api/players/top-form", async (req, res) => {
   const { team1, team2 } = req.query;
@@ -4752,13 +4860,12 @@ app.get("/api/players/top-form", async (req, res) => {
   }
 });
 
-
-app.get('/api/player/batting-order', async (req, res) => {
+app.get("/api/player/batting-order", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-      return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   const query = `
@@ -4835,47 +4942,26 @@ app.get('/api/player/batting-order', async (req, res) => {
   `;
 
   try {
-      const [rows] = await pool.query(query, [team1, team2, team2, team1]);
-      res.json(rows);
+    const [rows] = await pool.query(query, [team1, team2, team2, team1]);
+    res.json(rows);
   } catch (err) {
-      console.error(err);
-      res.status(500).send('Internal Server Error');
+    console.error(err);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//all player overview 
-app.get('/last-match-player-stats', async (req, res) => {
+//all player overview
+app.get("/last-match-player-stats", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH LastMatch AS (
           SELECT 
               m.id AS match_id,
@@ -4942,25 +5028,28 @@ app.get('/last-match-player-stats', async (req, res) => {
           RankedStats
       ORDER BY
           avg_fantasy_points DESC;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
 // API for Last 5 Matches Player Stats
-app.get('/last-5-matches-player-stats', async (req, res) => {
+app.get("/last-5-matches-player-stats", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH Last5Matches AS (
           SELECT 
               m.id AS match_id,
@@ -5027,25 +5116,28 @@ app.get('/last-5-matches-player-stats', async (req, res) => {
           RankedStats
       ORDER BY
           avg_fantasy_points DESC;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
 // API for Overall Player Stats Between Two Teams
-app.get('/overall-player-stats', async (req, res) => {
+app.get("/overall-player-stats", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH AllMatches AS (
           SELECT 
               m.id AS match_id,
@@ -5109,32 +5201,29 @@ app.get('/overall-player-stats', async (req, res) => {
           RankedStats
       ORDER BY
           avg_fantasy_points DESC;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
+//bowler corner
 
-
-
-
-
-
-//bowler corner 
-
-app.get('/bowler-stats-last-match', async (req, res) => {
+app.get("/bowler-stats-last-match", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH LastMatch AS (
           SELECT 
               m.id AS match_id,
@@ -5200,28 +5289,27 @@ app.get('/bowler-stats-last-match', async (req, res) => {
           BowlerStats
       ORDER BY
           avg_fantasy_points DESC;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
-
-
-app.get('/bowler-stats-last-5-matches', async (req, res) => {
+app.get("/bowler-stats-last-5-matches", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH Last5Matches AS (
           SELECT 
               m.id AS match_id,
@@ -5287,27 +5375,27 @@ app.get('/bowler-stats-last-5-matches', async (req, res) => {
           BowlerStats
       ORDER BY
           avg_fantasy_points DESC;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
-
-app.get('/bowler-stats-overall', async (req, res) => {
+app.get("/bowler-stats-overall", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       WITH AllMatches AS (
           SELECT 
               m.id AS match_id,
@@ -5370,30 +5458,23 @@ app.get('/bowler-stats-overall', async (req, res) => {
           BowlerStats
       ORDER BY
           avg_fantasy_points DESC;
-    `, [team1, team2, team2, team1]);
+    `,
+      [team1, team2, team2, team1]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
-
-
-
-
-
-
-
 // pl labs
-app.get('/new/team-stats', async (req, res) => {
+app.get("/new/team-stats", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
@@ -5448,29 +5529,33 @@ app.get('/new/team-stats', async (req, res) => {
     `;
 
     const [rows] = await pool.query(query, [
-      team1, team1, team1,
-      team2, team2, team2
+      team1,
+      team1,
+      team1,
+      team2,
+      team2,
+      team2,
     ]);
 
     // Format the response
     const formattedResponse = rows.reduce((acc, row) => {
-      acc[row.team_name] = row.last_5_matches?.split(',') || [];
+      acc[row.team_name] = row.last_5_matches?.split(",") || [];
       return acc;
     }, {});
 
     res.json(formattedResponse);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
-app.get('/new/matches-against-each-other', async (req, res) => {
+app.get("/new/matches-against-each-other", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
@@ -5507,24 +5592,36 @@ app.get('/new/matches-against-each-other', async (req, res) => {
     `;
 
     const [rows] = await pool.query(query, [
-      team1, team2, team1, team2, team1, team2, team2, team1
+      team1,
+      team2,
+      team1,
+      team2,
+      team1,
+      team2,
+      team2,
+      team1,
     ]);
 
     // Format the response
     const formattedResponse = {
       againstEachOther: {
-        team1: rows.find(row => row.team === 'AgainstEachOtherTeam1')?.matches_against_each_other?.split(',') || [],
-        team2: rows.find(row => row.team === 'AgainstEachOtherTeam2')?.matches_against_each_other?.split(',') || []
-      }
+        team1:
+          rows
+            .find((row) => row.team === "AgainstEachOtherTeam1")
+            ?.matches_against_each_other?.split(",") || [],
+        team2:
+          rows
+            .find((row) => row.team === "AgainstEachOtherTeam2")
+            ?.matches_against_each_other?.split(",") || [],
+      },
     };
 
     res.json(formattedResponse);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
-
 
 // const port = process.env.PORT || 8000;
 // app.listen(port, () => {
@@ -5542,16 +5639,12 @@ app.get('/new/matches-against-each-other', async (req, res) => {
 
 // comment
 
-
-
-
-
-app.get('/new/team-stats-and-prediction', async (req, res) => {
+app.get("/new/team-stats-and-prediction", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
@@ -5656,29 +5749,40 @@ app.get('/new/team-stats-and-prediction', async (req, res) => {
     `;
 
     const [rows] = await pool.query(teamLast5MatchesQuery, [
-      team1, team1, team1,
-      team2, team2, team2,
-      team1, team1, team2, team2, team1, team2,
-      team1, team2, team1, team2, team2, team1, team2, team1
+      team1,
+      team1,
+      team1,
+      team2,
+      team2,
+      team2,
+      team1,
+      team1,
+      team2,
+      team2,
+      team1,
+      team2,
+      team1,
+      team2,
+      team1,
+      team2,
+      team2,
+      team1,
+      team2,
+      team1,
     ]);
 
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
-
-
-
-
-
-app.get('/team-last-5-matches', async (req, res) => {
+app.get("/team-last-5-matches", async (req, res) => {
   const teamId = req.query.teamId;
 
   if (!teamId) {
-    return res.status(400).send('Team ID is required');
+    return res.status(400).send("Team ID is required");
   }
 
   try {
@@ -5720,25 +5824,25 @@ app.get('/team-last-5-matches', async (req, res) => {
 
     // Format the response
     const formattedResponse = {
-      team_name: rows[0]?.team_name || '',
-      last_5_matches: rows[0]?.last_5_matches?.split(',') || [],
-      team_1_scores: rows[0]?.team_1_scores?.split(',') || [],
-      team_2_scores: rows[0]?.team_2_scores?.split(',') || []
+      team_name: rows[0]?.team_name || "",
+      last_5_matches: rows[0]?.last_5_matches?.split(",") || [],
+      team_1_scores: rows[0]?.team_1_scores?.split(",") || [],
+      team_2_scores: rows[0]?.team_2_scores?.split(",") || [],
     };
 
     res.json(formattedResponse);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
-app.get('/new/matches-against-each-other', async (req, res) => {
+app.get("/new/matches-against-each-other", async (req, res) => {
   const team1 = req.query.team1;
   const team2 = req.query.team2;
 
   if (!team1 || !team2) {
-    return res.status(400).send('Team IDs are required');
+    return res.status(400).send("Team IDs are required");
   }
 
   try {
@@ -5781,11 +5885,16 @@ app.get('/new/matches-against-each-other', async (req, res) => {
     `;
 
     const [rows] = await pool.query(query, [
-      team1, team2, team1, team2, team1, team2
+      team1,
+      team2,
+      team1,
+      team2,
+      team1,
+      team2,
     ]);
 
     if (rows.length === 0) {
-      return res.status(404).send('No matches found between these teams');
+      return res.status(404).send("No matches found between these teams");
     }
 
     const row = rows[0];
@@ -5793,18 +5902,160 @@ app.get('/new/matches-against-each-other', async (req, res) => {
       againstEachOther: {
         team1_name: row.team1_name,
         team2_name: row.team2_name,
-        results_team1: row.results_team1 ? row.results_team1.split(',') : [],
-        results_team2: row.results_team2 ? row.results_team2.split(',') : [],
-        team_1_scores: row.team_1_scores ? row.team_1_scores.split(',') : [],
-        team_2_scores: row.team_2_scores ? row.team_2_scores.split(',') : []
-      }
+        results_team1: row.results_team1 ? row.results_team1.split(",") : [],
+        results_team2: row.results_team2 ? row.results_team2.split(",") : [],
+        team_1_scores: row.team_1_scores ? row.team_1_scores.split(",") : [],
+        team_2_scores: row.team_2_scores ? row.team_2_scores.split(",") : [],
+      },
     };
 
     res.json(formattedResponse);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send("Internal Server Error");
   }
 });
 
+// --------------------------------LOGIN--------------------------------------------------
+const resendLimit = {}; // In-memory storage for demonstration (you can use a database for persistence)
 
+app.post("/sendOtp", async (req, res) => {
+  const { phoneNumber } = req.body;
+
+  if (!phoneNumber) {
+    return res.status(400).json({ message: "Phone number is required" });
+  }
+
+  // Check resend limit
+  const today = new Date().toDateString();
+  if (!resendLimit[phoneNumber]) {
+    resendLimit[phoneNumber] = { count: 0, date: today };
+  } else if (resendLimit[phoneNumber].date !== today) {
+    resendLimit[phoneNumber] = { count: 0, date: today }; // Reset counter for new day
+  }
+
+  if (resendLimit[phoneNumber].count >= 3) {
+    return res.status(429).json({ message: "Resend limit reached for today" });
+  }
+
+  try {
+    // Use the custom OTP template "Test" in the API call
+    const response = await fetch(
+      `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/${phoneNumber}/AUTOGEN/Test`
+    );
+    const data = await response.json();
+
+    if (data.Status === "Success") {
+      resendLimit[phoneNumber].count += 1; // Increment resend count
+      return res
+        .status(200)
+        .json({ message: "OTP Sent", sessionId: data.Details });
+    } else {
+      return res.status(500).json({ message: "Error sending OTP" });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/verifyOtp", async (req, res) => {
+  const { phoneNumber, otp } = req.body;
+
+  if (!phoneNumber || !otp) {
+    return res
+      .status(400)
+      .json({ message: "Phone number and OTP are required" });
+  }
+
+  try {
+    // Verify OTP with 2factor.in
+    const response = await fetch(
+      `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/VERIFY3/${phoneNumber}/${otp}`
+    );
+    const data = await response.json();
+
+    if (data.Status === "Success") {
+      // OTP is verified, proceed with database operations
+
+      // Check if the user exists
+      const checkUserQuery = "SELECT * FROM users WHERE phone_number = ?";
+      connection.query(checkUserQuery, [phoneNumber], (err, results) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ message: "Database error" });
+        }
+
+        if (results.length === 0) {
+          // User does not exist, create a new user with trial period
+          const trialStartDate = new Date();
+          const trialEndDate = new Date();
+          trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
+
+          const insertUserQuery = `
+            INSERT INTO users (phone_number, status, trial_start_date, trial_end_date)
+            VALUES (?, 'trial', ?, ?)
+          `;
+          connection.query(
+            insertUserQuery,
+            [phoneNumber, trialStartDate, trialEndDate],
+            (err, insertResult) => {
+              if (err) {
+                console.error(err);
+                return res.status(500).json({ message: "Database error" });
+              }
+              // User created successfully
+              return res.status(200).json({
+                message: "OTP Verified and user created",
+                userId: insertResult.insertId,
+              });
+            }
+          );
+        } else {
+          // User exists
+          const user = results[0];
+          // Optionally, update trial dates or status
+          return res.status(200).json({
+            message: "OTP Verified",
+            userId: user.user_id,
+          });
+        }
+      });
+    } else {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Verify OTP Endpoint
+app.post("/verifyOtp", async (req, res) => {
+  const { phoneNumber, otp } = req.body;
+
+  if (!phoneNumber || !otp) {
+    return res
+      .status(400)
+      .json({ message: "Phone number and OTP are required" });
+  }
+
+  const apiKey = process.env.TWO_FACTOR_API_KEY;
+
+  try {
+    const response = await fetch(
+      `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY3/${phoneNumber}/${otp}`
+    );
+
+    const data = await response.json();
+
+    if (data.Status === "Success") {
+      return res.status(200).json({ message: "OTP Verified" });
+    } else {
+      return res.status(500).json({ message: "Invalid OTP" });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
