@@ -4,6 +4,8 @@ const axios = require("axios");
 const sequelize = require("./config/database");
 const authRoutes = require("./routes/authRoutes");
 const cors = require("cors");
+const jwt = require('jsonwebtoken');
+
 const {
   fetchMatchesAndSave,
 } = require("./controller/playerPerformanceController"); // Adjust the path if necessary
@@ -5917,7 +5919,191 @@ app.get("/new/matches-against-each-other", async (req, res) => {
 });
 
 // --------------------------------LOGIN--------------------------------------------------
+// const resendLimit = {}; // In-memory storage for demonstration (you can use a database for persistence)
+
+// app.post("/sendOtp", async (req, res) => {
+//   const { phoneNumber } = req.body;
+
+//   if (!phoneNumber) {
+//     return res.status(400).json({ message: "Phone number is required" });
+//   }
+
+//   // Check resend limit
+//   const today = new Date().toDateString();
+//   if (!resendLimit[phoneNumber]) {
+//     resendLimit[phoneNumber] = { count: 0, date: today };
+//   } else if (resendLimit[phoneNumber].date !== today) {
+//     resendLimit[phoneNumber] = { count: 0, date: today }; // Reset counter for new day
+//   }
+
+//   if (resendLimit[phoneNumber].count >= 3) {
+//     return res.status(429).json({ message: "Resend limit reached for today" });
+//   }
+
+//   try {
+//     // Use the custom OTP template "Test" in the API call
+//     const response = await fetch(
+//       `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/${phoneNumber}/AUTOGEN/Test`
+//     );
+//     const data = await response.json();
+
+//     if (data.Status === "Success") {
+//       resendLimit[phoneNumber].count += 1; // Increment resend count
+//       return res
+//         .status(200)
+//         .json({ message: "OTP Sent", sessionId: data.Details });
+//     } else {
+//       return res.status(500).json({ message: "Error sending OTP" });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+// app.post("/verifyOtp", async (req, res) => {
+//   const { phoneNumber, otp } = req.body;
+
+//   if (!phoneNumber || !otp) {
+//     return res
+//       .status(400)
+//       .json({ message: "Phone number and OTP are required" });
+//   }
+
+//   try {
+//     // Verify OTP with 2factor.in
+//     const response = await fetch(
+//       `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/VERIFY3/${phoneNumber}/${otp}`
+//     );
+//     const data = await response.json();
+
+//     if (data.Status === "Success") {
+//       // OTP is verified, proceed with database operations
+
+//       // Check if the user exists
+//       const checkUserQuery = "SELECT * FROM users WHERE phone_number = ?";
+//       connection.query(checkUserQuery, [phoneNumber], (err, results) => {
+//         if (err) {
+//           console.error(err);
+//           return res.status(500).json({ message: "Database error" });
+//         }
+
+//         if (results.length === 0) {
+//           // User does not exist, create a new user with trial period
+//           const trialStartDate = new Date();
+//           const trialEndDate = new Date();
+//           trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
+
+//           const insertUserQuery = `
+//             INSERT INTO users (phone_number, status, trial_start_date, trial_end_date)
+//             VALUES (?, 'trial', ?, ?)
+//           `;
+//           connection.query(
+//             insertUserQuery,
+//             [phoneNumber, trialStartDate, trialEndDate],
+//             (err, insertResult) => {
+//               if (err) {
+//                 console.error(err);
+//                 return res.status(500).json({ message: "Database error" });
+//               }
+//               // User created successfully
+//               return res.status(200).json({
+//                 message: "OTP Verified and user created",
+//                 userId: insertResult.insertId,
+//               });
+//             }
+//           );
+//         } else {
+//           // User exists
+//           const user = results[0];
+//           // Optionally, update trial dates or status
+//           return res.status(200).json({
+//             message: "OTP Verified",
+//             userId: user.user_id,
+//           });
+//         }
+//       });
+//     } else {
+//       return res.status(400).json({ message: "Invalid OTP" });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+// // Verify OTP Endpoint
+// app.post("/verifyOtp", async (req, res) => {
+//   const { phoneNumber, otp } = req.body;
+
+//   if (!phoneNumber || !otp) {
+//     return res
+//       .status(400)
+//       .json({ message: "Phone number and OTP are required" });
+//   }
+
+//   const apiKey = process.env.TWO_FACTOR_API_KEY;
+
+//   try {
+//     const response = await fetch(
+//       `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY3/${phoneNumber}/${otp}`
+//     );
+
+//     const data = await response.json();
+
+//     if (data.Status === "Success") {
+//       return res.status(200).json({ message: "OTP Verified" });
+//     } else {
+//       return res.status(500).json({ message: "Invalid OTP" });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+
+
+
 const resendLimit = {}; // In-memory storage for demonstration (you can use a database for persistence)
+
+// app.post("/sendOtp", async (req, res) => {
+//   const { phoneNumber } = req.body;
+
+//   if (!phoneNumber) {
+//     return res.status(400).json({ message: "Phone number is required" });
+//   }
+
+//   // Check resend limit
+//   const today = new Date().toDateString();
+//   if (!resendLimit[phoneNumber]) {
+//     resendLimit[phoneNumber] = { count: 0, date: today };
+//   } else if (resendLimit[phoneNumber].date !== today) {
+//     resendLimit[phoneNumber] = { count: 0, date: today }; // Reset counter for new day
+//   }
+
+//   if (resendLimit[phoneNumber].count >= 3) {
+//     return res.status(429).json({ message: "Resend limit reached for today" });
+//   }
+
+//   try {
+//     const response = await fetch(
+//       `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/${phoneNumber}/AUTOGEN/Test`
+//     );
+//     const data = await response.json();
+
+//     if (data.Status === "Success") {
+//       resendLimit[phoneNumber].count += 1; // Increment resend count
+//       return res.status(200).json({ message: "OTP Sent", sessionId: data.Details });
+//     } else {
+//       return res.status(500).json({ message: "Error sending OTP" });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
 
 app.post("/sendOtp", async (req, res) => {
   const { phoneNumber } = req.body;
@@ -5926,32 +6112,17 @@ app.post("/sendOtp", async (req, res) => {
     return res.status(400).json({ message: "Phone number is required" });
   }
 
-  // Check resend limit
-  const today = new Date().toDateString();
-  if (!resendLimit[phoneNumber]) {
-    resendLimit[phoneNumber] = { count: 0, date: today };
-  } else if (resendLimit[phoneNumber].date !== today) {
-    resendLimit[phoneNumber] = { count: 0, date: today }; // Reset counter for new day
-  }
-
-  if (resendLimit[phoneNumber].count >= 3) {
-    return res.status(429).json({ message: "Resend limit reached for today" });
-  }
-
   try {
-    // Use the custom OTP template "Test" in the API call
+    // API call to 2Factor for sending OTP
     const response = await fetch(
       `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/${phoneNumber}/AUTOGEN/Test`
     );
     const data = await response.json();
 
     if (data.Status === "Success") {
-      resendLimit[phoneNumber].count += 1; // Increment resend count
-      return res
-        .status(200)
-        .json({ message: "OTP Sent", sessionId: data.Details });
+      return res.status(200).json({ message: "OTP Sent", sessionId: data.Details });
     } else {
-      return res.status(500).json({ message: "Error sending OTP" });
+      return res.status(500).json({ message: data.Details || "Error sending OTP" });
     }
   } catch (error) {
     console.error(error);
@@ -5959,103 +6130,337 @@ app.post("/sendOtp", async (req, res) => {
   }
 });
 
-app.post("/verifyOtp", async (req, res) => {
-  const { phoneNumber, otp } = req.body;
 
-  if (!phoneNumber || !otp) {
-    return res
-      .status(400)
-      .json({ message: "Phone number and OTP are required" });
+
+
+
+
+
+
+
+// Endpoint to get current resend attempts
+app.post("/getResendAttempts", (req, res) => {
+  const { phoneNumber } = req.body;
+  if (!phoneNumber) {
+    return res.status(400).json({ message: "Phone number is required" });
   }
 
-  try {
-    // Verify OTP with 2factor.in
-    const response = await fetch(
-      `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/VERIFY3/${phoneNumber}/${otp}`
-    );
-    const data = await response.json();
-
-    if (data.Status === "Success") {
-      // OTP is verified, proceed with database operations
-
-      // Check if the user exists
-      const checkUserQuery = "SELECT * FROM users WHERE phone_number = ?";
-      connection.query(checkUserQuery, [phoneNumber], (err, results) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ message: "Database error" });
-        }
-
-        if (results.length === 0) {
-          // User does not exist, create a new user with trial period
-          const trialStartDate = new Date();
-          const trialEndDate = new Date();
-          trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
-
-          const insertUserQuery = `
-            INSERT INTO users (phone_number, status, trial_start_date, trial_end_date)
-            VALUES (?, 'trial', ?, ?)
-          `;
-          connection.query(
-            insertUserQuery,
-            [phoneNumber, trialStartDate, trialEndDate],
-            (err, insertResult) => {
-              if (err) {
-                console.error(err);
-                return res.status(500).json({ message: "Database error" });
-              }
-              // User created successfully
-              return res.status(200).json({
-                message: "OTP Verified and user created",
-                userId: insertResult.insertId,
-              });
-            }
-          );
-        } else {
-          // User exists
-          const user = results[0];
-          // Optionally, update trial dates or status
-          return res.status(200).json({
-            message: "OTP Verified",
-            userId: user.user_id,
-          });
-        }
-      });
-    } else {
-      return res.status(400).json({ message: "Invalid OTP" });
-    }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Server error" });
+  const today = new Date().toDateString();
+  if (resendLimit[phoneNumber] && resendLimit[phoneNumber].date === today) {
+    return res.status(200).json({ attempts: resendLimit[phoneNumber].count });
+  } else {
+    return res.status(200).json({ attempts: 0 }); // No attempts today
   }
 });
 
 // Verify OTP Endpoint
+// app.post("/verifyOtp", async (req, res) => {
+//   const { phoneNumber, otp } = req.body;
+
+//   if (!phoneNumber || !otp) {
+//     return res
+//       .status(400)
+//       .json({ message: "Phone number and OTP are required" });
+//   }
+
+//   const apiKey = process.env.TWO_FACTOR_API_KEY;
+
+//   try {
+//     const response = await fetch(
+//       `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY3/${phoneNumber}/${otp}`
+//     );
+
+//     const data = await response.json();
+
+//     if (data.Status === "Success") {
+//       return res.status(200).json({ message: "OTP Verified" });
+//     } else {
+//       return res.status(500).json({ message: "Invalid OTP" });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+
+
+const JWT_SECRET = process.env.JWT_SECRET || '123';
+
+
+// Verify OTP Endpoint with SQL query to handle user check and trial logic
+// Verify OTP Endpoint with SQL query to handle user check and trial logic using pool
 app.post("/verifyOtp", async (req, res) => {
   const { phoneNumber, otp } = req.body;
 
   if (!phoneNumber || !otp) {
-    return res
-      .status(400)
-      .json({ message: "Phone number and OTP are required" });
+    return res.status(400).json({ message: "Phone number and OTP are required" });
   }
 
-  const apiKey = process.env.TWO_FACTOR_API_KEY;
-
   try {
+    // Verify OTP using 2Factor API
     const response = await fetch(
-      `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY3/${phoneNumber}/${otp}`
+      `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/VERIFY3/${phoneNumber}/${otp}`
     );
 
     const data = await response.json();
+    if (data.Status !== "Success") {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
 
-    if (data.Status === "Success") {
-      return res.status(200).json({ message: "OTP Verified" });
+    // If OTP is verified, check if the user exists in the database
+    const query = `
+      WITH ExistingUser AS (
+        SELECT 
+          user_id,
+          phone_number,
+          status,
+          trial_start_date,
+          trial_end_date,
+          has_taken_trial
+        FROM users
+        WHERE phone_number = ?
+      )
+      SELECT 
+        user_id,
+        phone_number,
+        status,
+        trial_start_date,
+        trial_end_date,
+        has_taken_trial
+      FROM ExistingUser;
+    `;
+
+    const [rows] = await pool.query(query, [phoneNumber]);
+
+    if (rows.length === 0) {
+      // User does not exist, insert a new user with a 7-day trial
+      const trialStartDate = new Date();
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 7); // Set trial period to 7 days
+
+      const insertQuery = `
+        INSERT INTO users (phone_number, status, trial_start_date, trial_end_date, has_taken_trial)
+        VALUES (?, 'trial', ?, ?, true);
+      `;
+      const [insertResult] = await pool.query(insertQuery, [
+        phoneNumber,
+        trialStartDate,
+        trialEndDate,
+      ]);
+
+       // Create a JWT token
+       const token = jwt.sign(
+        {
+          user_id: insertResult.insertId,
+          phoneNumber,
+          status: 'trial',
+          trialStartDate,
+          trialEndDate,
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' } // Set expiration time as needed
+      );
+      console.log(token,"token11",user)
+
+      return res.status(200).json({
+        message: "OTP Verified and user created with a 7-day trial",
+        token,
+        user: {
+          user_id: insertResult.insertId,
+          phone_number: phoneNumber,
+          status: 'trial',
+          trial_start_date: trialStartDate,
+          trial_end_date: trialEndDate,
+        },
+      });
     } else {
-      return res.status(500).json({ message: "Invalid OTP" });
+      // User exists, check their status
+      const user = rows[0];
+      const currentDate = new Date();
+
+      // Check if the trial has expired
+      if (user.status === 'trial' && currentDate > user.trial_end_date) {
+        user.status = 'expired';
+        const updateQuery = `UPDATE users SET status = 'expired' WHERE id = ?`;
+        await pool.query(updateQuery, [user.user_id]);
+      }
+
+      // Create a JWT token
+      const token = jwt.sign(
+        {
+          user_id: user.user_id,
+          phoneNumber: user.phone_number,
+          status: user.status,
+          trialStartDate: user.trial_start_date,
+          trialEndDate: user.trial_end_date,
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' } // Adjust the expiration time if needed
+      );
+      console.log(token,"token",user)
+
+      return res.status(200).json({
+        message: "OTP Verified",
+        token,
+        user: {
+          user_id: user.user_id,
+          phone_number: user.phone_number,
+          status: user.status,
+          trial_start_date: user.trial_start_date,
+          trial_end_date: user.trial_end_date,
+          has_taken_trial: user.has_taken_trial,
+        },
+      });
     }
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Server error" });
+    console.error('Error during OTP verification:', error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+
+///backend dream team prediction
+
+app.post("/api/saveForm", async (req, res) => {
+  try {
+      const formData = req.body;
+
+      // Define the SQL query and parameters to insert the form data
+      const insertQuery = `
+          INSERT INTO match_predictions (
+              match_id,
+              title,
+              summary,
+              preview,
+              pitch,
+              records,
+              winning_percentage,
+              pitch_behaviour,
+              avg_inning_score,
+              best_suited_to,
+              captain_choice,
+              vice_captain_choice,
+              dream11_combination,
+              playing11_teamA,
+              playing11_teamB,
+              hot_picks,
+              expert_advice,
+              teams
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const values = [
+          formData.matchId,
+          formData.title,
+          formData.summary,
+          formData.tableOfContent.preview,
+          formData.tableOfContent.pitchReport.pitch,
+          formData.tableOfContent.pitchReport.records,
+          formData.tableOfContent.pitchReport.winningPercentage,
+          formData.tableOfContent.pitchReport.pitchBehaviour,
+          formData.tableOfContent.pitchReport.avgInningScore,
+          formData.tableOfContent.pitchReport.bestSuitedTo,
+          formData.captainChoice,
+          formData.viceCaptainChoice,
+          formData.expertAdvice.dream11Combination,
+          JSON.stringify(formData.playing11TeamA),
+          JSON.stringify(formData.playing11TeamB),
+          JSON.stringify(formData.hotPicks),
+          JSON.stringify(formData.expertAdvice),
+          JSON.stringify(formData.teams)
+      ];
+
+      // Execute the SQL query
+      const [result] = await pool.query(insertQuery, values);
+
+      // Return success response with the inserted data
+      res.status(201).json({ 
+          message: "Form data saved successfully!", 
+          predictionId: result.insertId 
+      });
+  } catch (error) {
+      console.error("Error saving form data:", error);
+      res.status(500).json({ error: "Failed to save form data" });
+  }
+});
+
+
+
+
+app.get("/api/getMatchData/:matchId", async (req, res) => {
+  const { matchId } = req.params;
+
+  try {
+    const query = `SELECT * FROM match_predictions WHERE match_id = ?`;
+    const [rows] = await pool.query(query, [matchId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Match data not found" });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Error fetching match data:", error);
+    res.status(500).json({ error: "Failed to fetch match data" });
+  }
+});
+
+
+
+app.put("/api/updateMatch/:matchId", async (req, res) => {
+  const { matchId } = req.params;
+  const formData = req.body;
+
+  try {
+    const updateQuery = `
+      UPDATE match_predictions SET
+        title = ?,
+        summary = ?,
+        preview = ?,
+        pitch = ?,
+        records = ?,
+        winning_percentage = ?,
+        pitch_behaviour = ?,
+        avg_inning_score = ?,
+        best_suited_to = ?,
+        captain_choice = ?,
+        vice_captain_choice = ?,
+        dream11_combination = ?,
+        playing11_teamA = ?,
+        playing11_teamB = ?,
+        hot_picks = ?,
+        expert_advice = ?,
+        teams = ?
+      WHERE match_id = ?
+    `;
+
+    const values = [
+      formData.title,
+      formData.summary,
+      formData.tableOfContent.preview,
+      formData.tableOfContent.pitchReport.pitch,
+      formData.tableOfContent.pitchReport.records,
+      formData.tableOfContent.pitchReport.winningPercentage,
+      formData.tableOfContent.pitchReport.pitchBehaviour,
+      formData.tableOfContent.pitchReport.avgInningScore,
+      formData.tableOfContent.pitchReport.bestSuitedTo,
+      formData.captainChoice,
+      formData.viceCaptainChoice,
+      formData.expertAdvice.dream11Combination,
+      JSON.stringify(formData.playing11TeamA),
+      JSON.stringify(formData.playing11TeamB),
+      JSON.stringify(formData.hotPicks),
+      JSON.stringify(formData.expertAdvice),
+      JSON.stringify(formData.teams),
+      matchId,
+    ];
+
+    await pool.query(updateQuery, values);
+    res.status(200).json({ message: "Match data updated successfully" });
+  } catch (error) {
+    console.error("Error updating match data:", error);
+    res.status(500).json({ error: "Failed to update match data" });
   }
 });
