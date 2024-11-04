@@ -6192,6 +6192,7 @@ const JWT_SECRET = process.env.JWT_SECRET || '123';
 // Verify OTP Endpoint with SQL query to handle user check and trial logic using pool
 app.post("/verifyOtp", async (req, res) => {
   const { phoneNumber, otp } = req.body;
+  console.log(phoneNumber,"sfjfdsjafdjafsgjfdasfds")
 
   if (!phoneNumber || !otp) {
     return res.status(400).json({ message: "Phone number and OTP are required" });
@@ -6204,6 +6205,8 @@ app.post("/verifyOtp", async (req, res) => {
     );
 
     const data = await response.json();
+
+    console.log(data,"datatata")
     if (data.Status !== "Success") {
       return res.status(400).json({ message: "Invalid OTP" });
     }
@@ -6282,9 +6285,10 @@ app.post("/verifyOtp", async (req, res) => {
       // Check if the trial has expired
       if (user.status === 'trial' && currentDate > user.trial_end_date) {
         user.status = 'expired';
-        const updateQuery = `UPDATE users SET status = 'expired' WHERE id = ?`;
+        const updateQuery = `UPDATE users SET status = 'expired' WHERE user_id = ?`;
         await pool.query(updateQuery, [user.user_id]);
       }
+      
 
       // Create a JWT token
       const token = jwt.sign(
