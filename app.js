@@ -6468,3 +6468,76 @@ app.put("/api/updateMatch/:matchId", async (req, res) => {
     res.status(500).json({ error: "Failed to update match data" });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------------key insight in two minutes api ----------------------------------------------
+
+
+
+app.get("/venue/conditions/:venueId", async (req, res) => {
+  const { venueId } = req.params;
+
+  const query = `
+      SELECT
+          AVG(first_innings_wickets) AS avg_wickets,
+          AVG(first_innings_score) AS avg_first_innings_score,
+          SUM(CASE WHEN first_innings_score < 140 THEN 1 ELSE 0 END) AS score_below_140,
+          SUM(CASE WHEN first_innings_score BETWEEN 140 AND 180 THEN 1 ELSE 0 END) AS score_140_to_180,
+          SUM(CASE WHEN first_innings_score > 180 THEN 1 ELSE 0 END) AS score_above_180,
+          GROUP_CONCAT(DISTINCT last_five_matches.match_id ORDER BY last_five_matches.match_id) AS match_ids,
+          COUNT(DISTINCT last_five_matches.match_id) AS match_count
+      FROM (
+          SELECT 
+              m.id AS match_id,
+              SUM(b.wickets) AS first_innings_wickets,
+              CAST(SUBSTRING_INDEX(mi.scores, '/', 1) AS UNSIGNED) AS first_innings_score
+          FROM matches m
+          JOIN match_innings_test mi ON m.id = mi.match_id AND mi.inning_number = 1
+          LEFT JOIN match_inning_bowlers_test b ON m.id = b.match_id AND b.inning_number = 1
+          WHERE m.venue_id = ? 
+          GROUP BY m.id
+          ORDER BY m.date_start DESC
+          LIMIT 5
+      ) AS last_five_matches;
+  `;
+
+  try {
+    const [results] = await pool.query(query, [venueId]);
+    if (results.length) {
+      const groundConditions = {
+        avgScore: Math.round(results[0].avg_first_innings_score),
+        avgWickets: Math.round(results[0].avg_wickets),
+        scoreBelow140: parseInt(results[0].score_below_140, 10),
+        score140To180: parseInt(results[0].score_140_to_180, 10),
+        scoreAbove180: parseInt(results[0].score_above_180, 10),
+      };
+      res.json(groundConditions); // Return data in structured format
+    } else {
+      res.status(404).send("No data found");
+    }
+  } catch (error) {
+    console.error("Error fetching average stats for venue:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
+
