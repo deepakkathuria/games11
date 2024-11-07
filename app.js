@@ -6541,3 +6541,130 @@ app.get("/venue/conditions/:venueId", async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.post("/api/saveForm1", async (req, res) => {
+  try {
+    const formData = req.body;
+
+    // First, check if the match_id already exists in the database
+    const checkQuery = `SELECT * FROM match_predictions WHERE match_id = ?`;
+    const [existingMatch] = await pool.query(checkQuery, [formData.matchId]);
+
+    if (existingMatch.length > 0) {
+      // Match ID exists, so we perform an update
+      const updateQuery = `
+        UPDATE match_predictions SET
+          title = ?,
+          summary = ?,
+          preview = ?,
+          pitch = ?,
+          records = ?,
+          winning_percentage = ?,
+          pitch_behaviour = ?,
+          avg_inning_score = ?,
+          best_suited_to = ?,
+          captain_choice = ?,
+          vice_captain_choice = ?,
+          dream11_combination = ?,
+          playing11_teamA = ?,
+          playing11_teamB = ?,
+          hot_picks = ?,
+          expert_advice = ?,
+          teams = ?
+        WHERE match_id = ?
+      `;
+
+      const updateValues = [
+        formData.title,
+        formData.summary,
+        formData.tableOfContent.preview,
+        formData.tableOfContent.pitchReport.pitch,
+        formData.tableOfContent.pitchReport.records,
+        formData.tableOfContent.pitchReport.winningPercentage,
+        formData.tableOfContent.pitchReport.pitchBehaviour,
+        formData.tableOfContent.pitchReport.avgInningScore,
+        formData.tableOfContent.pitchReport.bestSuitedTo,
+        formData.captainChoice,
+        formData.viceCaptainChoice,
+        formData.expertAdvice.dream11Combination,
+        JSON.stringify(formData.playing11TeamA),
+        JSON.stringify(formData.playing11TeamB),
+        JSON.stringify(formData.hotPicks),
+        JSON.stringify(formData.expertAdvice),
+        JSON.stringify(formData.teams),
+        formData.matchId,
+      ];
+
+      await pool.query(updateQuery, updateValues);
+      res.status(200).json({ message: "Match data updated successfully" });
+    } else {
+      // Match ID does not exist, so we perform an insert
+      const insertQuery = `
+        INSERT INTO match_predictions (
+          match_id,
+          title,
+          summary,
+          preview,
+          pitch,
+          records,
+          winning_percentage,
+          pitch_behaviour,
+          avg_inning_score,
+          best_suited_to,
+          captain_choice,
+          vice_captain_choice,
+          dream11_combination,
+          playing11_teamA,
+          playing11_teamB,
+          hot_picks,
+          expert_advice,
+          teams
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const insertValues = [
+        formData.matchId,
+        formData.title,
+        formData.summary,
+        formData.tableOfContent.preview,
+        formData.tableOfContent.pitchReport.pitch,
+        formData.tableOfContent.pitchReport.records,
+        formData.tableOfContent.pitchReport.winningPercentage,
+        formData.tableOfContent.pitchReport.pitchBehaviour,
+        formData.tableOfContent.pitchReport.avgInningScore,
+        formData.tableOfContent.pitchReport.bestSuitedTo,
+        formData.captainChoice,
+        formData.viceCaptainChoice,
+        formData.expertAdvice.dream11Combination,
+        JSON.stringify(formData.playing11TeamA),
+        JSON.stringify(formData.playing11TeamB),
+        JSON.stringify(formData.hotPicks),
+        JSON.stringify(formData.expertAdvice),
+        JSON.stringify(formData.teams),
+      ];
+
+      const [result] = await pool.query(insertQuery, insertValues);
+      res.status(201).json({ message: "Form data saved successfully!", predictionId: result.insertId });
+    }
+  } catch (error) {
+    console.error("Error saving form data:", error);
+    res.status(500).json({ error: "Failed to save form data" });
+  }
+});
