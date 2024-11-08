@@ -6668,3 +6668,67 @@ app.post("/api/saveForm1", async (req, res) => {
     res.status(500).json({ error: "Failed to save form data" });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------AT THIS VNUE KEY PREDICTION ---------------------------
+
+// Route to get stats based on only the venue_id
+
+
+
+app.get("/venue/:venueId/stats/all", async (req, res) => {
+  const { venueId } = req.params;
+
+  try {
+    const query = `
+          WITH unique_matches AS (
+              SELECT 
+                  m.id AS match_id,
+                  m.toss_winner,
+                  m.winning_team_id,
+                  m.toss_decision,
+                  MAX(mi.inning_number) AS max_inning_number
+              FROM matches m
+              LEFT JOIN match_innings_test mi ON m.id = mi.match_id
+              WHERE m.venue_id = ? 
+              GROUP BY m.id
+          )
+          SELECT 
+              COUNT(match_id) AS total_matches,
+              SUM(CASE WHEN toss_winner = winning_team_id THEN 1 ELSE 0 END) AS wins_after_winning_toss,
+              SUM(CASE WHEN toss_winner != winning_team_id THEN 1 ELSE 0 END) AS wins_after_losing_toss,
+              SUM(CASE WHEN toss_decision = 1 AND toss_winner = winning_team_id THEN 1 ELSE 0 END) AS wins_batting_first_after_winning_toss,
+              SUM(CASE WHEN toss_decision = 2 AND toss_winner = winning_team_id THEN 1 ELSE 0 END) AS wins_bowling_first_after_winning_toss,
+              SUM(CASE WHEN toss_decision = 1 THEN 1 ELSE 0 END) AS chose_to_bat_first,
+              SUM(CASE WHEN toss_decision = 2 THEN 1 ELSE 0 END) AS chose_to_bowl_first,
+              SUM(CASE WHEN max_inning_number = 1 AND winning_team_id = toss_winner THEN 1 ELSE 0 END) AS wins_batting_first,
+              SUM(CASE WHEN max_inning_number = 2 AND winning_team_id != toss_winner THEN 1 ELSE 0 END) AS wins_chasing
+          FROM unique_matches;
+      `;
+
+    const [results] = await pool.query(query, [venueId]);
+
+    if (results.length === 0) {
+      return res.status(404).send("No matches found");
+    }
+
+    res.json(results[0]); // Return the statistics as JSON
+  } catch (error) {
+    console.error("Error fetching venue statistics:", error);
+    res.status(500).send("Failed to retrieve data");
+  }
+});
