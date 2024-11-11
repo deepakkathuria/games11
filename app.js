@@ -6732,3 +6732,38 @@ app.get("/venue/:venueId/stats/all", async (req, res) => {
     res.status(500).send("Failed to retrieve data");
   }
 });
+
+
+
+
+
+
+
+
+
+// ----------------mydream11backedn api for key prediction--------------------
+    
+
+
+app.get('/matchdream/:match_id', async (req, res) => {
+  const { match_id } = req.params;
+
+  try {
+    const query = `
+      SELECT * 
+      FROM match_predictions
+      WHERE match_id = ?;
+    `;
+
+    const [results] = await pool.query(query, [match_id]);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Match data not found' });
+    }
+
+    res.json(results[0]); // Return the match data as JSON
+  } catch (error) {
+    console.error('Error fetching match data:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
