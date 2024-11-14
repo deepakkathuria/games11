@@ -6773,72 +6773,186 @@ app.get('/matchdream/:match_id', async (req, res) => {
 
 // ----fantsay player last two matches top-------------
 
-async function fetchPlayerIds1(matchId) {
-  const squadsApiUrl = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
-  try {
-      const response = await axios.get(squadsApiUrl);
-      const squads = response.data.response;
+// async function fetchPlayerIds1(matchId) {
+//   const squadsApiUrl = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
+//   try {
+//       const response = await axios.get(squadsApiUrl);
+//       const squads = response.data.response;
 
-      // Extract player IDs from both teams
-      const teamAPlayers = squads.teama.squads.map(player => player.player_id);
-      const teamBPlayers = squads.teamb.squads.map(player => player.player_id);
+//       // Extract player IDs from both teams
+//       const teamAPlayers = squads.teama.squads.map(player => player.player_id);
+//       const teamBPlayers = squads.teamb.squads.map(player => player.player_id);
 
-      // Combine both teams' player IDs
-      return [...teamAPlayers, ...teamBPlayers];
-  } catch (error) {
-      console.error("Error fetching player IDs:", error);
-      return [];
-  }
+//       // Combine both teams' player IDs
+//       return [...teamAPlayers, ...teamBPlayers];
+//   } catch (error) {
+//       console.error("Error fetching player IDs:", error);
+//       return [];
+//   }
+// }
+
+// // Route to get fantasy points for the last two matches for each player
+// app.get('/api/fantasy-points/:matchId', async (req, res) => {
+//   const matchId = req.params.matchId;
+
+//   try {
+//       // Step 1: Fetch player IDs from the squads API
+//       const playerIds = await fetchPlayerIds1(matchId);
+
+//       if (playerIds.length === 0) {
+//           return res.status(500).json({ status: 'error', message: 'Failed to fetch player IDs' });
+//       }
+
+//       // Step 2: Execute the SQL query using the fetched player IDs
+//       const query = `
+//           WITH RankedMatches AS (
+//               SELECT 
+//                   fp.player_id,
+//                   fp.match_id,
+//                   fp.points,
+//                   ROW_NUMBER() OVER (PARTITION BY fp.player_id ORDER BY m.date_start DESC) AS match_rank
+//               FROM 
+//                   fantasy_points_details fp
+//               JOIN 
+//                   matches m ON fp.match_id = m.id
+//               WHERE 
+//                   fp.player_id = ANY($1)
+//           )
+//           SELECT 
+//               rm.player_id,
+//               SUM(rm.points) AS total_fantasy_points,
+//               COUNT(rm.match_id) AS num_matches,
+//               STRING_AGG(rm.match_id::text, ', ' ORDER BY rm.match_rank ASC) AS last_two_matches
+//           FROM 
+//               RankedMatches rm
+//           WHERE 
+//               rm.match_rank <= 2
+//           GROUP BY 
+//               rm.player_id;
+//       `;
+
+//       // Run the query
+//       const { rows } = await pool.query(query, [playerIds]);
+//       res.json({
+//           status: 'ok',
+//           response: rows
+//       });
+//   } catch (error) {
+//       console.error("Error fetching fantasy points:", error);
+//       res.status(500).json({ status: 'error', message: 'Failed to fetch fantasy points' });
+//   }
+// });
+
+
+
+async function fetchPlayerDetails(matchId) {
+    const squadsApiUrl = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
+    try {
+        const response = await axios.get(squadsApiUrl);
+        const squads = response.data.response;
+
+        // Create a team ID to team name mapping from the `teams` array
+        const teamIdToNameMap = {};
+        squads.teams.forEach(team => {
+            teamIdToNameMap[team.tid] = team.title; // Mapping team_id to team_name
+        });
+
+        // Combine player details with team name, team id, and role
+        const players = [
+            ...squads.teama.squads.map(player => ({
+                player_id: parseInt(player.player_id),
+                player_name: player.name,
+                team_id: squads.teama.team_id,
+                team_name: teamIdToNameMap[squads.teama.team_id] || 'Team A', // Use mapped team name
+                playing_role: player.role
+            })),
+            ...squads.teamb.squads.map(player => ({
+                player_id: parseInt(player.player_id),
+                player_name: player.name,
+                team_id: squads.teamb.team_id,
+                team_name: teamIdToNameMap[squads.teamb.team_id] || 'Team B', // Use mapped team name
+                playing_role: player.role
+            }))
+        ];
+
+        return players;
+    } catch (error) {
+        console.error("Error fetching player details:", error);
+        return [];
+    }
 }
+
+
 
 // Route to get fantasy points for the last two matches for each player
 app.get('/api/fantasy-points/:matchId', async (req, res) => {
-  const matchId = req.params.matchId;
+    const matchId = req.params.matchId;
 
-  try {
-      // Step 1: Fetch player IDs from the squads API
-      const playerIds = await fetchPlayerIds1(matchId);
+    try {
+        // Fetch player details from the squads API
+        const players = await fetchPlayerDetails(matchId);
 
-      if (playerIds.length === 0) {
-          return res.status(500).json({ status: 'error', message: 'Failed to fetch player IDs' });
-      }
+        if (players.length === 0) {
+            return res.status(500).json({ status: 'error', message: 'Failed to fetch player details' });
+        }
 
-      // Step 2: Execute the SQL query using the fetched player IDs
-      const query = `
-          WITH RankedMatches AS (
-              SELECT 
-                  fp.player_id,
-                  fp.match_id,
-                  fp.points,
-                  ROW_NUMBER() OVER (PARTITION BY fp.player_id ORDER BY m.date_start DESC) AS match_rank
-              FROM 
-                  fantasy_points_details fp
-              JOIN 
-                  matches m ON fp.match_id = m.id
-              WHERE 
-                  fp.player_id = ANY($1)
-          )
-          SELECT 
-              rm.player_id,
-              SUM(rm.points) AS total_fantasy_points,
-              COUNT(rm.match_id) AS num_matches,
-              STRING_AGG(rm.match_id::text, ', ' ORDER BY rm.match_rank ASC) AS last_two_matches
-          FROM 
-              RankedMatches rm
-          WHERE 
-              rm.match_rank <= 2
-          GROUP BY 
-              rm.player_id;
-      `;
+        console.log(players)
 
-      // Run the query
-      const { rows } = await pool.query(query, [playerIds]);
-      res.json({
-          status: 'ok',
-          response: rows
-      });
-  } catch (error) {
-      console.error("Error fetching fantasy points:", error);
-      res.status(500).json({ status: 'error', message: 'Failed to fetch fantasy points' });
-  }
+        const playerIds = players.map(player => player.player_id).join(', ');
+
+        // SQL Query for fetching last two match fantasy points
+        const query = `
+            WITH RankedMatches AS (
+                SELECT 
+                    fp.player_id,
+                    fp.match_id,
+                    fp.points,
+                    ROW_NUMBER() OVER (PARTITION BY fp.player_id ORDER BY m.date_start DESC) AS match_rank
+                FROM 
+                    fantasy_points_details fp
+                JOIN 
+                    matches m ON fp.match_id = m.id
+                WHERE 
+                    fp.player_id IN (${playerIds})
+            )
+            SELECT 
+                rm.player_id,
+                SUM(rm.points) AS total_fantasy_points,
+                COUNT(rm.match_id) AS num_matches,
+                GROUP_CONCAT(rm.match_id ORDER BY rm.match_rank ASC SEPARATOR ', ') AS last_two_matches
+            FROM 
+                RankedMatches rm
+            WHERE 
+                rm.match_rank <= 2
+            GROUP BY 
+                rm.player_id;
+        `;
+
+        // Execute the SQL query
+        const [rows] = await pool.query(query);
+        console.log(rows,"etiwtitetwiteitwiyteit")
+
+        // Map fantasy points with player details
+        const result = rows.map(row => {
+            const player = players.find(p => p.player_id === row.player_id);
+            return {
+                player_id: row.player_id,
+                player_name: player?.player_name || '',
+                playing_role: player?.playing_role || '',
+                team_name: player?.team_name || '',
+                total_fantasy_points: row.total_fantasy_points,
+                num_matches: row.num_matches,
+                team_id: player?.team_id || '', // Use player.team_id here
+                last_two_matches: row.last_two_matches
+            };
+        });
+
+        res.json({
+            status: 'ok',
+            response: result
+        });
+    } catch (error) {
+        console.error("Error fetching fantasy points:", error);
+        res.status(500).json({ status: 'error', message: 'Failed to fetch fantasy points' });
+    }
 });
