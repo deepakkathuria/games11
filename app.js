@@ -6956,3 +6956,129 @@ app.get('/api/fantasy-points/:matchId', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Failed to fetch fantasy points' });
     }
 });
+
+
+
+
+async function fetchVenueAndPlayers(matchId) {
+    const squadsApiUrl = `https://rest.entitysport.com/v2/matches/${matchId}/squads?token=73d62591af4b3ccb51986ff5f8af5676`;
+    const newpoint2ApiUrl = `https://rest.entitysport.com/v2/matches/${matchId}/newpoint2?token=73d62591af4b3ccb51986ff5f8af5676`;
+
+    try {
+        // Fetch data from both APIs in parallel
+        const [squadsResponse, newpoint2Response] = await Promise.all([
+            axios.get(squadsApiUrl),
+            axios.get(newpoint2ApiUrl)
+        ]);
+
+        // Extract squads data
+        const squads = squadsResponse.data.response;
+        const teamIdToNameMap = {};
+        squads.teams.forEach(team => {
+            teamIdToNameMap[team.tid] = team.title; // Mapping team_id to team_name
+        });
+
+        const players = [
+            ...squads.teama.squads.map(player => ({
+                player_id: parseInt(player.player_id),
+                player_name: player.name,
+                team_id: squads.teama.team_id,
+                team_name: teamIdToNameMap[squads.teama.team_id] || 'Team A',
+                playing_role: player.role
+            })),
+            ...squads.teamb.squads.map(player => ({
+                player_id: parseInt(player.player_id),
+                player_name: player.name,
+                team_id: squads.teamb.team_id,
+                team_name: teamIdToNameMap[squads.teamb.team_id] || 'Team B',
+                playing_role: player.role
+            }))
+        ];
+
+        // Extract venue details
+        const venue = newpoint2Response.data.response.venue;
+
+        return { venueId: venue.venue_id, venueName: venue.name, players };
+    } catch (error) {
+        console.error("Error fetching venue and players:", error);
+        return { venueId: null, venueName: null, players: [] };
+    }
+}
+
+
+
+
+
+app.get('/api/top-players-at-venue/:matchId', async (req, res) => {
+    const matchId = req.params.matchId;
+
+    try {
+        // Fetch venue and player details
+        const { venueId, venueName, players } = await fetchVenueAndPlayers(matchId);
+
+        if (!venueId || players.length === 0) {
+            return res.status(500).json({ status: 'error', message: 'Failed to fetch venue or player details' });
+        }
+
+        const playerIds = players.map(player => player.player_id).join(', ');
+
+        // SQL Query to fetch fantasy points at this venue
+        const query = `
+            WITH LastMatchAtVenue AS (
+                SELECT 
+                    fp.player_id,
+                    fp.match_id,
+                    fp.points,
+                    ROW_NUMBER() OVER (PARTITION BY fp.player_id ORDER BY m.date_start DESC) AS match_rank
+                FROM 
+                    fantasy_points_details fp
+                JOIN 
+                    matches m ON fp.match_id = m.id
+                WHERE 
+                    fp.player_id IN (${playerIds}) AND m.venue_id = ?
+            )
+            SELECT 
+                lm.player_id,
+                SUM(lm.points) AS total_fantasy_points,
+                COUNT(lm.match_id) AS num_matches,
+                GROUP_CONCAT(lm.match_id ORDER BY lm.match_rank ASC SEPARATOR ', ') AS last_matches
+            FROM 
+                LastMatchAtVenue lm
+            WHERE 
+                lm.match_rank = 1
+            GROUP BY 
+                lm.player_id
+            ORDER BY 
+                total_fantasy_points DESC
+            LIMIT 2;
+        `;
+
+        // Execute the query with the venue ID as a parameter
+        const [rows] = await pool.query(query, [venueId]);
+
+        // Map query results with player details
+        const result = rows.map(row => {
+            const player = players.find(p => p.player_id === row.player_id);
+            return {
+                player_id: row.player_id,
+                player_name: player?.player_name || '',
+                playing_role: player?.playing_role || '',
+                team_name: player?.team_name || '',
+                total_fantasy_points: row.total_fantasy_points,
+                last_matches: row.last_matches,
+                venue_id: venueId,
+                venue_name: venueName,
+                team_id: player?.team_id || ''
+            };
+        });
+
+        res.json({
+            status: 'ok',
+            response: result
+        });
+    } catch (error) {
+        console.error("Error fetching top players at venue:", error);
+        res.status(500).json({ status: 'error', message: 'Failed to fetch top players at venue' });
+    }
+});
+
