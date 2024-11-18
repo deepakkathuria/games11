@@ -7010,6 +7010,7 @@ async function fetchVenueAndPlayers(matchId) {
 
 
 app.get('/api/top-players-at-venue/:matchId', async (req, res) => {
+    console.log("hitiing")
     const matchId = req.params.matchId;
 
     try {
@@ -7071,7 +7072,7 @@ app.get('/api/top-players-at-venue/:matchId', async (req, res) => {
                 team_id: player?.team_id || ''
             };
         });
-
+        console.log(rows,"rowsdata")
         res.json({
             status: 'ok',
             response: result
@@ -7082,3 +7083,51 @@ app.get('/api/top-players-at-venue/:matchId', async (req, res) => {
     }
 });
 
+
+
+
+// key predictiin with after winning toss at this venue
+
+app.get('/api/win-percentage/:venueId', async (req, res) => {
+  const venueId = req.params.venueId;
+
+  try {
+      // SQL query to calculate win percentage
+      const query = `
+          SELECT 
+              COUNT(*) AS total_matches,
+              SUM(CASE WHEN toss_winner = winning_team_id THEN 1 ELSE 0 END) AS matches_won_after_toss
+          FROM matches
+          WHERE venue_id = ?;
+      `;
+      
+      const [rows] = await pool.query(query, [venueId]);
+      
+      if (rows.length === 0) {
+          return res.status(404).json({
+              status: 'error',
+              message: 'No matches found for the given venue'
+          });
+      }
+
+      const { total_matches, matches_won_after_toss } = rows[0];
+      const winPercentage = total_matches > 0 
+          ? Math.round((matches_won_after_toss / total_matches) * 100) 
+          : 0;
+
+      res.json({
+          status: 'ok',
+          response: {
+              total_matches,
+              matches_won_after_toss,
+              win_percentage: `${winPercentage}%` // Append `%`
+          }
+      });
+  } catch (error) {
+      console.error("Error calculating win percentage:", error);
+      res.status(500).json({ 
+          status: 'error', 
+          message: 'Failed to calculate win percentage' 
+      });
+  }
+});
