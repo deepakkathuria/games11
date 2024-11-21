@@ -7131,3 +7131,315 @@ app.get('/api/win-percentage/:venueId', async (req, res) => {
       });
   }
 });
+
+
+
+// --------------------------  1. Create a Poll---------------------
+
+
+
+// app.post('/api/polls', async (req, res) => {
+//   const { title, description, options, match_id } = req.body;
+
+//   if (!title || !options || options.length < 2 || !match_id) {
+//       return res.status(400).json({ message: 'Invalid input. Provide a title, at least 2 options, and a match_id.' });
+//   }
+
+//   try {
+//       // Insert poll into the database
+//       const insertPollQuery = `
+//           INSERT INTO polls (title, description, match_id, status) 
+//           VALUES (?, ?, ?, 'active');
+//       `;
+//       const [pollResult] = await pool.query(insertPollQuery, [title, description || null, match_id]);
+//       const pollId = pollResult.insertId;
+
+//       // Insert poll options
+//       const insertOptionsQuery = `
+//           INSERT INTO poll_options (poll_id, option_text, votes_count) 
+//           VALUES (?, ?, 0);
+//       `;
+//       const optionPromises = options.map((option) =>
+//           pool.query(insertOptionsQuery, [pollId, option])
+//       );
+//       await Promise.all(optionPromises);
+
+//       res.status(201).json({ message: 'Poll created successfully', pollId });
+//   } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ error: error.message });
+//   }
+// });
+
+
+
+
+
+// app.post('/api/polls/:pollId/vote', async (req, res) => {
+//   const { pollId } = req.params;
+//   const { optionId } = req.body;
+//   const userId = req.body.user_id; // Assuming user_id is passed in the request
+
+//   try {
+//       // Check if the user has already voted
+//       const checkVoteQuery = `
+//           SELECT * 
+//           FROM poll_votes 
+//           WHERE poll_id = ? AND user_id = ?;
+//       `;
+//       const [existingVotes] = await pool.query(checkVoteQuery, [pollId, userId]);
+
+//       if (existingVotes.length > 0) {
+//           return res.status(400).json({ message: 'You have already voted.' });
+//       }
+
+//       // Insert the vote
+//       const insertVoteQuery = `
+//           INSERT INTO poll_votes (poll_id, option_id, user_id) 
+//           VALUES (?, ?, ?);
+//       `;
+//       await pool.query(insertVoteQuery, [pollId, optionId, userId]);
+
+//       // Increment the vote count
+//       const updateVoteCountQuery = `
+//           UPDATE poll_options 
+//           SET votes_count = votes_count + 1 
+//           WHERE id = ?;
+//       `;
+//       await pool.query(updateVoteCountQuery, [optionId]);
+
+//       res.status(200).json({ message: 'Vote recorded successfully.' });
+//   } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ error: error.message });
+//   }
+// });
+
+
+
+
+
+
+// app.get('/api/polls/:pollId/results', async (req, res) => {
+//   const { pollId } = req.params;
+
+//   try {
+//       // Fetch poll details
+//       const fetchPollQuery = `
+//           SELECT title, description, status, created_at 
+//           FROM polls 
+//           WHERE id = ?;
+//       `;
+//       const [pollRows] = await pool.query(fetchPollQuery, [pollId]);
+
+//       if (pollRows.length === 0) {
+//           return res.status(404).json({ message: 'Poll not found.' });
+//       }
+
+//       // Fetch poll options and their vote counts
+//       const fetchOptionsQuery = `
+//           SELECT option_text, votes_count 
+//           FROM poll_options 
+//           WHERE poll_id = ?;
+//       `;
+//       const [optionsRows] = await pool.query(fetchOptionsQuery, [pollId]);
+
+//       res.status(200).json({
+//           poll: pollRows[0],
+//           options: optionsRows
+//       });
+//   } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ error: error.message });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.post("/api/polls", async (req, res) => {
+  const { title, description, match_id } = req.body;
+
+  if (!title || !match_id) {
+    return res.status(400).json({ message: "Invalid input. Provide a title and match_id." });
+  }
+
+  try {
+    // Insert poll into the database
+    const insertPollQuery = `
+      INSERT INTO polls (title, description, match_id, status) 
+      VALUES (?, ?, ?, 'active');
+    `;
+    const [pollResult] = await pool.query(insertPollQuery, [title, description || null, match_id]);
+
+    res.status(201).json({ message: "Poll created successfully", pollId: pollResult.insertId });
+  } catch (error) {
+    console.error("Error creating poll:", error.message);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+
+// **Vote API**
+app.post("/api/polls/:pollId/vote", async (req, res) => {
+  const { pollId } = req.params;
+  const { team_id, user_id } = req.body;
+
+  if (!pollId || !team_id || !user_id) {
+    return res.status(400).json({ message: "Missing required fields: pollId, team_id, or user_id." });
+  }
+
+  try {
+    // Check if the user has already voted
+    const checkVoteQuery = `
+      SELECT * 
+      FROM poll_votes 
+      WHERE poll_id = ? AND user_id = ?;
+    `;
+    const [existingVotes] = await pool.query(checkVoteQuery, [pollId, user_id]);
+
+    if (existingVotes.length > 0) {
+      return res.status(400).json({ message: "You have already voted." });
+    }
+
+    // Insert the vote
+    const insertVoteQuery = `
+      INSERT INTO poll_votes (poll_id, team_id, user_id) 
+      VALUES (?, ?, ?);
+    `;
+    await pool.query(insertVoteQuery, [pollId, team_id, user_id]);
+
+    res.status(200).json({ message: "Vote recorded successfully." });
+  } catch (error) {
+    console.error("Error recording vote:", error.message);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+
+// **Fetch Poll Results API**
+app.get("/api/polls/:pollId/results", async (req, res) => {
+  const { pollId } = req.params;
+
+  try {
+    // Fetch poll details
+    const fetchPollQuery = `
+      SELECT id, title, description, match_id, status, created_at 
+      FROM polls 
+      WHERE id = ?;
+    `;
+    const [pollRows] = await pool.query(fetchPollQuery, [pollId]);
+
+    if (pollRows.length === 0) {
+      return res.status(404).json({ message: "Poll not found." });
+    }
+
+    // Fetch vote counts for each team
+    const fetchVoteCountsQuery = `
+      SELECT team_id, COUNT(*) AS votes_count,
+             ROUND((COUNT(*) / (SELECT COUNT(*) FROM poll_votes WHERE poll_id = ?)) * 100, 2) AS percentage
+      FROM poll_votes
+      WHERE poll_id = ?
+      GROUP BY team_id;
+    `;
+    const [voteCounts] = await pool.query(fetchVoteCountsQuery, [pollId, pollId]);
+
+    res.status(200).json({
+      poll: pollRows[0],
+      results: voteCounts,
+    });
+  } catch (error) {
+    console.error("Error fetching poll results:", error.message);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+
+
+
+
+// app.get('/api/matches/:matchId/poll', async (req, res) => {
+//   console.log("dsjfhsdhfghsdghfjds")
+//   const { matchId } = req.params; // Extract the matchId from the request URL
+
+//   try {
+//     // Query to fetch the pollId for the given match_id
+//     const query = `
+//       SELECT id AS pollId 
+//       FROM polls 
+//       WHERE match_id = ?;
+//     `;
+
+//     const [rows] = await pool.query(query, [matchId]);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ message: "Poll not found for this match." });
+//     }
+
+//     // Return the pollId
+//     res.status(200).json({ pollId: rows[0].pollId });
+//   } catch (error) {
+//     console.error("Error fetching pollId:", error.message);
+//     res.status(500).json({ error: "Internal server error." });
+//   }
+// });
+
+
+
+
+app.get('/api/matches/:matchId/poll', async (req, res) => {
+  const { matchId } = req.params;
+
+  try {
+    // Check if a poll exists for the given match_id
+    const checkPollQuery = `
+      SELECT id AS pollId 
+      FROM polls 
+      WHERE match_id = ?;
+    `;
+    const [rows] = await pool.query(checkPollQuery, [matchId]);
+
+    if (rows.length > 0) {
+      // Return the existing pollId
+      return res.status(200).json({ pollId: rows[0].pollId });
+    }
+
+    // No poll exists, create a new poll
+    const insertPollQuery = `
+      INSERT INTO polls (title, description, match_id, status) 
+      VALUES (?, ?, ?, 'active');
+    `;
+    const [pollResult] = await pool.query(insertPollQuery, [
+      `Who will win match ${matchId}?`,
+      'Vote for your favorite team!',
+      matchId,
+    ]);
+    const pollId = pollResult.insertId;
+
+    // Insert default options (Team A and Team B)
+    const insertOptionsQuery = `
+      INSERT INTO poll_options (poll_id, option_text, votes_count) 
+      VALUES (?, ?, 0), (?, ?, 0);
+    `;
+    await pool.query(insertOptionsQuery, [pollId, 'Team A', pollId, 'Team B']);
+
+    // Return the newly created pollId
+    res.status(201).json({ pollId });
+  } catch (error) {
+    console.error("Error fetching or creating poll:", error.message);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
