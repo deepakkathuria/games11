@@ -3384,7 +3384,7 @@ app.get("/new/teams/win-percentage/:teamId1/:teamId2", async (req, res) => {
               team_id,
               total_matches,
               wins,
-              (wins / total_matches) * 100 AS win_percentage
+              ROUND((wins / total_matches) * 100, 2) AS win_percentage
           FROM 
               TeamStats;
       `;
@@ -3404,6 +3404,7 @@ app.get("/new/teams/win-percentage/:teamId1/:teamId2", async (req, res) => {
     res.status(500).send("Server error: " + error.message);
   }
 });
+
 
 // /teams/win-percentage/:teamId1/:teamId2
 
