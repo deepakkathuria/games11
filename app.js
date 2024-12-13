@@ -56,6 +56,26 @@ const pool = mysql.createPool({
 
 app.use(express.json());
 
+
+const cron = require('node-cron');
+const pool = require('./db'); // Your database connection pool
+
+// Schedule the job to run daily at midnight
+cron.schedule('0 0 * * *', async () => {
+  try {
+    const query = `
+      UPDATE users
+      SET status = 'expired'
+      WHERE status = 'trial' AND trial_end_date < NOW();
+    `;
+    const [result] = await pool.query(query);
+    console.log(`Expired trials updated: ${result.affectedRows} rows affected.`);
+  } catch (error) {
+    console.error("Error updating expired trials:", error);
+  }
+});
+
+
 //  ENTITY MANIPULATION AND TAKING ENTITY DATA FROM TWO THREEE API AND SHOW IT ACCODINGLY APIS
 
 // -------------------------------------calculate top player on this venue-------------------------------------
