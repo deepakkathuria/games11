@@ -8,7 +8,7 @@ const cloudinary = require("cloudinary").v2;
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
 
 
-const { upload } = require("../login/config/multer"); // Ensure multer config is set up
+const { upload } = require("./config/multer"); // Ensure multer config is set up
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
