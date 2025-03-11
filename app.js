@@ -1049,7 +1049,7 @@ app.get("/product/:id", async (req, res) => {
     // Ensure the response is structured correctly
     res.status(200).json({
       status: 200,
-      product: rows[0] // Returns a single product object
+      rows: rows[0] // Returns a single product object
     });
   } catch (error) {
     console.error("Error fetching product:", error);
