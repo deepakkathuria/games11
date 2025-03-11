@@ -9,6 +9,8 @@ const { pollDBPool, userDBPool } = require("./config/db"); // Import database po
 
 
 const { upload } = require("./config/multer"); // Ensure multer config is set up
+const bcrypt = require("bcrypt");
+
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -904,11 +906,12 @@ app.delete("/cart/clear", async (req, res) => {
 app.post("/auth/signup", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required." });
     }
 
-    // Check if email already exists
+    // Check if the email already exists
     const checkQuery = `SELECT * FROM users WHERE email = ?`;
     const [existingUser] = await userDBPool.query(checkQuery, [email]);
 
@@ -916,16 +919,24 @@ app.post("/auth/signup", async (req, res) => {
       return res.status(400).json({ message: "This email already exists." });
     }
 
-    // Hash password before saving
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert new user into the database
     const insertQuery = `INSERT INTO users (name, email, password) VALUES (?, ?, ?)`;
     const [result] = await userDBPool.query(insertQuery, [name, email, hashedPassword]);
 
+    // Send response in the required format
     res.status(201).json({
       message: "Your account has been successfully created!",
-      userId: result.insertId,
+      result: {
+        fieldCount: result.fieldCount || 0,
+        affectedRows: result.affectedRows || 0,
+        insertId: result.insertId || null,
+        info: result.info || "",
+        serverStatus: result.serverStatus || 2,
+        warningStatus: result.warningStatus || 0,
+      },
     });
   } catch (error) {
     console.error("Error signing up:", error);
@@ -938,6 +949,7 @@ app.post("/auth/signup", async (req, res) => {
 app.post("/auth/signin", async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required." });
     }
@@ -947,7 +959,7 @@ app.post("/auth/signin", async (req, res) => {
     const [rows] = await userDBPool.query(query, [email]);
 
     if (rows.length < 1) {
-      return res.status(401).json({ message: "Email or password is incorrect." });
+      return res.status(401).json({ message: "Email or password is incorrect.", status: 401 });
     }
 
     const user = rows[0];
@@ -955,7 +967,7 @@ app.post("/auth/signin", async (req, res) => {
     // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Email or password is incorrect." });
+      return res.status(401).json({ message: "Email or password is incorrect.", status: 401 });
     }
 
     // Generate JWT Token
@@ -965,8 +977,10 @@ app.post("/auth/signin", async (req, res) => {
       { algorithm: "HS256", expiresIn: "1h" }
     );
 
+    // ✅ Matching response format
     res.status(200).json({
       message: "You are logged in!",
+      status: 200, // ✅ Added this to match the required response format
       token,
       user: {
         id: user.user_id,
@@ -974,9 +988,10 @@ app.post("/auth/signin", async (req, res) => {
         email: user.email,
       },
     });
+
   } catch (error) {
     console.error("Error signing in:", error);
-    res.status(500).json({ message: "Internal server error." });
+    res.status(500).json({ message: "Internal server error.", status: 500 });
   }
 });
 
