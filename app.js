@@ -1046,16 +1046,17 @@ app.get("/product/:id", async (req, res) => {
       return res.status(404).json({ status: 404, message: "Product not found" });
     }
 
-    // Ensure the response is structured correctly
+    // Ensure the response includes rows as an array
     res.status(200).json({
       status: 200,
-      rows: rows[0] // Returns a single product object
+      rows: [rows[0]] // Wrap the object in an array to match expected structure
     });
   } catch (error) {
     console.error("Error fetching product:", error);
     res.status(500).json({ status: 500, error: "Database error" });
   }
 });
+
 
 
 app.get("/category/:category", async (req, res) => {
