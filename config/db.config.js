@@ -1,23 +1,24 @@
-require("dotenv").config();
+require("dotenv").config({ path: __dirname + "/../.env" });
 
 const dbConfig = {
   HOST: process.env.DB_HOST,
   USER: process.env.DB_USER,
   PASSWORD: process.env.DB_PASSWORD,
-  DB: process.env.DB_NAME,
-  PORT: process.env.DB_PORT,
+  PORT: process.env.DB_PORT || 3306,
+  DIALECT: process.env.DB_DIALECT || "mysql",
 
-  dialect: process.env.DB_DIALECT,
+  // Separate Databases
+  USER_DB_NAME: process.env.USER_DB_NAME, // User-related DB
+  POLL_DB_NAME: process.env.POLL_DB_NAME, // Poll-related DB
+
   pool: {
-    max: 5,
+    max: 10, // Increased pool size
     min: 0,
-    acquire: process.env.DB_POOL_ACQUIRE,
-    idle: process.env.DB_POOL_IDLE,
-  },
-  define: {
-    charset: 'utf8mb4',
-    collate: 'utf8mb4_unicode_ci',
+    acquire: process.env.DB_POOL_ACQUIRE || 30000, // 30 sec
+    idle: process.env.DB_POOL_IDLE || 10000, // 10 sec
   },
 };
+
+console.log(dbConfig,"dbcccccccccccccccccccccccccccccccc")
 
 module.exports = dbConfig;
