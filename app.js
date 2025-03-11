@@ -22,7 +22,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`✅ Server is running on http://localhost:${PORT}`);
@@ -995,35 +995,50 @@ app.post("/auth/signin", async (req, res) => {
 
 // --------------------------products--------------------------------------------------------------------
 
-app.get("/products", async (req, res) => {
-  console.log("hittttttttttttttttttttttt")
-  try {
-    const query = "SELECT * FROM products";
-    const [rows] = await userDBPool.query(query);
+app.get('/products', async (req, res) => {
+  console.log("Fetching products...");
 
-    res.status(200).json({ products: rows });
+  try {
+      const query = "SELECT * FROM products";
+      const [rows] = await userDBPool.query(query);
+
+      // Format response with avg_rating field and required structure
+      const formattedRows = rows.map(product => ({
+          ...product,
+          avg_rating: null // Adding avg_rating field with null value
+      }));
+
+      res.status(200).json({
+          status: 200,
+          rows: formattedRows
+      });
+
   } catch (error) {
-    console.error("Error fetching products:", error);
-    res.status(500).json({ error: "Database error" });
+      console.error("Error fetching products:", error);
+      res.status(500).json({ status: 500, error: "Database error" });
   }
 });
 
 
-app.get("/products/:id", async (req, res) => {
+app.get("/product/:id", async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { id } = req.params;
 
     const query = "SELECT * FROM products WHERE item_id = ?";
-    const [rows] = await userDBPool.query(query, [productId]);
+    const [rows] = await userDBPool.query(query, [id]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ status: 404, message: "Product not found" });
     }
 
-    res.status(200).json({ product: rows[0] });
+    // Ensure the response is structured correctly
+    res.status(200).json({
+      status: 200,
+      product: rows[0] // Returns a single product object
+    });
   } catch (error) {
     console.error("Error fetching product:", error);
-    res.status(500).json({ error: "Database error" });
+    res.status(500).json({ status: 500, error: "Database error" });
   }
 });
 
@@ -1045,15 +1060,16 @@ app.get("/category/:category", async (req, res) => {
     const [rows] = await userDBPool.query(query, [category]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "No products found in this category" });
+      return res.status(404).json({ status: 404, message: "No products found in this category" });
     }
 
-    res.status(200).json({ products: rows });
+    res.status(200).json({ status: 200, rows });
   } catch (error) {
     console.error("Error fetching products by category:", error);
-    res.status(500).json({ error: "Database error" });
+    res.status(500).json({ status: 500, error: "Database error" });
   }
 });
+
 // ----------------------------------------------products--------------------------------------------------
 
 
