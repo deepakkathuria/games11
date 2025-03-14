@@ -1221,7 +1221,7 @@ app.put("/admin/product/:productId", async (req, res) => {
       cart_image,
       short_name,
       first_image,
-      images, // ✅ Get images from req.body instead of req.files
+      images, // ✅ Fix: Handle images properly
     } = req.body;
 
     if (!name || !price || !category) {
@@ -1236,14 +1236,38 @@ app.put("/admin/product/:productId", async (req, res) => {
       return res.status(404).json({ error: "❌ Product not found" });
     }
 
-    // ✅ Parse existing images
-    let existingImages = JSON.parse(existingProduct[0].images || "[]");
+    // ✅ Parse existing images safely
+    let existingImages = [];
+    try {
+      existingImages = JSON.parse(existingProduct[0].images || "[]");
+    } catch (error) {
+      console.error("❌ Error parsing existing images from DB:", error);
+      existingImages = [];
+    }
 
-    // ✅ Use images sent from frontend, otherwise keep existing images
-    let updatedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
+    // ✅ Ensure `images` is an array
+    let updatedImages = [];
 
+    try {
+      if (typeof images === "string") {
+        if (images.startsWith("[") && images.endsWith("]")) {
+          updatedImages = JSON.parse(images); // ✅ Valid JSON string
+        } else {
+          updatedImages = [images]; // ✅ Convert single URL string to array
+        }
+      } else if (Array.isArray(images)) {
+        updatedImages = images;
+      } else {
+        updatedImages = [];
+      }
+    } catch (error) {
+      console.error("❌ Error parsing images:", error);
+      return res.status(400).json({ error: "Invalid images format" });
+    }
+
+    // ✅ If no new images provided, keep existing images
     if (updatedImages.length === 0) {
-      updatedImages = existingImages; // Retain old images if no new ones are provided
+      updatedImages = existingImages;
     }
 
     const query = `
@@ -1261,7 +1285,7 @@ app.put("/admin/product/:productId", async (req, res) => {
       isNew || 0,
       features || null,
       description || null,
-      JSON.stringify(updatedImages), // ✅ Store updated images as JSON array
+      JSON.stringify(updatedImages), // ✅ Store images as JSON array
       JSON.stringify(includes) || "[]",
       JSON.stringify(gallery) || "[]",
       JSON.stringify(category_image) || "[]",
@@ -1277,6 +1301,9 @@ app.put("/admin/product/:productId", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
+
 
 /**
  * ✅ Delete Product
