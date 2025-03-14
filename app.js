@@ -7,16 +7,27 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
 
+const multer = require("multer");
+// const upload = multer({ dest: "uploads/" });
+
+
 
 const { upload } = require("./config/multer"); // Ensure multer config is set up
 const bcrypt = require("bcrypt");
 
 
+// cloudinary.config({
+//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+//   api_key: process.env.CLOUDINARY_API_KEY,
+//   api_secret: process.env.CLOUDINARY_API_SECRET,
+// });
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name:"dqvntxciv",
+  api_key: "495824874469665",
+  api_secret:"4OVkfZHoFtifgAZ1ByReediZJGU",
 });
+
 
 
 
@@ -31,11 +42,11 @@ app.listen(PORT, () => {
 });
 
 // Cloudinary Configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// cloudinary.config({
+//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+//   api_key: process.env.CLOUDINARY_API_KEY,
+//   api_secret: process.env.CLOUDINARY_API_SECRET,
+// });
 
 
 const cron = require('node-cron');
@@ -1111,11 +1122,12 @@ app.get("/admin/products", async (req, res) => {
   }
 });
 
-// **Get Product by ID**
+/**
+ * ✅ Get Product by ID
+ */
 app.get("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
-
     const query = "SELECT * FROM products WHERE item_id = ?";
     const [rows] = await userDBPool.query(query, [productId]);
 
@@ -1130,16 +1142,32 @@ app.get("/admin/product/:productId", async (req, res) => {
   }
 });
 
-// **Create New Product**
+/**
+ * ✅ Create New Product
+ */
 app.post("/admin/products", upload.array("images"), async (req, res) => {
   try {
     const {
-      name, price, slug, category, new: isNew, features, description,
-      includes, gallery, category_image, cart_image, short_name, first_image
+      name,
+      price,
+      slug,
+      category,
+      new: isNew,
+      features,
+      description,
+      includes,
+      gallery,
+      category_image,
+      cart_image,
+      short_name,
+      first_image,
     } = req.body;
 
-    let uploadedImages = [];
+    if (!name || !price || !category) {
+      return res.status(400).json({ error: "Name, Price, and Category are required" });
+    }
 
+    let uploadedImages = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         const result = await cloudinary.uploader.upload(file.path, { folder: "products" });
@@ -1153,9 +1181,20 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
     `;
 
     await userDBPool.query(query, [
-      name, price, slug, category, isNew, features, description, JSON.stringify(uploadedImages),
-      JSON.stringify(includes), JSON.stringify(gallery), JSON.stringify(category_image),
-      cart_image, short_name, first_image
+      name,
+      price,
+      slug,
+      category,
+      isNew || 0,
+      features || null,
+      description || null,
+      JSON.stringify(uploadedImages),
+      JSON.stringify(includes) || "[]",
+      JSON.stringify(gallery) || "[]",
+      JSON.stringify(category_image) || "[]",
+      cart_image || null,
+      short_name || null,
+      first_image || null,
     ]);
 
     res.status(201).json({ message: "Product created successfully", images: uploadedImages });
@@ -1165,15 +1204,41 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
   }
 });
 
-// **Update Product**
+/**
+ * ✅ Update Product
+ */
 app.put("/admin/product/:productId", upload.array("images"), async (req, res) => {
   try {
     const { productId } = req.params;
     const {
-      name, price, slug, category, new: isNew, features, description,
-      includes, gallery, category_image, cart_image, short_name, first_image
+      name,
+      price,
+      slug,
+      category,
+      new: isNew,
+      features,
+      description,
+      includes,
+      gallery,
+      category_image,
+      cart_image,
+      short_name,
+      first_image,
     } = req.body;
 
+    if (!name || !price || !category) {
+      return res.status(400).json({ error: "Name, Price, and Category are required" });
+    }
+
+    // Fetch existing product images
+    const selectQuery = "SELECT images FROM products WHERE item_id = ?";
+    const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
+
+    if (existingProduct.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    let existingImages = JSON.parse(existingProduct[0].images || "[]");
     let uploadedImages = [];
 
     if (req.files && req.files.length > 0) {
@@ -1183,6 +1248,8 @@ app.put("/admin/product/:productId", upload.array("images"), async (req, res) =>
       }
     }
 
+    const finalImages = uploadedImages.length > 0 ? uploadedImages : existingImages;
+
     const query = `
       UPDATE products SET 
       name = ?, price = ?, slug = ?, category = ?, new = ?, features = ?, description = ?, 
@@ -1191,19 +1258,33 @@ app.put("/admin/product/:productId", upload.array("images"), async (req, res) =>
     `;
 
     await userDBPool.query(query, [
-      name, price, slug, category, isNew, features, description, JSON.stringify(uploadedImages),
-      JSON.stringify(includes), JSON.stringify(gallery), JSON.stringify(category_image),
-      cart_image, short_name, first_image, productId
+      name,
+      price,
+      slug,
+      category,
+      isNew || 0,
+      features || null,
+      description || null,
+      JSON.stringify(finalImages),
+      JSON.stringify(includes) || "[]",
+      JSON.stringify(gallery) || "[]",
+      JSON.stringify(category_image) || "[]",
+      cart_image || null,
+      short_name || null,
+      first_image || null,
+      productId,
     ]);
 
-    res.status(200).json({ message: "Product updated successfully", images: uploadedImages });
+    res.status(200).json({ message: "Product updated successfully", images: finalImages });
   } catch (error) {
     console.error("Error updating product:", error);
     res.status(500).json({ error: "Database error" });
   }
 });
 
-// **Delete Product**
+/**
+ * ✅ Delete Product
+ */
 app.delete("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
@@ -1217,7 +1298,6 @@ app.delete("/admin/product/:productId", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
-
 
 
 
