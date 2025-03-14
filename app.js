@@ -1161,17 +1161,21 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
       cart_image,
       short_name,
       first_image,
+      images // Receiving images
     } = req.body;
 
     if (!name || !price || !category) {
       return res.status(400).json({ error: "Name, Price, and Category are required" });
     }
 
+    // ✅ Ensure images are correctly parsed before inserting into the database
     let uploadedImages = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const result = await cloudinary.uploader.upload(file.path, { folder: "products" });
-        uploadedImages.push(result.secure_url);
+    if (images) {
+      try {
+        uploadedImages = JSON.parse(images);
+      } catch (error) {
+        console.error("Error parsing images:", error);
+        uploadedImages = []; // Fallback if parsing fails
       }
     }
 
@@ -1188,7 +1192,7 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
       isNew || 0,
       features || null,
       description || null,
-      JSON.stringify(uploadedImages),
+      JSON.stringify(uploadedImages), // ✅ Ensure images are stored correctly
       JSON.stringify(includes) || "[]",
       JSON.stringify(gallery) || "[]",
       JSON.stringify(category_image) || "[]",
@@ -1203,6 +1207,7 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
 
 /**
  * ✅ Update Product
