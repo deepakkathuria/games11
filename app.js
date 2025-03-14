@@ -1106,21 +1106,62 @@ app.get("/category/:category", async (req, res) => {
 // ------------------------------------admin-----------------------------------------------
 
 
+// app.get("/admin/products", async (req, res) => {
+//   try {
+//     const query = "SELECT * FROM products";
+//     const [rows] = await userDBPool.query(query);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ message: "No products found" });
+//     }
+
+//     res.status(200).json({ products: rows });
+//   } catch (error) {
+//     console.error("Error fetching products:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
 app.get("/admin/products", async (req, res) => {
   try {
-    const query = "SELECT * FROM products";
-    const [rows] = await userDBPool.query(query);
+    let { page, limit } = req.query;
+
+    page = parseInt(page) || 1; // Default to page 1
+    limit = parseInt(limit) || 15; // Default limit 15 products per page
+    const offset = (page - 1) * limit; // Calculate offset
+
+    const query = `SELECT * FROM products LIMIT ? OFFSET ?`;
+    const countQuery = `SELECT COUNT(*) AS total FROM products`;
+
+    // Fetch paginated results
+    const [rows] = await userDBPool.query(query, [limit, offset]);
+    const [[totalCount]] = await userDBPool.query(countQuery);
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "No products found" });
+      return res.status(404).json({ message: "No products found", total: 0, products: [] });
     }
 
-    res.status(200).json({ products: rows });
+    res.status(200).json({
+      total: totalCount.total,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount.total / limit),
+      products: rows,
+    });
   } catch (error) {
-    console.error("Error fetching products:", error);
+    console.error("❌ Error fetching products:", error);
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
+
+
+
+
+
+
+
+
 
 /**
  * ✅ Get Product by ID
