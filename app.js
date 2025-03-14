@@ -1145,7 +1145,7 @@ app.get("/admin/product/:productId", async (req, res) => {
 /**
  * ✅ Create New Product
  */
-app.post("/admin/products", upload.array("images"), async (req, res) => {
+app.post("/admin/products", async (req, res) => {
   try {
     const {
       name,
@@ -1161,19 +1161,15 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
       cart_image,
       short_name,
       first_image,
+      images, // ✅ Get images directly from the request body
     } = req.body;
 
     if (!name || !price || !category) {
       return res.status(400).json({ error: "Name, Price, and Category are required" });
     }
 
-    let uploadedImages = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const result = await cloudinary.uploader.upload(file.path, { folder: "products" });
-        uploadedImages.push(result.secure_url);
-      }
-    }
+    // ✅ Ensure images are stored as an array
+    let uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
 
     const query = `
       INSERT INTO products (name, price, slug, category, new, features, description, images, includes, gallery, category_image, cart_image, short_name, first_image) 
@@ -1188,7 +1184,7 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
       isNew || 0,
       features || null,
       description || null,
-      JSON.stringify(uploadedImages),
+      JSON.stringify(uploadedImages), // ✅ Store images as JSON array
       JSON.stringify(includes) || "[]",
       JSON.stringify(gallery) || "[]",
       JSON.stringify(category_image) || "[]",
@@ -1197,12 +1193,13 @@ app.post("/admin/products", upload.array("images"), async (req, res) => {
       first_image || null,
     ]);
 
-    res.status(201).json({ message: "Product created successfully", images: uploadedImages });
+    res.status(201).json({ message: "✅ Product created successfully", images: uploadedImages });
   } catch (error) {
-    console.error("Error creating product:", error);
+    console.error("❌ Error creating product:", error);
     res.status(500).json({ error: "Database error" });
   }
 });
+
 
 /**
  * ✅ Update Product
