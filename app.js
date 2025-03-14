@@ -1204,7 +1204,7 @@ app.post("/admin/products", async (req, res) => {
 /**
  * ✅ Update Product
  */
-app.put("/admin/product/:productId", upload.array("images"), async (req, res) => {
+app.put("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
     const {
@@ -1221,31 +1221,30 @@ app.put("/admin/product/:productId", upload.array("images"), async (req, res) =>
       cart_image,
       short_name,
       first_image,
+      images, // ✅ Get images from req.body instead of req.files
     } = req.body;
 
     if (!name || !price || !category) {
-      return res.status(400).json({ error: "Name, Price, and Category are required" });
+      return res.status(400).json({ error: "❌ Name, Price, and Category are required" });
     }
 
-    // Fetch existing product images
+    // ✅ Fetch existing product images from DB
     const selectQuery = "SELECT images FROM products WHERE item_id = ?";
     const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
 
     if (existingProduct.length === 0) {
-      return res.status(404).json({ error: "Product not found" });
+      return res.status(404).json({ error: "❌ Product not found" });
     }
 
+    // ✅ Parse existing images
     let existingImages = JSON.parse(existingProduct[0].images || "[]");
-    let uploadedImages = [];
 
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const result = await cloudinary.uploader.upload(file.path, { folder: "products" });
-        uploadedImages.push(result.secure_url);
-      }
+    // ✅ Use images sent from frontend, otherwise keep existing images
+    let updatedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
+
+    if (updatedImages.length === 0) {
+      updatedImages = existingImages; // Retain old images if no new ones are provided
     }
-
-    const finalImages = uploadedImages.length > 0 ? uploadedImages : existingImages;
 
     const query = `
       UPDATE products SET 
@@ -1262,7 +1261,7 @@ app.put("/admin/product/:productId", upload.array("images"), async (req, res) =>
       isNew || 0,
       features || null,
       description || null,
-      JSON.stringify(finalImages),
+      JSON.stringify(updatedImages), // ✅ Store updated images as JSON array
       JSON.stringify(includes) || "[]",
       JSON.stringify(gallery) || "[]",
       JSON.stringify(category_image) || "[]",
@@ -1272,9 +1271,9 @@ app.put("/admin/product/:productId", upload.array("images"), async (req, res) =>
       productId,
     ]);
 
-    res.status(200).json({ message: "Product updated successfully", images: finalImages });
+    res.status(200).json({ message: "✅ Product updated successfully", images: updatedImages });
   } catch (error) {
-    console.error("Error updating product:", error);
+    console.error("❌ Error updating product:", error);
     res.status(500).json({ error: "Database error" });
   }
 });
