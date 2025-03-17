@@ -6,6 +6,8 @@ const axios = require("axios");
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
 const multer = require("multer");
 // const upload = multer({ dest: "uploads/" });
@@ -21,6 +23,11 @@ const bcrypt = require("bcrypt");
 //   api_key: process.env.CLOUDINARY_API_KEY,
 //   api_secret: process.env.CLOUDINARY_API_SECRET,
 // });
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 cloudinary.config({
   cloud_name:"dqvntxciv",
@@ -617,6 +624,48 @@ app.post("/orders/create", async (req, res) => {
 });
 
 
+// app.get("/orders/user", async (req, res) => {
+//   try {
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) {
+//       return res.status(401).json({ error: "Unauthorized access" });
+//     }
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     const query = "SELECT * FROM orders WHERE user_id = ?";
+//     const [rows] = await userDBPool.query(query, [userId]);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ message: "No orders found for this user" });
+//     }
+
+//     res.status(200).json({ orders: rows });
+//   } catch (error) {
+//     console.error("Error fetching user orders:", error);
+//     res.status(500).json({ error: "Failed to fetch orders" });
+//   }
+// });
+
+// app.get("/orders/:orderId", async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+
+//     const query = `SELECT * FROM orders WHERE order_id = ?`;
+//     const [rows] = await userDBPool.query(query, [orderId]);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     res.status(200).json({ order: rows[0] });
+//   } catch (error) {
+//     console.error("Error fetching order details:", error);
+//     res.status(500).json({ error: "Failed to fetch order details" });
+//   }
+// });
+
 app.get("/orders/user", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -627,37 +676,89 @@ app.get("/orders/user", async (req, res) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
-    const query = "SELECT * FROM orders WHERE user_id = ?";
+    const query = `
+      SELECT o.order_id, o.total_amount, o.created_at,
+             oi.product_id, oi.quantity, oi.price,
+             p.name AS product_name, p.image AS product_image
+      FROM orders o
+      JOIN order_items oi ON o.order_id = oi.order_id
+      JOIN products p ON oi.product_id = p.item_id
+      WHERE o.user_id = ?
+    `;
     const [rows] = await userDBPool.query(query, [userId]);
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "No orders found for this user" });
     }
 
-    res.status(200).json({ orders: rows });
+    // Group products under each order
+    const ordersMap = new Map();
+
+    rows.forEach(row => {
+      if (!ordersMap.has(row.order_id)) {
+        ordersMap.set(row.order_id, {
+          order_id: row.order_id,
+          total_amount: row.total_amount,
+          created_at: row.created_at,
+          products: [],
+        });
+      }
+      ordersMap.get(row.order_id).products.push({
+        product_id: row.product_id,
+        name: row.product_name,
+        image: row.product_image,
+        quantity: row.quantity,
+        price: row.price,
+      });
+    });
+
+    res.status(200).json({ orders: Array.from(ordersMap.values()) });
   } catch (error) {
     console.error("Error fetching user orders:", error);
     res.status(500).json({ error: "Failed to fetch orders" });
   }
 });
 
+
 app.get("/orders/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    const query = `SELECT * FROM orders WHERE order_id = ?`;
+    const query = `
+      SELECT o.order_id, o.total_amount, o.created_at,
+             oi.product_id, oi.quantity, oi.price,
+             p.name AS product_name, p.image AS product_image
+      FROM orders o
+      JOIN order_items oi ON o.order_id = oi.order_id
+      JOIN products p ON oi.product_id = p.item_id
+      WHERE o.order_id = ?
+    `;
     const [rows] = await userDBPool.query(query, [orderId]);
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    res.status(200).json({ order: rows[0] });
+    const order = {
+      order_id: rows[0].order_id,
+      total_amount: rows[0].total_amount,
+      created_at: rows[0].created_at,
+      products: rows.map(row => ({
+        product_id: row.product_id,
+        name: row.product_name,
+        image: row.product_image,
+        quantity: row.quantity,
+        price: row.price,
+      })),
+    };
+
+    res.status(200).json({ order });
   } catch (error) {
     console.error("Error fetching order details:", error);
     res.status(500).json({ error: "Failed to fetch order details" });
   }
 });
+
 
 
 app.patch("/orders/:orderId", async (req, res) => {
@@ -1369,4 +1470,57 @@ app.delete("/admin/product/:productId", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+// ----------------------------------razor pay anad address oredr apis ----------------------------------------
+
+
+
+
+// Route to create a payment order
+app.post("/create-order", async (req, res) => {
+  try {
+    const { amount, currency } = req.body;
+
+    const options = {
+      amount: amount * 100, // Razorpay accepts amount in paise (INR * 100)
+      currency: currency || "INR",
+      receipt: `receipt_${Date.now()}`,
+      payment_capture: 1, // Auto capture payment
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.status(201).json({ order });
+  } catch (error) {
+    console.error("Error creating Razorpay order:", error);
+    res.status(500).json({ error: "Failed to create payment order" });
+  }
+});
+
+
+
+app.post("/verify-payment", async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const generatedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(razorpay_order_id + "|" + razorpay_payment_id)
+      .digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+
+    res.status(200).json({ success: true, message: "Payment verified successfully" });
+  } catch (error) {
+    console.error("Error verifying Razorpay payment:", error);
+    res.status(500).json({ error: "Failed to verify payment" });
+  }
+});
 
