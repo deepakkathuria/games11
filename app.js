@@ -676,15 +676,18 @@ app.get("/orders/user", async (req, res) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
+    // Fetch orders along with product details
     const query = `
-      SELECT o.order_id, o.total_amount, o.created_at,
-             oi.product_id, oi.quantity, oi.price,
-             p.name AS product_name, p.image AS product_image
-      FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id
-      JOIN products p ON oi.product_id = p.item_id
-      WHERE o.user_id = ?
+      SELECT 
+        orders.order_id, orders.total_amount, orders.created_at,
+        order_items.item_id, order_items.quantity, order_items.price AS item_price,
+        products.name AS product_name, products.images AS product_images
+      FROM orders
+      LEFT JOIN order_items ON orders.order_id = order_items.order_id
+      LEFT JOIN products ON order_items.item_id = products.item_id
+      WHERE orders.user_id = ?
     `;
+
     const [rows] = await userDBPool.query(query, [userId]);
 
     if (rows.length === 0) {
@@ -700,24 +703,29 @@ app.get("/orders/user", async (req, res) => {
           order_id: row.order_id,
           total_amount: row.total_amount,
           created_at: row.created_at,
-          products: [],
+          products: [], // Initialize products array
         });
       }
-      ordersMap.get(row.order_id).products.push({
-        product_id: row.product_id,
-        name: row.product_name,
-        image: row.product_image,
-        quantity: row.quantity,
-        price: row.price,
-      });
+
+      if (row.item_id) {
+        ordersMap.get(row.order_id).products.push({
+          item_id: row.item_id,
+          name: row.product_name,
+          image: JSON.parse(row.product_images || "[]")[0] || "/assets/default-product.png", // Take first image if available
+          quantity: row.quantity,
+          price: row.item_price,
+        });
+      }
     });
 
     res.status(200).json({ orders: Array.from(ordersMap.values()) });
+
   } catch (error) {
     console.error("Error fetching user orders:", error);
     res.status(500).json({ error: "Failed to fetch orders" });
   }
 });
+
 
 
 app.get("/orders/:orderId", async (req, res) => {
@@ -726,11 +734,11 @@ app.get("/orders/:orderId", async (req, res) => {
 
     const query = `
       SELECT o.order_id, o.total_amount, o.created_at,
-             oi.product_id, oi.quantity, oi.price,
-             p.name AS product_name, p.image AS product_image
+             oi.item_id, oi.quantity, oi.price AS item_price,
+             p.name AS product_name, p.images AS product_images
       FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id
-      JOIN products p ON oi.product_id = p.item_id
+      LEFT JOIN order_items oi ON o.order_id = oi.order_id
+      LEFT JOIN products p ON oi.item_id = p.item_id
       WHERE o.order_id = ?
     `;
     const [rows] = await userDBPool.query(query, [orderId]);
@@ -739,25 +747,28 @@ app.get("/orders/:orderId", async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    // Structure order response
     const order = {
       order_id: rows[0].order_id,
       total_amount: rows[0].total_amount,
       created_at: rows[0].created_at,
-      products: rows.map(row => ({
-        product_id: row.product_id,
+      products: rows[0].item_id ? rows.map(row => ({
+        item_id: row.item_id,
         name: row.product_name,
-        image: row.product_image,
+        image: JSON.parse(row.product_images || "[]")[0] || "/assets/default-product.png", // Use first image if available
         quantity: row.quantity,
-        price: row.price,
-      })),
+        price: row.item_price,
+      })) : []
     };
 
     res.status(200).json({ order });
+
   } catch (error) {
     console.error("Error fetching order details:", error);
     res.status(500).json({ error: "Failed to fetch order details" });
   }
 });
+
 
 
 
