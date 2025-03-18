@@ -1397,6 +1397,56 @@ app.post("/auth/signin", async (req, res) => {
   }
 });
 
+
+app.patch("/auth/change-password", async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    // Check if token is provided
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized: No token provided." });
+    }
+
+    // Verify user from JWT token
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET || "default_secret");
+    const userId = decoded.id;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: "Both old and new passwords are required." });
+    }
+
+    // Fetch the current password from the database
+    const query = `SELECT password FROM users WHERE user_id = ?`;
+    const [rows] = await userDBPool.query(query, [userId]);
+
+    if (rows.length < 1) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const user = rows[0];
+
+    // Compare old password
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Old password is incorrect." });
+    }
+
+    // Hash the new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in database
+    const updateQuery = `UPDATE users SET password = ? WHERE user_id = ?`;
+    await userDBPool.query(updateQuery, [hashedNewPassword, userId]);
+
+    res.status(200).json({ message: "Password updated successfully!" });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+
 // ---------------------------------------------------------authroute----------------------------------------
 
 
