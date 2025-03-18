@@ -602,28 +602,7 @@ app.post("/reviews/create", async (req, res) => {
 
 
 // -----------------------------------------------------------oreder routes ----------------------------------------
-app.post("/orders/create", async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Unauthorized access" });
 
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    const userId = decoded.id;
-
-    const { total_amount, payment_method, order_status, transaction_id } = req.body;
-
-    const query = `
-      INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
-      VALUES (?, ?, 'pending', ?, ?, ?)
-    `;
-    const [result] = await userDBPool.query(query, [userId, total_amount, payment_method, order_status, transaction_id]);
-
-    res.status(201).json({ message: "Order created successfully", orderId: result.insertId });
-  } catch (error) {
-    console.error("Error creating order:", error);
-    res.status(500).json({ error: "Failed to create order" });
-  }
-});
 
 
 // app.get("/orders/user", async (req, res) => {
@@ -794,6 +773,123 @@ app.get("/orders/:orderId", async (req, res) => {
 
 
 
+// app.patch("/orders/:orderId", async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+//     const { order_status } = req.body;
+
+//     const query = `UPDATE orders SET order_status = ? WHERE order_id = ?`;
+//     const [result] = await userDBPool.query(query, [order_status, orderId]);
+
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     res.status(200).json({ message: "Order status updated successfully" });
+//   } catch (error) {
+//     console.error("Error updating order status:", error);
+//     res.status(500).json({ error: "Failed to update order status" });
+//   }
+// });
+
+
+
+// app.delete("/orders/:orderId", async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+
+//     const query = `DELETE FROM orders WHERE order_id = ?`;
+//     const [result] = await userDBPool.query(query, [orderId]);
+
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     res.status(200).json({ message: "Order deleted successfully" });
+//   } catch (error) {
+//     console.error("Error deleting order:", error);
+//     res.status(500).json({ error: "Failed to delete order" });
+//   }
+// });
+
+
+// app.post("/orders/create", async (req, res) => {
+//   try {
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) return res.status(401).json({ error: "Unauthorized access" });
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     const { total_amount, payment_method, order_status, transaction_id } = req.body;
+
+//     const query = `
+//       INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
+//       VALUES (?, ?, 'pending', ?, ?, ?)
+//     `;
+//     const [result] = await userDBPool.query(query, [userId, total_amount, payment_method, order_status, transaction_id]);
+
+//     res.status(201).json({ message: "Order created successfully", orderId: result.insertId });
+//   } catch (error) {
+//     console.error("Error creating order:", error);
+//     res.status(500).json({ error: "Failed to create order" });
+//   }
+// });
+
+app.post("/orders/create", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized access" });
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const { total_amount, payment_method, order_status, transaction_id, products } = req.body;
+
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ error: "Products array is required" });
+    }
+
+    // Insert into orders table
+    const queryOrder = `
+      INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
+      VALUES (?, ?, 'pending', ?, ?, ?)
+    `;
+    const [orderResult] = await userDBPool.query(queryOrder, [
+      userId,
+      total_amount,
+      payment_method,
+      order_status,
+      transaction_id,
+    ]);
+
+    const orderId = orderResult.insertId;
+
+    // Insert into order_items table
+    const orderItemsQuery = `
+      INSERT INTO order_items (order_id, product_id, quantity, price)
+      VALUES ?
+    `;
+
+    const orderItemsData = products.map((product) => [
+      orderId,
+      product.product_id,
+      product.quantity,
+      product.price,
+    ]);
+
+    await userDBPool.query(orderItemsQuery, [orderItemsData]);
+
+    res.status(201).json({ message: "Order created successfully", orderId });
+  } catch (error) {
+    console.error("Error creating order:", error);
+    res.status(500).json({ error: "Failed to create order" });
+  }
+});
+
+/**
+ * Update order status
+ */
 app.patch("/orders/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -813,20 +909,26 @@ app.patch("/orders/:orderId", async (req, res) => {
   }
 });
 
-
-
+/**
+ * Delete order (Ensures order_items are deleted first)
+ */
 app.delete("/orders/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    const query = `DELETE FROM orders WHERE order_id = ?`;
-    const [result] = await userDBPool.query(query, [orderId]);
+    // Delete related order items first
+    const deleteOrderItemsQuery = `DELETE FROM order_items WHERE order_id = ?`;
+    await userDBPool.query(deleteOrderItemsQuery, [orderId]);
+
+    // Then delete the order
+    const deleteOrderQuery = `DELETE FROM orders WHERE order_id = ?`;
+    const [result] = await userDBPool.query(deleteOrderQuery, [orderId]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    res.status(200).json({ message: "Order deleted successfully" });
+    res.status(200).json({ message: "Order and associated items deleted successfully" });
   } catch (error) {
     console.error("Error deleting order:", error);
     res.status(500).json({ error: "Failed to delete order" });
@@ -835,17 +937,131 @@ app.delete("/orders/:orderId", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+//  ------------------------------- order address-----------------------------------------------------
+
+// app.post("/orders/:orderId/address", async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+//     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
+
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) return res.status(401).json({ error: "Unauthorized access" });
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     const query = `
+//       INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
+//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+//     `;
+//     await userDBPool.query(query, [orderId, userId, full_name, phone_number, street_address, city, state, postal_code, country]);
+
+//     res.status(201).json({ message: "Address added successfully" });
+//   } catch (error) {
+//     console.error("Error adding address:", error);
+//     res.status(500).json({ error: "Failed to add address" });
+//   }
+// });
+
+
+
+// app.get("/orders/:orderId/address", async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+
+//     const query = `SELECT * FROM address_orders WHERE order_id = ?`;
+//     const [rows] = await userDBPool.query(query, [orderId]);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ message: "Address not found" });
+//     }
+
+//     res.status(200).json({ address: rows[0] });
+//   } catch (error) {
+//     console.error("Error fetching order address:", error);
+//     res.status(500).json({ error: "Failed to fetch address" });
+//   }
+// });
+
+
+// app.patch("/orders/address/:addressId", async (req, res) => {
+//   try {
+//     const { addressId } = req.params;
+//     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
+
+//     const query = `
+//       UPDATE address_orders SET full_name = ?, phone_number = ?, street_address = ?, city = ?, state = ?, postal_code = ?, country = ?
+//       WHERE address_id = ?
+//     `;
+//     const [result] = await userDBPool.query(query, [full_name, phone_number, street_address, city, state, postal_code, country, addressId]);
+
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ message: "Address not found" });
+//     }
+
+//     res.status(200).json({ message: "Address updated successfully" });
+//   } catch (error) {
+//     console.error("Error updating address:", error);
+//     res.status(500).json({ error: "Failed to update address" });
+//   }
+// });
+
+
+
+// app.delete("/orders/address/:addressId", async (req, res) => {
+//   try {
+//     const { addressId } = req.params;
+
+//     const query = `DELETE FROM address_orders WHERE address_id = ?`;
+//     const [result] = await userDBPool.query(query, [addressId]);
+
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ message: "Address not found" });
+//     }
+
+//     res.status(200).json({ message: "Address deleted successfully" });
+//   } catch (error) {
+//     console.error("Error deleting address:", error);
+//     res.status(500).json({ error: "Failed to delete address" });
+//   }
+// });
+
+
+
+
+
 app.post("/orders/:orderId/address", async (req, res) => {
   try {
     const { orderId } = req.params;
     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
 
+    // Authenticate user
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Unauthorized access" });
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
+    // Check if the order exists and belongs to the user
+    const [orderCheck] = await userDBPool.query(`SELECT user_id FROM orders WHERE order_id = ?`, [orderId]);
+    if (orderCheck.length === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    if (orderCheck[0].user_id !== userId) {
+      return res.status(403).json({ error: "You do not have permission to add an address to this order" });
+    }
+
+    // Insert Address
     const query = `
       INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -859,17 +1075,19 @@ app.post("/orders/:orderId/address", async (req, res) => {
   }
 });
 
-
-
+/**
+ * Get Address for an Order (GET /orders/:orderId/address)
+ */
 app.get("/orders/:orderId/address", async (req, res) => {
   try {
     const { orderId } = req.params;
 
+    // Fetch Address
     const query = `SELECT * FROM address_orders WHERE order_id = ?`;
     const [rows] = await userDBPool.query(query, [orderId]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Address not found" });
+      return res.status(404).json({ message: "Address not found for this order" });
     }
 
     res.status(200).json({ address: rows[0] });
@@ -879,20 +1097,40 @@ app.get("/orders/:orderId/address", async (req, res) => {
   }
 });
 
-
-app.patch("/orders/address/:addressId", async (req, res) => {
+/**
+ * Update an Address (PATCH /orders/:orderId/address)
+ */
+app.patch("/orders/:orderId/address", async (req, res) => {
   try {
-    const { addressId } = req.params;
+    const { orderId } = req.params;
     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
 
+    // Authenticate user
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized access" });
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    // Ensure the user owns the address before updating
+    const [addressCheck] = await userDBPool.query(`SELECT user_id FROM address_orders WHERE order_id = ?`, [orderId]);
+    if (addressCheck.length === 0) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+    if (addressCheck[0].user_id !== userId) {
+      return res.status(403).json({ error: "You do not have permission to update this address" });
+    }
+
+    // Update Address
     const query = `
-      UPDATE address_orders SET full_name = ?, phone_number = ?, street_address = ?, city = ?, state = ?, postal_code = ?, country = ?
-      WHERE address_id = ?
+      UPDATE address_orders 
+      SET full_name = ?, phone_number = ?, street_address = ?, city = ?, state = ?, postal_code = ?, country = ?
+      WHERE order_id = ?
     `;
-    const [result] = await userDBPool.query(query, [full_name, phone_number, street_address, city, state, postal_code, country, addressId]);
+    const [result] = await userDBPool.query(query, [full_name, phone_number, street_address, city, state, postal_code, country, orderId]);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Address not found" });
+      return res.status(404).json({ message: "Address not found or unchanged" });
     }
 
     res.status(200).json({ message: "Address updated successfully" });
@@ -902,14 +1140,32 @@ app.patch("/orders/address/:addressId", async (req, res) => {
   }
 });
 
-
-
-app.delete("/orders/address/:addressId", async (req, res) => {
+/**
+ * Delete an Address (DELETE /orders/:orderId/address)
+ */
+app.delete("/orders/:orderId/address", async (req, res) => {
   try {
-    const { addressId } = req.params;
+    const { orderId } = req.params;
 
-    const query = `DELETE FROM address_orders WHERE address_id = ?`;
-    const [result] = await userDBPool.query(query, [addressId]);
+    // Authenticate user
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized access" });
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    // Ensure the user owns the address before deleting
+    const [addressCheck] = await userDBPool.query(`SELECT user_id FROM address_orders WHERE order_id = ?`, [orderId]);
+    if (addressCheck.length === 0) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+    if (addressCheck[0].user_id !== userId) {
+      return res.status(403).json({ error: "You do not have permission to delete this address" });
+    }
+
+    // Delete Address
+    const query = `DELETE FROM address_orders WHERE order_id = ?`;
+    const [result] = await userDBPool.query(query, [orderId]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Address not found" });
@@ -922,9 +1178,7 @@ app.delete("/orders/address/:addressId", async (req, res) => {
   }
 });
 
-
-
-// --------------------------------------------------oreder -------------------------------------------
+// --------------------------------------------------oreder addresss -------------------------------------------
 
 
 
