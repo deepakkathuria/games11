@@ -6,8 +6,10 @@ const axios = require("axios");
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
-const Razorpay = require("razorpay");
-const crypto = require("crypto");
+
+
+// const Razorpay = require("razorpay");
+// const crypto = require("crypto");
 
 const multer = require("multer");
 // const upload = multer({ dest: "uploads/" });
@@ -24,10 +26,10 @@ const bcrypt = require("bcrypt");
 //   api_secret: process.env.CLOUDINARY_API_SECRET,
 // });
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// const razorpay = new Razorpay({
+//   key_id: process.env.RAZORPAY_KEY_ID,
+//   key_secret: process.env.RAZORPAY_KEY_SECRET,
+// });
 
 cloudinary.config({
   cloud_name:"dqvntxciv",
@@ -1514,44 +1516,44 @@ app.delete("/admin/product/:productId", async (req, res) => {
 
 
 // Route to create a payment order
-app.post("/create-order", async (req, res) => {
-  try {
-    const { amount, currency } = req.body;
+// app.post("/create-order", async (req, res) => {
+//   try {
+//     const { amount, currency } = req.body;
 
-    const options = {
-      amount: amount * 100, // Razorpay accepts amount in paise (INR * 100)
-      currency: currency || "INR",
-      receipt: `receipt_${Date.now()}`,
-      payment_capture: 1, // Auto capture payment
-    };
+//     const options = {
+//       amount: amount * 100, // Razorpay accepts amount in paise (INR * 100)
+//       currency: currency || "INR",
+//       receipt: `receipt_${Date.now()}`,
+//       payment_capture: 1, // Auto capture payment
+//     };
 
-    const order = await razorpay.orders.create(options);
-    res.status(201).json({ order });
-  } catch (error) {
-    console.error("Error creating Razorpay order:", error);
-    res.status(500).json({ error: "Failed to create payment order" });
-  }
-});
+//     const order = await razorpay.orders.create(options);
+//     res.status(201).json({ order });
+//   } catch (error) {
+//     console.error("Error creating Razorpay order:", error);
+//     res.status(500).json({ error: "Failed to create payment order" });
+//   }
+// });
 
 
 
-app.post("/verify-payment", async (req, res) => {
-  try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+// app.post("/verify-payment", async (req, res) => {
+//   try {
+//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    const generatedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(razorpay_order_id + "|" + razorpay_payment_id)
-      .digest("hex");
+//     const generatedSignature = crypto
+//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+//       .update(razorpay_order_id + "|" + razorpay_payment_id)
+//       .digest("hex");
 
-    if (generatedSignature !== razorpay_signature) {
-      return res.status(400).json({ error: "Payment verification failed" });
-    }
+//     if (generatedSignature !== razorpay_signature) {
+//       return res.status(400).json({ error: "Payment verification failed" });
+//     }
 
-    res.status(200).json({ success: true, message: "Payment verified successfully" });
-  } catch (error) {
-    console.error("Error verifying Razorpay payment:", error);
-    res.status(500).json({ error: "Failed to verify payment" });
-  }
-});
+//     res.status(200).json({ success: true, message: "Payment verified successfully" });
+//   } catch (error) {
+//     console.error("Error verifying Razorpay payment:", error);
+//     res.status(500).json({ error: "Failed to verify payment" });
+//   }
+// });
 
