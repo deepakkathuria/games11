@@ -1100,9 +1100,12 @@ app.get("/orders/:orderId/address", async (req, res) => {
 /**
  * Update an Address (PATCH /orders/:orderId/address)
  */
-app.patch("/orders/:orderId/address", async (req, res) => {
+/**
+ * Update an Address (PATCH /orders/address/:addressId)
+ */
+app.patch("/orders/address/:addressId", async (req, res) => {
   try {
-    const { orderId } = req.params;
+    const { addressId } = req.params;
     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
 
     // Authenticate user
@@ -1113,7 +1116,7 @@ app.patch("/orders/:orderId/address", async (req, res) => {
     const userId = decoded.id;
 
     // Ensure the user owns the address before updating
-    const [addressCheck] = await userDBPool.query(`SELECT user_id FROM address_orders WHERE order_id = ?`, [orderId]);
+    const [addressCheck] = await userDBPool.query(`SELECT user_id FROM address_orders WHERE address_id = ?`, [addressId]);
     if (addressCheck.length === 0) {
       return res.status(404).json({ error: "Address not found" });
     }
@@ -1125,9 +1128,9 @@ app.patch("/orders/:orderId/address", async (req, res) => {
     const query = `
       UPDATE address_orders 
       SET full_name = ?, phone_number = ?, street_address = ?, city = ?, state = ?, postal_code = ?, country = ?
-      WHERE order_id = ?
+      WHERE address_id = ?
     `;
-    const [result] = await userDBPool.query(query, [full_name, phone_number, street_address, city, state, postal_code, country, orderId]);
+    const [result] = await userDBPool.query(query, [full_name, phone_number, street_address, city, state, postal_code, country, addressId]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Address not found or unchanged" });
@@ -1141,11 +1144,11 @@ app.patch("/orders/:orderId/address", async (req, res) => {
 });
 
 /**
- * Delete an Address (DELETE /orders/:orderId/address)
+ * Delete an Address (DELETE /orders/address/:addressId)
  */
-app.delete("/orders/:orderId/address", async (req, res) => {
+app.delete("/orders/address/:addressId", async (req, res) => {
   try {
-    const { orderId } = req.params;
+    const { addressId } = req.params;
 
     // Authenticate user
     const token = req.headers.authorization?.split(" ")[1];
@@ -1155,7 +1158,7 @@ app.delete("/orders/:orderId/address", async (req, res) => {
     const userId = decoded.id;
 
     // Ensure the user owns the address before deleting
-    const [addressCheck] = await userDBPool.query(`SELECT user_id FROM address_orders WHERE order_id = ?`, [orderId]);
+    const [addressCheck] = await userDBPool.query(`SELECT user_id FROM address_orders WHERE address_id = ?`, [addressId]);
     if (addressCheck.length === 0) {
       return res.status(404).json({ error: "Address not found" });
     }
@@ -1164,8 +1167,8 @@ app.delete("/orders/:orderId/address", async (req, res) => {
     }
 
     // Delete Address
-    const query = `DELETE FROM address_orders WHERE order_id = ?`;
-    const [result] = await userDBPool.query(query, [orderId]);
+    const query = `DELETE FROM address_orders WHERE address_id = ?`;
+    const [result] = await userDBPool.query(query, [addressId]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Address not found" });
