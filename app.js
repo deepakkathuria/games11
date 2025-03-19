@@ -1348,6 +1348,55 @@ app.post("/auth/signup", async (req, res) => {
 
 
 
+// app.post("/auth/signin", async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     if (!email || !password) {
+//       return res.status(400).json({ message: "Email and password are required." });
+//     }
+
+//     // Get user from database
+//     const query = `SELECT * FROM users WHERE email = ?`;
+//     const [rows] = await userDBPool.query(query, [email]);
+
+//     if (rows.length < 1) {
+//       return res.status(401).json({ message: "Email or password is incorrect.", status: 401 });
+//     }
+
+//     const user = rows[0];
+
+//     // Compare password
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch) {
+//       return res.status(401).json({ message: "Email or password is incorrect.", status: 401 });
+//     }
+
+//     // Generate JWT Token
+//     const token = jwt.sign(
+//       { id: user.user_id },
+//       process.env.ACCESS_TOKEN_SECRET || "default_secret",
+//       { algorithm: "HS256", expiresIn: "1h" }
+//     );
+
+//     // ✅ Matching response format
+//     res.status(200).json({
+//       message: "You are logged in!",
+//       status: 200, // ✅ Added this to match the required response format
+//       token,
+//       user: {
+//         id: user.user_id,
+//         name: user.name,
+//         email: user.email,
+//       },
+//     });
+
+//   } catch (error) {
+//     console.error("Error signing in:", error);
+//     res.status(500).json({ message: "Internal server error.", status: 500 });
+//   }
+// })
+
 app.post("/auth/signin", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -1379,16 +1428,21 @@ app.post("/auth/signin", async (req, res) => {
       { algorithm: "HS256", expiresIn: "1h" }
     );
 
-    // ✅ Matching response format
+    // ✅ Fetch user's cart after login
+    const cartQuery = `SELECT * FROM Cart WHERE user_id = ?`;
+    const [cartItems] = await userDBPool.query(cartQuery, [user.user_id]);
+
+    // ✅ Return cart items in response
     res.status(200).json({
       message: "You are logged in!",
-      status: 200, // ✅ Added this to match the required response format
+      status: 200,
       token,
       user: {
         id: user.user_id,
         name: user.name,
         email: user.email,
       },
+      cartItems: cartItems, // ✅ Send cart in response
     });
 
   } catch (error) {
@@ -1396,6 +1450,9 @@ app.post("/auth/signin", async (req, res) => {
     res.status(500).json({ message: "Internal server error.", status: 500 });
   }
 });
+
+
+
 
 
 app.patch("/auth/change-password", async (req, res) => {
