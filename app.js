@@ -1200,7 +1200,8 @@ app.get("/cart", async (req, res) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
-    const query = `SELECT * FROM Cart WHERE user_id = ?`;
+    // ✅ Fetch only active cart items
+    const query = `SELECT * FROM Cart WHERE user_id = ? AND status = 'active'`;
     const [rows] = await userDBPool.query(query, [userId]);
 
     res.status(200).json({ cartItems: rows });
@@ -1209,6 +1210,7 @@ app.get("/cart", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch cart items" });
   }
 });
+
 
 
 app.post("/cart/add", async (req, res) => {
@@ -1282,8 +1284,9 @@ app.delete("/cart/clear", async (req, res) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
-    const query = `DELETE FROM Cart WHERE user_id = ?`;
-    const [result] = await userDBPool.query(query, [userId]);
+    // ✅ Instead of deleting, just mark as inactive
+    const query = `UPDATE Cart SET status = 'inactive' WHERE user_id = ?`;
+    await userDBPool.query(query, [userId]);
 
     res.status(200).json({ message: "Cart cleared successfully." });
   } catch (error) {
@@ -1291,6 +1294,7 @@ app.delete("/cart/clear", async (req, res) => {
     res.status(500).json({ error: "Failed to clear cart" });
   }
 });
+
 
 // ------------------------------------------------------cart--------------------------------------------------------
 
