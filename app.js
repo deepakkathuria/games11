@@ -1199,6 +1199,7 @@ app.get("/cart", async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
+    console.log(userId,"savjadfg")
 
     // ✅ Fetch only active cart items
     const query = `SELECT * FROM Cart WHERE user_id = ? AND status = 'active'`;
@@ -1231,12 +1232,12 @@ app.post("/cart/add", async (req, res) => {
       const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
 
       if (existingItem.length < 1) {
-        // Insert new item
-        const insertQuery = `INSERT INTO Cart (user_id, id, quantity, name, price, image) VALUES (?, ?, ?, ?, ?, ?)`;
+        // ✅ Fixed: Now inserts as `active`
+        const insertQuery = `INSERT INTO Cart (user_id, id, quantity, name, price, image, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`;
         await userDBPool.query(insertQuery, [userId, item.id, item.quantity, item.name, item.price, item.image]);
       } else {
-        // Update quantity
-        const updateQuery = `UPDATE Cart SET quantity = ? WHERE id = ? AND user_id = ?`;
+        // ✅ Fixed: Now updates quantity and marks as `active`
+        const updateQuery = `UPDATE Cart SET quantity = ?, status = 'active' WHERE id = ? AND user_id = ?`;
         await userDBPool.query(updateQuery, [item.quantity, item.id, userId]);
       }
     }
@@ -1247,6 +1248,7 @@ app.post("/cart/add", async (req, res) => {
     res.status(500).json({ error: "Failed to add items to cart" });
   }
 });
+
 
 
 
