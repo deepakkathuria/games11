@@ -8,8 +8,8 @@ const cloudinary = require("cloudinary").v2;
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
 
 
-// const Razorpay = require("razorpay");
-// const crypto = require("crypto");
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
 const multer = require("multer");
 // const upload = multer({ dest: "uploads/" });
@@ -20,16 +20,13 @@ const { upload } = require("./config/multer"); // Ensure multer config is set up
 const bcrypt = require("bcrypt");
 
 
-// cloudinary.config({
-//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-//   api_key: process.env.CLOUDINARY_API_KEY,
-//   api_secret: process.env.CLOUDINARY_API_SECRET,
-// });
 
-// const razorpay = new Razorpay({
-//   key_id: process.env.RAZORPAY_KEY_ID,
-//   key_secret: process.env.RAZORPAY_KEY_SECRET,
-// });
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
 
 cloudinary.config({
   cloud_name:"dqvntxciv",
@@ -605,48 +602,7 @@ app.post("/reviews/create", async (req, res) => {
 
 
 
-// app.get("/orders/user", async (req, res) => {
-//   try {
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) {
-//       return res.status(401).json({ error: "Unauthorized access" });
-//     }
 
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const query = "SELECT * FROM orders WHERE user_id = ?";
-//     const [rows] = await userDBPool.query(query, [userId]);
-
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "No orders found for this user" });
-//     }
-
-//     res.status(200).json({ orders: rows });
-//   } catch (error) {
-//     console.error("Error fetching user orders:", error);
-//     res.status(500).json({ error: "Failed to fetch orders" });
-//   }
-// });
-
-// app.get("/orders/:orderId", async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-
-//     const query = `SELECT * FROM orders WHERE order_id = ?`;
-//     const [rows] = await userDBPool.query(query, [orderId]);
-
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "Order not found" });
-//     }
-
-//     res.status(200).json({ order: rows[0] });
-//   } catch (error) {
-//     console.error("Error fetching order details:", error);
-//     res.status(500).json({ error: "Failed to fetch order details" });
-//   }
-// });
-//
 
 app.get("/orders/user", async (req, res) => {
   try {
@@ -773,68 +729,6 @@ app.get("/orders/:orderId", async (req, res) => {
 
 
 
-// app.patch("/orders/:orderId", async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-//     const { order_status } = req.body;
-
-//     const query = `UPDATE orders SET order_status = ? WHERE order_id = ?`;
-//     const [result] = await userDBPool.query(query, [order_status, orderId]);
-
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ message: "Order not found" });
-//     }
-
-//     res.status(200).json({ message: "Order status updated successfully" });
-//   } catch (error) {
-//     console.error("Error updating order status:", error);
-//     res.status(500).json({ error: "Failed to update order status" });
-//   }
-// });
-
-
-
-// app.delete("/orders/:orderId", async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-
-//     const query = `DELETE FROM orders WHERE order_id = ?`;
-//     const [result] = await userDBPool.query(query, [orderId]);
-
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ message: "Order not found" });
-//     }
-
-//     res.status(200).json({ message: "Order deleted successfully" });
-//   } catch (error) {
-//     console.error("Error deleting order:", error);
-//     res.status(500).json({ error: "Failed to delete order" });
-//   }
-// });
-
-
-// app.post("/orders/create", async (req, res) => {
-//   try {
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) return res.status(401).json({ error: "Unauthorized access" });
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const { total_amount, payment_method, order_status, transaction_id } = req.body;
-
-//     const query = `
-//       INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
-//       VALUES (?, ?, 'pending', ?, ?, ?)
-//     `;
-//     const [result] = await userDBPool.query(query, [userId, total_amount, payment_method, order_status, transaction_id]);
-
-//     res.status(201).json({ message: "Order created successfully", orderId: result.insertId });
-//   } catch (error) {
-//     console.error("Error creating order:", error);
-//     res.status(500).json({ error: "Failed to create order" });
-//   }
-// });
 
 app.post("/orders/create", async (req, res) => {
   try {
@@ -948,94 +842,6 @@ app.delete("/orders/:orderId", async (req, res) => {
 
 
 //  ------------------------------- order address-----------------------------------------------------
-
-// app.post("/orders/:orderId/address", async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-//     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
-
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) return res.status(401).json({ error: "Unauthorized access" });
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const query = `
-//       INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
-//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-//     `;
-//     await userDBPool.query(query, [orderId, userId, full_name, phone_number, street_address, city, state, postal_code, country]);
-
-//     res.status(201).json({ message: "Address added successfully" });
-//   } catch (error) {
-//     console.error("Error adding address:", error);
-//     res.status(500).json({ error: "Failed to add address" });
-//   }
-// });
-
-
-
-// app.get("/orders/:orderId/address", async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-
-//     const query = `SELECT * FROM address_orders WHERE order_id = ?`;
-//     const [rows] = await userDBPool.query(query, [orderId]);
-
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "Address not found" });
-//     }
-
-//     res.status(200).json({ address: rows[0] });
-//   } catch (error) {
-//     console.error("Error fetching order address:", error);
-//     res.status(500).json({ error: "Failed to fetch address" });
-//   }
-// });
-
-
-// app.patch("/orders/address/:addressId", async (req, res) => {
-//   try {
-//     const { addressId } = req.params;
-//     const { full_name, phone_number, street_address, city, state, postal_code, country } = req.body;
-
-//     const query = `
-//       UPDATE address_orders SET full_name = ?, phone_number = ?, street_address = ?, city = ?, state = ?, postal_code = ?, country = ?
-//       WHERE address_id = ?
-//     `;
-//     const [result] = await userDBPool.query(query, [full_name, phone_number, street_address, city, state, postal_code, country, addressId]);
-
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ message: "Address not found" });
-//     }
-
-//     res.status(200).json({ message: "Address updated successfully" });
-//   } catch (error) {
-//     console.error("Error updating address:", error);
-//     res.status(500).json({ error: "Failed to update address" });
-//   }
-// });
-
-
-
-// app.delete("/orders/address/:addressId", async (req, res) => {
-//   try {
-//     const { addressId } = req.params;
-
-//     const query = `DELETE FROM address_orders WHERE address_id = ?`;
-//     const [result] = await userDBPool.query(query, [addressId]);
-
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ message: "Address not found" });
-//     }
-
-//     res.status(200).json({ message: "Address deleted successfully" });
-//   } catch (error) {
-//     console.error("Error deleting address:", error);
-//     res.status(500).json({ error: "Failed to delete address" });
-//   }
-// });
-
 
 
 
@@ -1885,45 +1691,76 @@ app.delete("/admin/product/:productId", async (req, res) => {
 
 
 
-// Route to create a payment order
-// app.post("/create-order", async (req, res) => {
-//   try {
-//     const { amount, currency } = req.body;
+app.post("/create-order", async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+      payment_capture: 1,
+    });
 
-//     const options = {
-//       amount: amount * 100, // Razorpay accepts amount in paise (INR * 100)
-//       currency: currency || "INR",
-//       receipt: `receipt_${Date.now()}`,
-//       payment_capture: 1, // Auto capture payment
-//     };
-
-//     const order = await razorpay.orders.create(options);
-//     res.status(201).json({ order });
-//   } catch (error) {
-//     console.error("Error creating Razorpay order:", error);
-//     res.status(500).json({ error: "Failed to create payment order" });
-//   }
-// });
+    res.json({ success: true, order });
+  } catch (error) {
+    console.error("Razorpay order creation failed:", error);
+    res.status(500).json({ success: false, message: "Failed to create Razorpay order" });
+  }
+});
 
 
 
-// app.post("/verify-payment", async (req, res) => {
-//   try {
-//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+app.post("/verify-payment", async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
 
-//     const generatedSignature = crypto
-//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-//       .update(razorpay_order_id + "|" + razorpay_payment_id)
-//       .digest("hex");
+    const sign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
 
-//     if (generatedSignature !== razorpay_signature) {
-//       return res.status(400).json({ error: "Payment verification failed" });
-//     }
+    if (sign !== razorpay_signature) {
+      return res.status(400).json({ success: false, message: "Invalid signature" });
+    }
 
-//     res.status(200).json({ success: true, message: "Payment verified successfully" });
-//   } catch (error) {
-//     console.error("Error verifying Razorpay payment:", error);
-//     res.status(500).json({ error: "Failed to verify payment" });
-//   }
-// });
+    // ✅ Extract userId from JWT
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
 
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const { products, address, total_amount } = orderData;
+
+    // ✅ Insert order
+    const [orderRes] = await userDBPool.query(
+      `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
+       VALUES (?, ?, 'success', 'razorpay', 'confirmed', ?)`,
+      [userId, total_amount, razorpay_payment_id]
+    );
+
+    const orderId = orderRes.insertId;
+
+    // ✅ Insert address if available
+    if (address) {
+      const { full_name, phone_number, street_address, city, state, postal_code, country } = address;
+      await userDBPool.query(
+        `INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [orderId, userId, full_name, phone_number, street_address, city, state, postal_code, country || "India"]
+      );
+    }
+
+    // ✅ Insert order items
+    const orderItems = products.map(item => [orderId, item.product_id, item.quantity, item.price]);
+    await userDBPool.query(
+      `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
+      [orderItems]
+    );
+
+    res.status(200).json({ success: true, message: "Order verified and saved", orderId });
+  } catch (error) {
+    console.error("Payment verification failed:", error);
+    res.status(500).json({ success: false, message: "Payment verification failed" });
+  }
+});
