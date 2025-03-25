@@ -678,12 +678,15 @@ app.get("/orders/:orderId", async (req, res) => {
     const { orderId } = req.params;
 
     const query = `
-      SELECT o.order_id, o.total_amount, o.created_at,
-             oi.product_id, oi.quantity, oi.price AS item_price,
-             p.name AS product_name, p.images AS product_images
+      SELECT 
+        o.order_id, o.total_amount, o.created_at,
+        oi.product_id, oi.quantity, oi.price AS item_price,
+        p.name AS product_name, p.images AS product_images,
+        ao.full_name, ao.phone_number, ao.street_address, ao.city, ao.state, ao.postal_code, ao.country
       FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id
-      JOIN products p ON oi.product_id = p.item_id
+      LEFT JOIN order_items oi ON o.order_id = oi.order_id
+      LEFT JOIN products p ON oi.product_id = p.item_id
+      LEFT JOIN address_orders ao ON o.order_id = ao.order_id
       WHERE o.order_id = ?;
     `;
 
@@ -693,11 +696,19 @@ app.get("/orders/:orderId", async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Format order response
     const order = {
       order_id: rows[0].order_id,
       total_amount: rows[0].total_amount,
       created_at: rows[0].created_at,
+      address: {
+        full_name: rows[0].full_name,
+        phone_number: rows[0].phone_number,
+        street_address: rows[0].street_address,
+        city: rows[0].city,
+        state: rows[0].state,
+        postal_code: rows[0].postal_code,
+        country: rows[0].country,
+      },
       products: rows.map(row => {
         let productImage = null;
         if (row.product_images) {
@@ -725,6 +736,7 @@ app.get("/orders/:orderId", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch order details" });
   }
 });
+
 
 
 
@@ -1160,54 +1172,7 @@ app.post("/auth/signup", async (req, res) => {
 
 
 
-// app.post("/auth/signin", async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
 
-//     if (!email || !password) {
-//       return res.status(400).json({ message: "Email and password are required." });
-//     }
-
-//     // Get user from database
-//     const query = `SELECT * FROM users WHERE email = ?`;
-//     const [rows] = await userDBPool.query(query, [email]);
-
-//     if (rows.length < 1) {
-//       return res.status(401).json({ message: "Email or password is incorrect.", status: 401 });
-//     }
-
-//     const user = rows[0];
-
-//     // Compare password
-//     const isMatch = await bcrypt.compare(password, user.password);
-//     if (!isMatch) {
-//       return res.status(401).json({ message: "Email or password is incorrect.", status: 401 });
-//     }
-
-//     // Generate JWT Token
-//     const token = jwt.sign(
-//       { id: user.user_id },
-//       process.env.ACCESS_TOKEN_SECRET || "default_secret",
-//       { algorithm: "HS256", expiresIn: "1h" }
-//     );
-
-//     // ✅ Matching response format
-//     res.status(200).json({
-//       message: "You are logged in!",
-//       status: 200, // ✅ Added this to match the required response format
-//       token,
-//       user: {
-//         id: user.user_id,
-//         name: user.name,
-//         email: user.email,
-//       },
-//     });
-
-//   } catch (error) {
-//     console.error("Error signing in:", error);
-//     res.status(500).json({ message: "Internal server error.", status: 500 });
-//   }
-// })
 
 app.post("/auth/signin", async (req, res) => {
   try {
