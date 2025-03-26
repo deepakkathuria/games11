@@ -1381,35 +1381,50 @@ app.get("/category/:category", async (req, res) => {
 // ------------------------------------admin-----------------------------------------------
 
 
-// app.get("/admin/products", async (req, res) => {
-//   try {
-//     const query = "SELECT * FROM products";
-//     const [rows] = await userDBPool.query(query);
 
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "No products found" });
-//     }
-
-//     res.status(200).json({ products: rows });
-//   } catch (error) {
-//     console.error("Error fetching products:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 app.get("/admin/products", async (req, res) => {
   try {
-    let { page, limit } = req.query;
+    let { page, limit, category, subcategory, is_trendy, is_unique } = req.query;
 
-    page = parseInt(page) || 1; // Default to page 1
-    limit = parseInt(limit) || 15; // Default limit 15 products per page
-    const offset = (page - 1) * limit; // Calculate offset
+    page = parseInt(page) || 1;
+    limit = parseInt(limit) || 15;
+    const offset = (page - 1) * limit;
 
-    const query = `SELECT * FROM products LIMIT ? OFFSET ?`;
-    const countQuery = `SELECT COUNT(*) AS total FROM products`;
+    // ✅ Dynamic filters
+    const filters = [];
+    const values = [];
 
-    // Fetch paginated results
-    const [rows] = await userDBPool.query(query, [limit, offset]);
-    const [[totalCount]] = await userDBPool.query(countQuery);
+    if (category) {
+      filters.push("category = ?");
+      values.push(category);
+    }
+
+    if (subcategory) {
+      filters.push("subcategory = ?");
+      values.push(subcategory);
+    }
+
+    if (is_trendy !== undefined) {
+      filters.push("is_trendy = ?");
+      values.push(is_trendy === "true" ? 1 : 0);
+    }
+
+    if (is_unique !== undefined) {
+      filters.push("is_unique = ?");
+      values.push(is_unique === "true" ? 1 : 0);
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+
+    const query = `SELECT * FROM products ${whereClause} LIMIT ? OFFSET ?`;
+    const countQuery = `SELECT COUNT(*) AS total FROM products ${whereClause}`;
+
+    // Add pagination values
+    const paginatedValues = [...values, limit, offset];
+
+    // Run queries
+    const [rows] = await userDBPool.query(query, paginatedValues);
+    const [[totalCount]] = await userDBPool.query(countQuery, values);
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "No products found", total: 0, products: [] });
@@ -1436,6 +1451,207 @@ app.get("/admin/products", async (req, res) => {
 
 
 
+
+
+// /**
+//  * ✅ Get Product by ID
+//  */
+// app.get("/admin/product/:productId", async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+//     const query = "SELECT * FROM products WHERE item_id = ?";
+//     const [rows] = await userDBPool.query(query, [productId]);
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({ message: "Product not found" });
+//     }
+
+//     res.status(200).json({ product: rows[0] });
+//   } catch (error) {
+//     console.error("Error fetching product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+// /**
+//  * ✅ Create New Product
+//  */
+// app.post("/admin/products", async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       price,
+//       slug,
+//       category,
+//       new: isNew,
+//       features,
+//       description,
+//       includes,
+//       gallery,
+//       category_image,
+//       cart_image,
+//       short_name,
+//       first_image,
+//       images, // ✅ Get images directly from the request body
+//     } = req.body;
+
+//     if (!name || !price || !category) {
+//       return res.status(400).json({ error: "Name, Price, and Category are required" });
+//     }
+
+//     // ✅ Ensure images are stored as an array
+//     let uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
+
+//     const query = `
+//       INSERT INTO products (name, price, slug, category, new, features, description, images, includes, gallery, category_image, cart_image, short_name, first_image) 
+//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+//     `;
+
+//     await userDBPool.query(query, [
+//       name,
+//       price,
+//       slug,
+//       category,
+//       isNew || 0,
+//       features || null,
+//       description || null,
+//       JSON.stringify(uploadedImages), // ✅ Store images as JSON array
+//       JSON.stringify(includes) || "[]",
+//       JSON.stringify(gallery) || "[]",
+//       JSON.stringify(category_image) || "[]",
+//       cart_image || null,
+//       short_name || null,
+//       first_image || null,
+//     ]);
+
+//     res.status(201).json({ message: "✅ Product created successfully", images: uploadedImages });
+//   } catch (error) {
+//     console.error("❌ Error creating product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
+// /**
+//  * ✅ Update Product
+//  */
+// app.put("/admin/product/:productId", async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+//     const {
+//       name,
+//       price,
+//       slug,
+//       category,
+//       new: isNew,
+//       features,
+//       description,
+//       includes,
+//       gallery,
+//       category_image,
+//       cart_image,
+//       short_name,
+//       first_image,
+//       images, // ✅ Fix: Handle images properly
+//     } = req.body;
+
+//     if (!name || !price || !category) {
+//       return res.status(400).json({ error: "❌ Name, Price, and Category are required" });
+//     }
+
+//     // ✅ Fetch existing product images from DB
+//     const selectQuery = "SELECT images FROM products WHERE item_id = ?";
+//     const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
+
+//     if (existingProduct.length === 0) {
+//       return res.status(404).json({ error: "❌ Product not found" });
+//     }
+
+//     // ✅ Parse existing images safely
+//     let existingImages = [];
+//     try {
+//       existingImages = JSON.parse(existingProduct[0].images || "[]");
+//     } catch (error) {
+//       console.error("❌ Error parsing existing images from DB:", error);
+//       existingImages = [];
+//     }
+
+//     // ✅ Ensure `images` is an array
+//     let updatedImages = [];
+
+//     try {
+//       if (typeof images === "string") {
+//         if (images.startsWith("[") && images.endsWith("]")) {
+//           updatedImages = JSON.parse(images); // ✅ Valid JSON string
+//         } else {
+//           updatedImages = [images]; // ✅ Convert single URL string to array
+//         }
+//       } else if (Array.isArray(images)) {
+//         updatedImages = images;
+//       } else {
+//         updatedImages = [];
+//       }
+//     } catch (error) {
+//       console.error("❌ Error parsing images:", error);
+//       return res.status(400).json({ error: "Invalid images format" });
+//     }
+
+//     // ✅ If no new images provided, keep existing images
+//     if (updatedImages.length === 0) {
+//       updatedImages = existingImages;
+//     }
+
+//     const query = `
+//       UPDATE products SET 
+//       name = ?, price = ?, slug = ?, category = ?, new = ?, features = ?, description = ?, 
+//       images = ?, includes = ?, gallery = ?, category_image = ?, cart_image = ?, short_name = ?, first_image = ?
+//       WHERE item_id = ?
+//     `;
+
+//     await userDBPool.query(query, [
+//       name,
+//       price,
+//       slug,
+//       category,
+//       isNew || 0,
+//       features || null,
+//       description || null,
+//       JSON.stringify(updatedImages), // ✅ Store images as JSON array
+//       JSON.stringify(includes) || "[]",
+//       JSON.stringify(gallery) || "[]",
+//       JSON.stringify(category_image) || "[]",
+//       cart_image || null,
+//       short_name || null,
+//       first_image || null,
+//       productId,
+//     ]);
+
+//     res.status(200).json({ message: "✅ Product updated successfully", images: updatedImages });
+//   } catch (error) {
+//     console.error("❌ Error updating product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
+
+
+// /**
+//  * ✅ Delete Product
+//  */
+// app.delete("/admin/product/:productId", async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+
+//     const query = "DELETE FROM products WHERE item_id = ?";
+//     await userDBPool.query(query, [productId]);
+
+//     res.status(200).json({ message: "Product deleted successfully" });
+//   } catch (error) {
+//     console.error("Error deleting product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
 
 
 /**
@@ -1468,6 +1684,9 @@ app.post("/admin/products", async (req, res) => {
       price,
       slug,
       category,
+      subcategory,           // ✅ NEW
+      is_trendy = false,     // ✅ NEW
+      is_unique = false,     // ✅ NEW
       new: isNew,
       features,
       description,
@@ -1477,19 +1696,22 @@ app.post("/admin/products", async (req, res) => {
       cart_image,
       short_name,
       first_image,
-      images, // ✅ Get images directly from the request body
+      images,
     } = req.body;
 
     if (!name || !price || !category) {
       return res.status(400).json({ error: "Name, Price, and Category are required" });
     }
 
-    // ✅ Ensure images are stored as an array
-    let uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
+    const uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
 
     const query = `
-      INSERT INTO products (name, price, slug, category, new, features, description, images, includes, gallery, category_image, cart_image, short_name, first_image) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (
+        name, price, slug, category, subcategory, is_trendy, is_unique,
+        new, features, description, images, includes, gallery,
+        category_image, cart_image, short_name, first_image
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await userDBPool.query(query, [
@@ -1497,10 +1719,13 @@ app.post("/admin/products", async (req, res) => {
       price,
       slug,
       category,
+      subcategory || null,
+      is_trendy,
+      is_unique,
       isNew || 0,
       features || null,
       description || null,
-      JSON.stringify(uploadedImages), // ✅ Store images as JSON array
+      JSON.stringify(uploadedImages),
       JSON.stringify(includes) || "[]",
       JSON.stringify(gallery) || "[]",
       JSON.stringify(category_image) || "[]",
@@ -1516,7 +1741,6 @@ app.post("/admin/products", async (req, res) => {
   }
 });
 
-
 /**
  * ✅ Update Product
  */
@@ -1528,6 +1752,9 @@ app.put("/admin/product/:productId", async (req, res) => {
       price,
       slug,
       category,
+      subcategory,
+      is_trendy = false,
+      is_unique = false,
       new: isNew,
       features,
       description,
@@ -1537,14 +1764,13 @@ app.put("/admin/product/:productId", async (req, res) => {
       cart_image,
       short_name,
       first_image,
-      images, // ✅ Fix: Handle images properly
+      images,
     } = req.body;
 
     if (!name || !price || !category) {
       return res.status(400).json({ error: "❌ Name, Price, and Category are required" });
     }
 
-    // ✅ Fetch existing product images from DB
     const selectQuery = "SELECT images FROM products WHERE item_id = ?";
     const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
 
@@ -1552,7 +1778,6 @@ app.put("/admin/product/:productId", async (req, res) => {
       return res.status(404).json({ error: "❌ Product not found" });
     }
 
-    // ✅ Parse existing images safely
     let existingImages = [];
     try {
       existingImages = JSON.parse(existingProduct[0].images || "[]");
@@ -1561,35 +1786,32 @@ app.put("/admin/product/:productId", async (req, res) => {
       existingImages = [];
     }
 
-    // ✅ Ensure `images` is an array
     let updatedImages = [];
-
     try {
       if (typeof images === "string") {
         if (images.startsWith("[") && images.endsWith("]")) {
-          updatedImages = JSON.parse(images); // ✅ Valid JSON string
+          updatedImages = JSON.parse(images);
         } else {
-          updatedImages = [images]; // ✅ Convert single URL string to array
+          updatedImages = [images];
         }
       } else if (Array.isArray(images)) {
         updatedImages = images;
-      } else {
-        updatedImages = [];
       }
     } catch (error) {
       console.error("❌ Error parsing images:", error);
       return res.status(400).json({ error: "Invalid images format" });
     }
 
-    // ✅ If no new images provided, keep existing images
     if (updatedImages.length === 0) {
       updatedImages = existingImages;
     }
 
     const query = `
       UPDATE products SET 
-      name = ?, price = ?, slug = ?, category = ?, new = ?, features = ?, description = ?, 
-      images = ?, includes = ?, gallery = ?, category_image = ?, cart_image = ?, short_name = ?, first_image = ?
+        name = ?, price = ?, slug = ?, category = ?, subcategory = ?, is_trendy = ?, is_unique = ?,
+        new = ?, features = ?, description = ?, 
+        images = ?, includes = ?, gallery = ?, 
+        category_image = ?, cart_image = ?, short_name = ?, first_image = ?
       WHERE item_id = ?
     `;
 
@@ -1598,10 +1820,13 @@ app.put("/admin/product/:productId", async (req, res) => {
       price,
       slug,
       category,
+      subcategory || null,
+      is_trendy,
+      is_unique,
       isNew || 0,
       features || null,
       description || null,
-      JSON.stringify(updatedImages), // ✅ Store images as JSON array
+      JSON.stringify(updatedImages),
       JSON.stringify(includes) || "[]",
       JSON.stringify(gallery) || "[]",
       JSON.stringify(category_image) || "[]",
@@ -1617,9 +1842,6 @@ app.put("/admin/product/:productId", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
-
-
-
 
 /**
  * ✅ Delete Product
