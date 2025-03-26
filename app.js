@@ -1723,6 +1723,9 @@ app.post("/verify-payment", async (req, res) => {
       [orderItems]
     );
 
+    await userDBPool.query(`DELETE FROM Cart WHERE user_id = ?`, [userId]);
+
+
     res.status(200).json({ success: true, message: "Order verified and saved", orderId });
   } catch (error) {
     console.error("Payment verification failed:", error);
