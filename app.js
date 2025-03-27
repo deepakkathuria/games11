@@ -1335,6 +1335,7 @@ app.patch("/auth/change-password", async (req, res) => {
 //   }
 // });
 
+// Product Pagination API with JSON image parsing
 app.get('/products', async (req, res) => {
   console.log("📦 Fetching paginated products...");
 
@@ -1342,41 +1343,33 @@ app.get('/products', async (req, res) => {
   const limit = parseInt(req.query.limit) || 16;
   const offset = (page - 1) * limit;
 
-  const { category, subcategory } = req.query;
-
   try {
-    let countQuery = "SELECT COUNT(*) AS count FROM products WHERE 1";
-    let dataQuery = "SELECT * FROM products WHERE 1";
-    const queryParams = [];
-
-    // 📦 Optional filters
-    if (category) {
-      countQuery += " AND category = ?";
-      dataQuery += " AND category = ?";
-      queryParams.push(category);
-    }
-
-    if (subcategory) {
-      countQuery += " AND subcategory = ?";
-      dataQuery += " AND subcategory = ?";
-      queryParams.push(subcategory);
-    }
-
-    // 🔢 Get total count with filters
-    const [countResult] = await userDBPool.query(countQuery, queryParams);
+    const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
     const totalCount = countResult[0].count;
     const totalPages = Math.ceil(totalCount / limit);
 
-    // 📄 Final paginated query
-    dataQuery += " ORDER BY item_id DESC LIMIT ? OFFSET ?";
-    const finalParams = [...queryParams, limit, offset];
+    const [rows] = await userDBPool.query(
+      "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
+      [limit, offset]
+    );
 
-    const [rows] = await userDBPool.query(dataQuery, finalParams);
+    const formattedRows = rows.map((product) => {
+      let parsedImages = [];
 
-    const formattedRows = rows.map(product => ({
-      ...product,
-      avg_rating: null // Add dummy rating
-    }));
+      try {
+        parsedImages = typeof product.images === "string"
+          ? JSON.parse(product.images)
+          : product.images;
+      } catch (e) {
+        parsedImages = [];
+      }
+
+      return {
+        ...product,
+        images: parsedImages,
+        avg_rating: null,
+      };
+    });
 
     res.status(200).json({
       status: 200,
@@ -1390,6 +1383,7 @@ app.get('/products', async (req, res) => {
     res.status(500).json({ status: 500, error: "Database error" });
   }
 });
+
 
 
 
