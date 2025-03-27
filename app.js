@@ -1865,7 +1865,7 @@ app.delete("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
 
-    // Step 1: Fetch images from DB
+    // Step 1: Get image URLs from DB
     const [result] = await userDBPool.query(
       "SELECT images FROM products WHERE item_id = ?",
       [productId]
@@ -1878,29 +1878,27 @@ app.delete("/admin/product/:productId", async (req, res) => {
     let images = [];
     try {
       images = JSON.parse(result[0].images || "[]");
-    } catch (error) {
-      console.warn("⚠️ Error parsing images:", error);
+    } catch (err) {
+      console.warn("⚠️ Failed to parse images:", err.message);
     }
 
-    // Step 2: Extract Cloudinary public_ids
+    // Step 2: Extract public IDs from image URLs
     const publicIds = images.map((url) => {
-      const segments = url.split("/");
-      const file = segments[segments.length - 1];
-      const [publicId] = file.split("."); // Remove file extension
-      return `products/${publicId}`; // Assuming uploaded to `products` folder
-    });
+      const matches = url.match(/\/upload\/(?:v\d+\/)?(.*)\.[a-zA-Z]+$/);
+      return matches ? matches[1] : null;
+    }).filter(Boolean);
 
-    // Step 3: Delete from Cloudinary
+    // Step 3: Delete each image from Cloudinary
     for (const publicId of publicIds) {
       try {
         await cloudinary.uploader.destroy(publicId);
         console.log(`✅ Deleted from Cloudinary: ${publicId}`);
       } catch (err) {
-        console.warn(`❌ Failed to delete ${publicId} from Cloudinary`, err.message);
+        console.warn(`❌ Failed to delete ${publicId} from Cloudinary:`, err.message);
       }
     }
 
-    // Step 4: Delete from DB
+    // Step 4: Delete product from DB
     await userDBPool.query("DELETE FROM products WHERE item_id = ?", [productId]);
 
     res.status(200).json({ message: "✅ Product and images deleted successfully" });
