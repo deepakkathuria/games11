@@ -1296,27 +1296,42 @@ app.patch("/auth/change-password", async (req, res) => {
 
 // --------------------------products--------------------------------------------------------------------
 
+
+
 // app.get('/products', async (req, res) => {
-//   console.log("Fetching products...");
+//   console.log("📦 Fetching paginated products...");
+
+//   const page = parseInt(req.query.page) || 1;
+//   const limit = parseInt(req.query.limit) || 16;
+//   const offset = (page - 1) * limit;
 
 //   try {
-//       const query = "SELECT * FROM products";
-//       const [rows] = await userDBPool.query(query);
+//     // Get total count first
+//     const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
+//     const totalCount = countResult[0].count;
+//     const totalPages = Math.ceil(totalCount / limit);
 
-//       // Format response with avg_rating field and required structure
-//       const formattedRows = rows.map(product => ({
-//           ...product,
-//           avg_rating: null // Adding avg_rating field with null value
-//       }));
+//     // Get paginated data
+//     const [rows] = await userDBPool.query(
+//       "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
+//       [limit, offset]
+//     );
 
-//       res.status(200).json({
-//           status: 200,
-//           rows: formattedRows
-//       });
+//     const formattedRows = rows.map(product => ({
+//       ...product,
+//       avg_rating: null // Add dummy rating
+//     }));
+
+//     res.status(200).json({
+//       status: 200,
+//       currentPage: page,
+//       totalPages,
+//       rows: formattedRows,
+//     });
 
 //   } catch (error) {
-//       console.error("Error fetching products:", error);
-//       res.status(500).json({ status: 500, error: "Database error" });
+//     console.error("❌ Error fetching paginated products:", error);
+//     res.status(500).json({ status: 500, error: "Database error" });
 //   }
 // });
 
@@ -1327,17 +1342,36 @@ app.get('/products', async (req, res) => {
   const limit = parseInt(req.query.limit) || 16;
   const offset = (page - 1) * limit;
 
+  const { category, subcategory } = req.query;
+
   try {
-    // Get total count first
-    const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
+    let countQuery = "SELECT COUNT(*) AS count FROM products WHERE 1";
+    let dataQuery = "SELECT * FROM products WHERE 1";
+    const queryParams = [];
+
+    // 📦 Optional filters
+    if (category) {
+      countQuery += " AND category = ?";
+      dataQuery += " AND category = ?";
+      queryParams.push(category);
+    }
+
+    if (subcategory) {
+      countQuery += " AND subcategory = ?";
+      dataQuery += " AND subcategory = ?";
+      queryParams.push(subcategory);
+    }
+
+    // 🔢 Get total count with filters
+    const [countResult] = await userDBPool.query(countQuery, queryParams);
     const totalCount = countResult[0].count;
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Get paginated data
-    const [rows] = await userDBPool.query(
-      "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
-      [limit, offset]
-    );
+    // 📄 Final paginated query
+    dataQuery += " ORDER BY item_id DESC LIMIT ? OFFSET ?";
+    const finalParams = [...queryParams, limit, offset];
+
+    const [rows] = await userDBPool.query(dataQuery, finalParams);
 
     const formattedRows = rows.map(product => ({
       ...product,
@@ -1356,6 +1390,7 @@ app.get('/products', async (req, res) => {
     res.status(500).json({ status: 500, error: "Database error" });
   }
 });
+
 
 
 app.get("/product/:id", async (req, res) => {
