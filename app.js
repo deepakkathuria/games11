@@ -1860,53 +1860,56 @@ app.put("/admin/product/:productId", async (req, res) => {
 //   }
 // });
 
-
 app.delete("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
 
-    // Step 1: Get image URLs from DB
-    const [result] = await userDBPool.query(
+    // 1️⃣ Fetch the product to get images
+    const [rows] = await userDBPool.query(
       "SELECT images FROM products WHERE item_id = ?",
       [productId]
     );
 
-    if (result.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({ message: "❌ Product not found" });
     }
 
     let images = [];
+
     try {
-      images = JSON.parse(result[0].images || "[]");
-    } catch (err) {
-      console.warn("⚠️ Failed to parse images:", err.message);
+      const rawImages = rows[0].images;
+      images = typeof rawImages === "string" ? JSON.parse(rawImages) : rawImages;
+    } catch (error) {
+      console.warn("⚠️ Failed to parse images:", error);
+      return res.status(400).json({ error: "Invalid image format in DB" });
     }
 
-    // Step 2: Extract public IDs from image URLs
-    const publicIds = images.map((url) => {
-      const matches = url.match(/\/upload\/(?:v\d+\/)?(.*)\.[a-zA-Z]+$/);
-      return matches ? matches[1] : null;
-    }).filter(Boolean);
-
-    // Step 3: Delete each image from Cloudinary
-    for (const publicId of publicIds) {
-      try {
-        await cloudinary.uploader.destroy(publicId);
-        console.log(`✅ Deleted from Cloudinary: ${publicId}`);
-      } catch (err) {
-        console.warn(`❌ Failed to delete ${publicId} from Cloudinary:`, err.message);
+    // 2️⃣ Delete each image from Cloudinary
+    for (const url of images) {
+      const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)\.(jpg|jpeg|png|webp|gif)/i);
+      if (match && match[1]) {
+        const publicId = match[1]; // e.g. "products/oz1ucu1l0dw3kkju8y35"
+        try {
+          await cloudinary.uploader.destroy(publicId);
+          console.log("✅ Deleted from Cloudinary:", publicId);
+        } catch (err) {
+          console.warn("❌ Cloudinary deletion failed for:", publicId, err.message);
+        }
       }
     }
 
-    // Step 4: Delete product from DB
+    // 3️⃣ Delete the product from the database
     await userDBPool.query("DELETE FROM products WHERE item_id = ?", [productId]);
 
     res.status(200).json({ message: "✅ Product and images deleted successfully" });
   } catch (error) {
-    console.error("❌ Error deleting product:", error);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ Deletion Error:", error);
+    res.status(500).json({ error: "Server error while deleting product" });
   }
 });
+
+
+
 
 
 
