@@ -1846,20 +1846,69 @@ app.put("/admin/product/:productId", async (req, res) => {
 /**
  * ✅ Delete Product
  */
+// app.delete("/admin/product/:productId", async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+
+//     const query = "DELETE FROM products WHERE item_id = ?";
+//     await userDBPool.query(query, [productId]);
+
+//     res.status(200).json({ message: "Product deleted successfully" });
+//   } catch (error) {
+//     console.error("Error deleting product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
 app.delete("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const query = "DELETE FROM products WHERE item_id = ?";
-    await userDBPool.query(query, [productId]);
+    // Step 1: Fetch images from DB
+    const [result] = await userDBPool.query(
+      "SELECT images FROM products WHERE item_id = ?",
+      [productId]
+    );
 
-    res.status(200).json({ message: "Product deleted successfully" });
+    if (result.length === 0) {
+      return res.status(404).json({ message: "❌ Product not found" });
+    }
+
+    let images = [];
+    try {
+      images = JSON.parse(result[0].images || "[]");
+    } catch (error) {
+      console.warn("⚠️ Error parsing images:", error);
+    }
+
+    // Step 2: Extract Cloudinary public_ids
+    const publicIds = images.map((url) => {
+      const segments = url.split("/");
+      const file = segments[segments.length - 1];
+      const [publicId] = file.split("."); // Remove file extension
+      return `products/${publicId}`; // Assuming uploaded to `products` folder
+    });
+
+    // Step 3: Delete from Cloudinary
+    for (const publicId of publicIds) {
+      try {
+        await cloudinary.uploader.destroy(publicId);
+        console.log(`✅ Deleted from Cloudinary: ${publicId}`);
+      } catch (err) {
+        console.warn(`❌ Failed to delete ${publicId} from Cloudinary`, err.message);
+      }
+    }
+
+    // Step 4: Delete from DB
+    await userDBPool.query("DELETE FROM products WHERE item_id = ?", [productId]);
+
+    res.status(200).json({ message: "✅ Product and images deleted successfully" });
   } catch (error) {
-    console.error("Error deleting product:", error);
-    res.status(500).json({ error: "Database error" });
+    console.error("❌ Error deleting product:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
-
 
 
 
