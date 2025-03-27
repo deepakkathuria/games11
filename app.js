@@ -1296,27 +1296,64 @@ app.patch("/auth/change-password", async (req, res) => {
 
 // --------------------------products--------------------------------------------------------------------
 
+// app.get('/products', async (req, res) => {
+//   console.log("Fetching products...");
+
+//   try {
+//       const query = "SELECT * FROM products";
+//       const [rows] = await userDBPool.query(query);
+
+//       // Format response with avg_rating field and required structure
+//       const formattedRows = rows.map(product => ({
+//           ...product,
+//           avg_rating: null // Adding avg_rating field with null value
+//       }));
+
+//       res.status(200).json({
+//           status: 200,
+//           rows: formattedRows
+//       });
+
+//   } catch (error) {
+//       console.error("Error fetching products:", error);
+//       res.status(500).json({ status: 500, error: "Database error" });
+//   }
+// });
+
 app.get('/products', async (req, res) => {
-  console.log("Fetching products...");
+  console.log("📦 Fetching paginated products...");
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 16;
+  const offset = (page - 1) * limit;
 
   try {
-      const query = "SELECT * FROM products";
-      const [rows] = await userDBPool.query(query);
+    // Get total count first
+    const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
+    const totalCount = countResult[0].count;
+    const totalPages = Math.ceil(totalCount / limit);
 
-      // Format response with avg_rating field and required structure
-      const formattedRows = rows.map(product => ({
-          ...product,
-          avg_rating: null // Adding avg_rating field with null value
-      }));
+    // Get paginated data
+    const [rows] = await userDBPool.query(
+      "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
+      [limit, offset]
+    );
 
-      res.status(200).json({
-          status: 200,
-          rows: formattedRows
-      });
+    const formattedRows = rows.map(product => ({
+      ...product,
+      avg_rating: null // Add dummy rating
+    }));
+
+    res.status(200).json({
+      status: 200,
+      currentPage: page,
+      totalPages,
+      rows: formattedRows,
+    });
 
   } catch (error) {
-      console.error("Error fetching products:", error);
-      res.status(500).json({ status: 500, error: "Database error" });
+    console.error("❌ Error fetching paginated products:", error);
+    res.status(500).json({ status: 500, error: "Database error" });
   }
 });
 
@@ -1846,19 +1883,7 @@ app.put("/admin/product/:productId", async (req, res) => {
 /**
  * ✅ Delete Product
  */
-// app.delete("/admin/product/:productId", async (req, res) => {
-//   try {
-//     const { productId } = req.params;
 
-//     const query = "DELETE FROM products WHERE item_id = ?";
-//     await userDBPool.query(query, [productId]);
-
-//     res.status(200).json({ message: "Product deleted successfully" });
-//   } catch (error) {
-//     console.error("Error deleting product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 
 app.delete("/admin/product/:productId", async (req, res) => {
   try {
@@ -1911,6 +1936,31 @@ app.delete("/admin/product/:productId", async (req, res) => {
 
 
 
+
+app.get("/admin/categories", async (req, res) => {
+  try {
+    const query = "SELECT DISTINCT category, subcategory FROM products";
+    const [rows] = await userDBPool.query(query);
+
+    const result = {};
+    rows.forEach(({ category, subcategory }) => {
+      if (!category) return;
+      if (!result[category]) result[category] = new Set();
+      if (subcategory) result[category].add(subcategory);
+    });
+
+    // Convert Sets to Arrays
+    const formatted = {};
+    for (const [cat, subs] of Object.entries(result)) {
+      formatted[cat] = [...subs];
+    }
+
+    res.status(200).json({ categories: formatted });
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 
