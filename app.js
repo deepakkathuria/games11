@@ -1336,22 +1336,92 @@ app.patch("/auth/change-password", async (req, res) => {
 // });
 
 // Product Pagination API with JSON image parsing
-app.get('/products', async (req, res) => {
-  console.log("📦 Fetching paginated products...");
+// app.get('/products', async (req, res) => {
+//   console.log("📦 Fetching paginated products...");
 
+//   const page = parseInt(req.query.page) || 1;
+//   const limit = parseInt(req.query.limit) || 16;
+//   const offset = (page - 1) * limit;
+
+//   try {
+//     const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
+//     const totalCount = countResult[0].count;
+//     const totalPages = Math.ceil(totalCount / limit);
+
+//     const [rows] = await userDBPool.query(
+//       "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
+//       [limit, offset]
+//     );
+
+//     const formattedRows = rows.map((product) => {
+//       let parsedImages = [];
+
+//       try {
+//         parsedImages = typeof product.images === "string"
+//           ? JSON.parse(product.images)
+//           : product.images;
+//       } catch (e) {
+//         parsedImages = [];
+//       }
+
+//       return {
+//         ...product,
+//         images: parsedImages,
+//         avg_rating: null,
+//       };
+//     });
+
+//     res.status(200).json({
+//       status: 200,
+//       currentPage: page,
+//       totalPages,
+//       rows: formattedRows,
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error fetching paginated products:", error);
+//     res.status(500).json({ status: 500, error: "Database error" });
+//   }
+// });
+
+
+app.get('/products', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 16;
   const offset = (page - 1) * limit;
+  const category = req.query.category;
+  const subcategory = req.query.subcategory;
 
   try {
-    const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
+    let countQuery = "SELECT COUNT(*) AS count FROM products";
+    let dataQuery = "SELECT * FROM products";
+    const queryParams = [];
+    const conditions = [];
+
+    if (category) {
+      conditions.push("category = ?");
+      queryParams.push(category);
+    }
+
+    if (subcategory) {
+      conditions.push("subcategory = ?");
+      queryParams.push(subcategory);
+    }
+
+    if (conditions.length > 0) {
+      const whereClause = " WHERE " + conditions.join(" AND ");
+      countQuery += whereClause;
+      dataQuery += whereClause;
+    }
+
+    dataQuery += " ORDER BY item_id DESC LIMIT ? OFFSET ?";
+    queryParams.push(limit, offset);
+
+    const [countResult] = await userDBPool.query(countQuery, queryParams.slice(0, -2));
     const totalCount = countResult[0].count;
     const totalPages = Math.ceil(totalCount / limit);
 
-    const [rows] = await userDBPool.query(
-      "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
-      [limit, offset]
-    );
+    const [rows] = await userDBPool.query(dataQuery, queryParams);
 
     const formattedRows = rows.map((product) => {
       let parsedImages = [];
@@ -1379,7 +1449,7 @@ app.get('/products', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error fetching paginated products:", error);
+    console.error("❌ Error fetching filtered products:", error);
     res.status(500).json({ status: 500, error: "Database error" });
   }
 });
