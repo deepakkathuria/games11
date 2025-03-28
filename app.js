@@ -1385,6 +1385,40 @@ app.patch("/auth/change-password", async (req, res) => {
 // });
 
 
+app.get('/products/trending', async (req, res) => {
+  try {
+    const [rows] = await userDBPool.query(
+      "SELECT * FROM products WHERE is_trendy = 1 ORDER BY item_id DESC LIMIT 8"
+    );
+
+    const formattedRows = rows.map((product) => {
+      let parsedImages = [];
+      try {
+        parsedImages = typeof product.images === "string"
+          ? JSON.parse(product.images)
+          : product.images;
+      } catch (e) {
+        parsedImages = [];
+      }
+
+      return {
+        ...product,
+        images: parsedImages,
+        avg_rating: null,
+      };
+    });
+
+    res.status(200).json({
+      status: 200,
+      rows: formattedRows,
+    });
+  } catch (error) {
+    console.error("❌ Trending fetch error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
 app.get('/products', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 16;
