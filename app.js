@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
+const { sendInvoiceEmail } = require("./utils/generateInvoice");
+
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
 
 
@@ -2130,9 +2132,76 @@ app.post("/create-order", async (req, res) => {
 
 
 
+// app.post("/verify-payment", async (req, res) => {
+//   try {
+//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
+
+//     const sign = crypto
+//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+//       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+//       .digest("hex");
+
+//     if (sign !== razorpay_signature) {
+//       return res.status(400).json({ success: false, message: "Invalid signature" });
+//     }
+
+//     // ✅ Extract userId from JWT
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     const { products, address, total_amount } = orderData;
+
+//     // ✅ Insert order
+//     const [orderRes] = await userDBPool.query(
+//       `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
+//        VALUES (?, ?, 'success', 'razorpay', 'confirmed', ?)`,
+//       [userId, total_amount, razorpay_payment_id]
+//     );
+
+//     const orderId = orderRes.insertId;
+
+//     // ✅ Insert address if available
+//     if (address) {
+//       const { full_name, phone_number, street_address, city, state, postal_code, country } = address;
+//       await userDBPool.query(
+//         `INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
+//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+//         [orderId, userId, full_name, phone_number, street_address, city, state, postal_code, country || "India"]
+//       );
+//     }
+
+//     // ✅ Insert order items
+//     const orderItems = products.map(item => [orderId, item.product_id, item.quantity, item.price]);
+//     await userDBPool.query(
+//       `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
+//       [orderItems]
+//     );
+
+//     await userDBPool.query(`DELETE FROM Cart WHERE user_id = ?`, [userId]);
+
+
+//     res.status(200).json({ success: true, message: "Order verified and saved", orderId });
+//   } catch (error) {
+//     console.error("Payment verification failed:", error);
+//     res.status(500).json({ success: false, message: "Payment verification failed" });
+//   }
+// });
+
+
+
+
+
 app.post("/verify-payment", async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      orderData,
+    } = req.body;
 
     const sign = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -2140,19 +2209,22 @@ app.post("/verify-payment", async (req, res) => {
       .digest("hex");
 
     if (sign !== razorpay_signature) {
-      return res.status(400).json({ success: false, message: "Invalid signature" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid signature" });
     }
 
     // ✅ Extract userId from JWT
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!token)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
     const { products, address, total_amount } = orderData;
 
-    // ✅ Insert order
+    // ✅ Insert into orders
     const [orderRes] = await userDBPool.query(
       `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
        VALUES (?, ?, 'success', 'razorpay', 'confirmed', ?)`,
@@ -2163,25 +2235,108 @@ app.post("/verify-payment", async (req, res) => {
 
     // ✅ Insert address if available
     if (address) {
-      const { full_name, phone_number, street_address, city, state, postal_code, country } = address;
+      const {
+        full_name,
+        phone_number,
+        street_address,
+        city,
+        state,
+        postal_code,
+        country,
+      } = address;
+
       await userDBPool.query(
         `INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [orderId, userId, full_name, phone_number, street_address, city, state, postal_code, country || "India"]
+        [
+          orderId,
+          userId,
+          full_name,
+          phone_number,
+          street_address,
+          city,
+          state,
+          postal_code,
+          country || "India",
+        ]
       );
     }
 
     // ✅ Insert order items
-    const orderItems = products.map(item => [orderId, item.product_id, item.quantity, item.price]);
+    const orderItems = products.map((item) => [
+      orderId,
+      item.product_id,
+      item.quantity,
+      item.price,
+    ]);
+
     await userDBPool.query(
       `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
       [orderItems]
     );
 
+    // ✅ Clear Cart
     await userDBPool.query(`DELETE FROM Cart WHERE user_id = ?`, [userId]);
 
+    // ✅ Fetch full order to send email
+    const [rows] = await userDBPool.query(
+      `
+      SELECT 
+        o.order_id, o.total_amount, o.created_at,
+        oi.product_id, oi.quantity, oi.price AS item_price,
+        p.name AS product_name, p.images AS product_images,
+        ao.full_name, ao.phone_number, ao.street_address, ao.city, ao.state, ao.postal_code, ao.country
+      FROM orders o
+      LEFT JOIN order_items oi ON o.order_id = oi.order_id
+      LEFT JOIN products p ON oi.product_id = p.item_id
+      LEFT JOIN address_orders ao ON o.order_id = ao.order_id
+      WHERE o.order_id = ?
+    `,
+      [orderId]
+    );
 
-    res.status(200).json({ success: true, message: "Order verified and saved", orderId });
+    if (rows.length > 0) {
+      const order = {
+        order_id: rows[0].order_id,
+        total_amount: rows[0].total_amount,
+        created_at: rows[0].created_at,
+        address: {
+          full_name: rows[0].full_name,
+          phone_number: rows[0].phone_number,
+          street_address: rows[0].street_address,
+          city: rows[0].city,
+          state: rows[0].state,
+          postal_code: rows[0].postal_code,
+          country: rows[0].country,
+        },
+        products: rows.map((row) => {
+          let productImage = null;
+          try {
+            const imagesArray = JSON.parse(row.product_images);
+            productImage = Array.isArray(imagesArray)
+              ? imagesArray[0]
+              : row.product_images;
+          } catch {
+            productImage = row.product_images;
+          }
+
+          return {
+            product_id: row.product_id,
+            name: row.product_name,
+            image: productImage,
+            quantity: row.quantity,
+            price: row.item_price,
+          };
+        }),
+      };
+
+      // ✅ Send email to owner
+      await sendInvoiceEmail(order);
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Order verified and saved", orderId });
   } catch (error) {
     console.error("Payment verification failed:", error);
     res.status(500).json({ success: false, message: "Payment verification failed" });

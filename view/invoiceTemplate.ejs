@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .header { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+    .section { margin-bottom: 15px; }
+    .bold { font-weight: bold; }
+    .line { border-top: 1px solid #ccc; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">Invoice - Order #<%= order.order_id %></div>
+
+  <div class="section">
+    <span class="bold">Date:</span> <%= new Date(order.created_at).toLocaleDateString() %>
+  </div>
+
+  <div class="line"></div>
+
+  <div class="section">
+    <div class="bold">Customer Details:</div>
+    <div><%= order.address.full_name %></div>
+    <div><%= order.address.street_address %>, <%= order.address.city %>, <%= order.address.state %> - <%= order.address.postal_code %>, <%= order.address.country %></div>
+    <div><strong>Phone:</strong> <%= order.address.phone_number %></div>
+  </div>
+
+  <div class="line"></div>
+
+  <div class="section">
+    <div class="bold">Order Summary:</div>
+    <ul>
+      <% order.products.forEach(item => { %>
+        <li><%= item.name %> (x<%= item.quantity %>) - Rs. <%= item.price %></li>
+      <% }) %>
+    </ul>
+    <div><strong>Total:</strong> Rs. <%= order.total_amount %></div>
+  </div>
+
+  <div class="section">
+    For queries, contact: <strong>+91 8447145941</strong><br />
+    WhatsApp: https://wa.me/8447145941
+  </div>
+</body>
+</html>
