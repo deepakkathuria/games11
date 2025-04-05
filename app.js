@@ -5,7 +5,6 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
-const { sendInvoiceEmail } = require("./utils/generateInvoice");
 
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
 
@@ -38,6 +37,10 @@ cloudinary.config({
 
 
 
+const sendInvoiceEmail = require("./utils/sendInvoiceEmail");
+
+
+
 
 const app = express();
 app.use(express.json());
@@ -58,6 +61,7 @@ app.listen(PORT, () => {
 
 
 const cron = require('node-cron');
+// const sendInvoiceEmail = require("./utils/sendInvoiceemail");
 // const pool = require('./db'); // Your database connection pool
 
 // Schedule the job to run daily at midnight
