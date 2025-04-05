@@ -1,0 +1,35 @@
+const axios = require("axios");
+
+const sendTelegramMessage = async (order) => {
+  const productDetails = order.products
+    .map(
+      (item) => `
+🛍️ *${item.name}*
+🖼️ Image: ${item.image}
+📦 Quantity: ${item.quantity}
+💰 Price: Rs. ${item.price}`
+    )
+    .join("\n\n");
+
+  const message = `
+🛒 *New Order Received*
+👤 *Customer:* ${order.address.full_name}
+📞 *Phone:* ${order.address.phone_number}
+📍 *Address:* ${order.address.street_address}, ${order.address.city}, ${order.address.state} - ${order.address.postal_code}
+💵 *Total:* Rs. ${order.total_amount}
+
+=======================
+${productDetails}
+`;
+
+  const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+
+  await axios.post(url, {
+    chat_id: process.env.TELEGRAM_CHAT_ID,
+    text: message,
+    parse_mode: "Markdown",
+    disable_web_page_preview: false, // if true, disables preview of image links
+  });
+};
+
+module.exports = sendTelegramMessage;
