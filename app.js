@@ -1854,6 +1854,71 @@ app.get("/admin/product/:productId", async (req, res) => {
 /**
  * ✅ Create New Product
  */
+// app.post("/admin/products", async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       price,
+//       slug,
+//       category,
+//       subcategory,           // ✅ NEW
+//       is_trendy = false,     // ✅ NEW
+//       is_unique = false,     // ✅ NEW
+//       new: isNew,
+//       features,
+//       description,
+//       includes,
+//       gallery,
+//       category_image,
+//       cart_image,
+//       short_name,
+//       first_image,
+//       images,
+//     } = req.body;
+
+//     if (!name || !price || !category) {
+//       return res.status(400).json({ error: "Name, Price, and Category are required" });
+//     }
+
+//     const uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
+
+//     const query = `
+//       INSERT INTO products (
+//         name, price, slug, category, subcategory, is_trendy, is_unique,
+//         new, features, description, images, includes, gallery,
+//         category_image, cart_image, short_name, first_image
+//       )
+//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+//     `;
+
+//     await userDBPool.query(query, [
+//       name,
+//       price,
+//       slug,
+//       category,
+//       subcategory || null,
+//       is_trendy,
+//       is_unique,
+//       isNew || 0,
+//       features || null,
+//       description || null,
+//       JSON.stringify(uploadedImages),
+//       JSON.stringify(includes) || "[]",
+//       JSON.stringify(gallery) || "[]",
+//       JSON.stringify(category_image) || "[]",
+//       cart_image || null,
+//       short_name || null,
+//       first_image || null,
+//     ]);
+
+//     res.status(201).json({ message: "✅ Product created successfully", images: uploadedImages });
+//   } catch (error) {
+//     console.error("❌ Error creating product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
 app.post("/admin/products", async (req, res) => {
   try {
     const {
@@ -1861,9 +1926,9 @@ app.post("/admin/products", async (req, res) => {
       price,
       slug,
       category,
-      subcategory,           // ✅ NEW
-      is_trendy = false,     // ✅ NEW
-      is_unique = false,     // ✅ NEW
+      subcategory,
+      is_trendy = false,
+      is_unique = false,
       new: isNew,
       features,
       description,
@@ -1874,6 +1939,7 @@ app.post("/admin/products", async (req, res) => {
       short_name,
       first_image,
       images,
+      sold_out = false, // ✅ NEW
     } = req.body;
 
     if (!name || !price || !category) {
@@ -1886,9 +1952,9 @@ app.post("/admin/products", async (req, res) => {
       INSERT INTO products (
         name, price, slug, category, subcategory, is_trendy, is_unique,
         new, features, description, images, includes, gallery,
-        category_image, cart_image, short_name, first_image
+        category_image, cart_image, short_name, first_image, sold_out
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await userDBPool.query(query, [
@@ -1909,6 +1975,7 @@ app.post("/admin/products", async (req, res) => {
       cart_image || null,
       short_name || null,
       first_image || null,
+      sold_out, // ✅ NEW
     ]);
 
     res.status(201).json({ message: "✅ Product created successfully", images: uploadedImages });
@@ -1918,9 +1985,117 @@ app.post("/admin/products", async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+
 /**
  * ✅ Update Product
  */
+// app.put("/admin/product/:productId", async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+//     const {
+//       name,
+//       price,
+//       slug,
+//       category,
+//       subcategory,
+//       is_trendy = false,
+//       is_unique = false,
+//       new: isNew,
+//       features,
+//       description,
+//       includes,
+//       gallery,
+//       category_image,
+//       cart_image,
+//       short_name,
+//       first_image,
+//       images,
+//     } = req.body;
+
+//     if (!name || !price || !category) {
+//       return res.status(400).json({ error: "❌ Name, Price, and Category are required" });
+//     }
+
+//     const selectQuery = "SELECT images FROM products WHERE item_id = ?";
+//     const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
+
+//     if (existingProduct.length === 0) {
+//       return res.status(404).json({ error: "❌ Product not found" });
+//     }
+
+//     let existingImages = [];
+//     try {
+//       existingImages = JSON.parse(existingProduct[0].images || "[]");
+//     } catch (error) {
+//       console.error("❌ Error parsing existing images from DB:", error);
+//       existingImages = [];
+//     }
+
+//     let updatedImages = [];
+//     try {
+//       if (typeof images === "string") {
+//         if (images.startsWith("[") && images.endsWith("]")) {
+//           updatedImages = JSON.parse(images);
+//         } else {
+//           updatedImages = [images];
+//         }
+//       } else if (Array.isArray(images)) {
+//         updatedImages = images;
+//       }
+//     } catch (error) {
+//       console.error("❌ Error parsing images:", error);
+//       return res.status(400).json({ error: "Invalid images format" });
+//     }
+
+//     if (updatedImages.length === 0) {
+//       updatedImages = existingImages;
+//     }
+
+//     const query = `
+//       UPDATE products SET 
+//         name = ?, price = ?, slug = ?, category = ?, subcategory = ?, is_trendy = ?, is_unique = ?,
+//         new = ?, features = ?, description = ?, 
+//         images = ?, includes = ?, gallery = ?, 
+//         category_image = ?, cart_image = ?, short_name = ?, first_image = ?
+//       WHERE item_id = ?
+//     `;
+
+//     await userDBPool.query(query, [
+//       name,
+//       price,
+//       slug,
+//       category,
+//       subcategory || null,
+//       is_trendy,
+//       is_unique,
+//       isNew || 0,
+//       features || null,
+//       description || null,
+//       JSON.stringify(updatedImages),
+//       JSON.stringify(includes) || "[]",
+//       JSON.stringify(gallery) || "[]",
+//       JSON.stringify(category_image) || "[]",
+//       cart_image || null,
+//       short_name || null,
+//       first_image || null,
+//       productId,
+//     ]);
+
+//     res.status(200).json({ message: "✅ Product updated successfully", images: updatedImages });
+//   } catch (error) {
+//     console.error("❌ Error updating product:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
 app.put("/admin/product/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
@@ -1942,6 +2117,7 @@ app.put("/admin/product/:productId", async (req, res) => {
       short_name,
       first_image,
       images,
+      sold_out = false, // ✅ NEW
     } = req.body;
 
     if (!name || !price || !category) {
@@ -1988,7 +2164,7 @@ app.put("/admin/product/:productId", async (req, res) => {
         name = ?, price = ?, slug = ?, category = ?, subcategory = ?, is_trendy = ?, is_unique = ?,
         new = ?, features = ?, description = ?, 
         images = ?, includes = ?, gallery = ?, 
-        category_image = ?, cart_image = ?, short_name = ?, first_image = ?
+        category_image = ?, cart_image = ?, short_name = ?, first_image = ?, sold_out = ?
       WHERE item_id = ?
     `;
 
@@ -2010,6 +2186,7 @@ app.put("/admin/product/:productId", async (req, res) => {
       cart_image || null,
       short_name || null,
       first_image || null,
+      sold_out, // ✅ NEW
       productId,
     ]);
 
@@ -2019,6 +2196,8 @@ app.put("/admin/product/:productId", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
 
 /**
  * ✅ Delete Product
