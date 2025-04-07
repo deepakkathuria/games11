@@ -1395,7 +1395,9 @@ app.patch("/auth/change-password", async (req, res) => {
 app.get('/products/trending', async (req, res) => {
   try {
     const [rows] = await userDBPool.query(
-      "SELECT * FROM products WHERE is_trendy = 1 ORDER BY item_id DESC LIMIT 8"
+      `SELECT * FROM products 
+       WHERE is_trendy = 1 OR is_unique = 1 
+       ORDER BY item_id DESC LIMIT 8`
     );
 
     const formattedRows = rows.map((product) => {
@@ -1424,6 +1426,7 @@ app.get('/products/trending', async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 
 app.get('/products', async (req, res) => {
