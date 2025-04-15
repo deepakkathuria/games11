@@ -474,49 +474,6 @@ app.post("/user/upload", upload.single("file"), async (req, res) => {
 
 
 
-// -------------------------------payment routes--------------------------------------------------------
-// app.post("/create-payment-intent", async (req, res) => {
-//   try {
-//     const { cartItems } = req.body;
-
-//     if (!cartItems || cartItems.length === 0) {
-//       return res.status(400).json({ message: "Cart items are required." });
-//     }
-
-//     const orderAmount = cartItems.reduce(
-//       (accumulator, current) => accumulator + current.price * current.quantity,
-//       0
-//     );
-
-//     if (orderAmount <= 0) {
-//       return res.status(400).json({ message: "Invalid order amount." });
-//     }
-
-//     const paymentIntent = await stripe.paymentIntents.create({
-//       amount: orderAmount * 100, // Convert to cents
-//       currency: "usd",
-//       automatic_payment_methods: {
-//         enabled: true,
-//       },
-//     });
-
-//     res.status(200).json({
-//       clientSecret: paymentIntent.client_secret,
-//     });
-//   } catch (error) {
-//     console.error("Error creating payment intent:", error);
-//     res.status(500).json({ error: "Failed to create payment intent." });
-//   }
-// });
-
-// ------------------------------payment routes------------------------------------------------------------
-
-
-
-
-
-
-
 
 
 // ---------------------------------------------review routes----------------------------------------------------
@@ -1123,6 +1080,47 @@ app.delete("/cart/clear", async (req, res) => {
 
 
 
+app.post("/cart/apply-promo", async (req, res) => {
+  const { code, cartTotal } = req.body;
+
+  try {
+    const query = "SELECT * FROM promo_codes WHERE code = ?";
+    const [promo] = await userDBPool.query(query, [code]);
+
+    if (!promo.length) return res.status(400).json({ error: "Invalid promo code" });
+
+    const promoData = promo[0];
+
+    if (promoData.expiry_date && new Date(promoData.expiry_date) < new Date()) {
+      return res.status(400).json({ error: "Promo code expired" });
+    }
+
+    if (cartTotal < promoData.min_cart_value) {
+      return res.status(400).json({ error: `Minimum cart value should be Rs.${promoData.min_cart_value}` });
+    }
+
+    let discount = (cartTotal * promoData.discount_percent) / 100;
+
+    if (promoData.max_discount_value && discount > promoData.max_discount_value) {
+      discount = promoData.max_discount_value;
+    }
+
+    const discountedTotal = cartTotal - discount;
+
+    return res.status(200).json({
+      message: "Promo applied successfully",
+      discount: Math.round(discount),
+      total: Math.round(discountedTotal),
+      promo: code,
+    });
+  } catch (err) {
+    console.error("Promo error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 // ------------------------------------------------------cart--------------------------------------------------------
 
 
@@ -1305,91 +1303,7 @@ app.patch("/auth/change-password", async (req, res) => {
 
 
 
-// app.get('/products', async (req, res) => {
-//   console.log("📦 Fetching paginated products...");
 
-//   const page = parseInt(req.query.page) || 1;
-//   const limit = parseInt(req.query.limit) || 16;
-//   const offset = (page - 1) * limit;
-
-//   try {
-//     // Get total count first
-//     const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
-//     const totalCount = countResult[0].count;
-//     const totalPages = Math.ceil(totalCount / limit);
-
-//     // Get paginated data
-//     const [rows] = await userDBPool.query(
-//       "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
-//       [limit, offset]
-//     );
-
-//     const formattedRows = rows.map(product => ({
-//       ...product,
-//       avg_rating: null // Add dummy rating
-//     }));
-
-//     res.status(200).json({
-//       status: 200,
-//       currentPage: page,
-//       totalPages,
-//       rows: formattedRows,
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Error fetching paginated products:", error);
-//     res.status(500).json({ status: 500, error: "Database error" });
-//   }
-// });
-
-// Product Pagination API with JSON image parsing
-// app.get('/products', async (req, res) => {
-//   console.log("📦 Fetching paginated products...");
-
-//   const page = parseInt(req.query.page) || 1;
-//   const limit = parseInt(req.query.limit) || 16;
-//   const offset = (page - 1) * limit;
-
-//   try {
-//     const [countResult] = await userDBPool.query("SELECT COUNT(*) AS count FROM products");
-//     const totalCount = countResult[0].count;
-//     const totalPages = Math.ceil(totalCount / limit);
-
-//     const [rows] = await userDBPool.query(
-//       "SELECT * FROM products ORDER BY item_id DESC LIMIT ? OFFSET ?",
-//       [limit, offset]
-//     );
-
-//     const formattedRows = rows.map((product) => {
-//       let parsedImages = [];
-
-//       try {
-//         parsedImages = typeof product.images === "string"
-//           ? JSON.parse(product.images)
-//           : product.images;
-//       } catch (e) {
-//         parsedImages = [];
-//       }
-
-//       return {
-//         ...product,
-//         images: parsedImages,
-//         avg_rating: null,
-//       };
-//     });
-
-//     res.status(200).json({
-//       status: 200,
-//       currentPage: page,
-//       totalPages,
-//       rows: formattedRows,
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Error fetching paginated products:", error);
-//     res.status(500).json({ status: 500, error: "Database error" });
-//   }
-// });
 
 
 app.get('/products/trending', async (req, res) => {
@@ -1633,205 +1547,6 @@ app.get("/admin/products", async (req, res) => {
 
 
 
-// /**
-//  * ✅ Get Product by ID
-//  */
-// app.get("/admin/product/:productId", async (req, res) => {
-//   try {
-//     const { productId } = req.params;
-//     const query = "SELECT * FROM products WHERE item_id = ?";
-//     const [rows] = await userDBPool.query(query, [productId]);
-
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "Product not found" });
-//     }
-
-//     res.status(200).json({ product: rows[0] });
-//   } catch (error) {
-//     console.error("Error fetching product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
-
-// /**
-//  * ✅ Create New Product
-//  */
-// app.post("/admin/products", async (req, res) => {
-//   try {
-//     const {
-//       name,
-//       price,
-//       slug,
-//       category,
-//       new: isNew,
-//       features,
-//       description,
-//       includes,
-//       gallery,
-//       category_image,
-//       cart_image,
-//       short_name,
-//       first_image,
-//       images, // ✅ Get images directly from the request body
-//     } = req.body;
-
-//     if (!name || !price || !category) {
-//       return res.status(400).json({ error: "Name, Price, and Category are required" });
-//     }
-
-//     // ✅ Ensure images are stored as an array
-//     let uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
-
-//     const query = `
-//       INSERT INTO products (name, price, slug, category, new, features, description, images, includes, gallery, category_image, cart_image, short_name, first_image) 
-//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-//     `;
-
-//     await userDBPool.query(query, [
-//       name,
-//       price,
-//       slug,
-//       category,
-//       isNew || 0,
-//       features || null,
-//       description || null,
-//       JSON.stringify(uploadedImages), // ✅ Store images as JSON array
-//       JSON.stringify(includes) || "[]",
-//       JSON.stringify(gallery) || "[]",
-//       JSON.stringify(category_image) || "[]",
-//       cart_image || null,
-//       short_name || null,
-//       first_image || null,
-//     ]);
-
-//     res.status(201).json({ message: "✅ Product created successfully", images: uploadedImages });
-//   } catch (error) {
-//     console.error("❌ Error creating product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
-
-
-// /**
-//  * ✅ Update Product
-//  */
-// app.put("/admin/product/:productId", async (req, res) => {
-//   try {
-//     const { productId } = req.params;
-//     const {
-//       name,
-//       price,
-//       slug,
-//       category,
-//       new: isNew,
-//       features,
-//       description,
-//       includes,
-//       gallery,
-//       category_image,
-//       cart_image,
-//       short_name,
-//       first_image,
-//       images, // ✅ Fix: Handle images properly
-//     } = req.body;
-
-//     if (!name || !price || !category) {
-//       return res.status(400).json({ error: "❌ Name, Price, and Category are required" });
-//     }
-
-//     // ✅ Fetch existing product images from DB
-//     const selectQuery = "SELECT images FROM products WHERE item_id = ?";
-//     const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
-
-//     if (existingProduct.length === 0) {
-//       return res.status(404).json({ error: "❌ Product not found" });
-//     }
-
-//     // ✅ Parse existing images safely
-//     let existingImages = [];
-//     try {
-//       existingImages = JSON.parse(existingProduct[0].images || "[]");
-//     } catch (error) {
-//       console.error("❌ Error parsing existing images from DB:", error);
-//       existingImages = [];
-//     }
-
-//     // ✅ Ensure `images` is an array
-//     let updatedImages = [];
-
-//     try {
-//       if (typeof images === "string") {
-//         if (images.startsWith("[") && images.endsWith("]")) {
-//           updatedImages = JSON.parse(images); // ✅ Valid JSON string
-//         } else {
-//           updatedImages = [images]; // ✅ Convert single URL string to array
-//         }
-//       } else if (Array.isArray(images)) {
-//         updatedImages = images;
-//       } else {
-//         updatedImages = [];
-//       }
-//     } catch (error) {
-//       console.error("❌ Error parsing images:", error);
-//       return res.status(400).json({ error: "Invalid images format" });
-//     }
-
-//     // ✅ If no new images provided, keep existing images
-//     if (updatedImages.length === 0) {
-//       updatedImages = existingImages;
-//     }
-
-//     const query = `
-//       UPDATE products SET 
-//       name = ?, price = ?, slug = ?, category = ?, new = ?, features = ?, description = ?, 
-//       images = ?, includes = ?, gallery = ?, category_image = ?, cart_image = ?, short_name = ?, first_image = ?
-//       WHERE item_id = ?
-//     `;
-
-//     await userDBPool.query(query, [
-//       name,
-//       price,
-//       slug,
-//       category,
-//       isNew || 0,
-//       features || null,
-//       description || null,
-//       JSON.stringify(updatedImages), // ✅ Store images as JSON array
-//       JSON.stringify(includes) || "[]",
-//       JSON.stringify(gallery) || "[]",
-//       JSON.stringify(category_image) || "[]",
-//       cart_image || null,
-//       short_name || null,
-//       first_image || null,
-//       productId,
-//     ]);
-
-//     res.status(200).json({ message: "✅ Product updated successfully", images: updatedImages });
-//   } catch (error) {
-//     console.error("❌ Error updating product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
-
-
-
-
-// /**
-//  * ✅ Delete Product
-//  */
-// app.delete("/admin/product/:productId", async (req, res) => {
-//   try {
-//     const { productId } = req.params;
-
-//     const query = "DELETE FROM products WHERE item_id = ?";
-//     await userDBPool.query(query, [productId]);
-
-//     res.status(200).json({ message: "Product deleted successfully" });
-//   } catch (error) {
-//     console.error("Error deleting product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 
 
 /**
@@ -1857,69 +1572,6 @@ app.get("/admin/product/:productId", async (req, res) => {
 /**
  * ✅ Create New Product
  */
-// app.post("/admin/products", async (req, res) => {
-//   try {
-//     const {
-//       name,
-//       price,
-//       slug,
-//       category,
-//       subcategory,           // ✅ NEW
-//       is_trendy = false,     // ✅ NEW
-//       is_unique = false,     // ✅ NEW
-//       new: isNew,
-//       features,
-//       description,
-//       includes,
-//       gallery,
-//       category_image,
-//       cart_image,
-//       short_name,
-//       first_image,
-//       images,
-//     } = req.body;
-
-//     if (!name || !price || !category) {
-//       return res.status(400).json({ error: "Name, Price, and Category are required" });
-//     }
-
-//     const uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
-
-//     const query = `
-//       INSERT INTO products (
-//         name, price, slug, category, subcategory, is_trendy, is_unique,
-//         new, features, description, images, includes, gallery,
-//         category_image, cart_image, short_name, first_image
-//       )
-//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-//     `;
-
-//     await userDBPool.query(query, [
-//       name,
-//       price,
-//       slug,
-//       category,
-//       subcategory || null,
-//       is_trendy,
-//       is_unique,
-//       isNew || 0,
-//       features || null,
-//       description || null,
-//       JSON.stringify(uploadedImages),
-//       JSON.stringify(includes) || "[]",
-//       JSON.stringify(gallery) || "[]",
-//       JSON.stringify(category_image) || "[]",
-//       cart_image || null,
-//       short_name || null,
-//       first_image || null,
-//     ]);
-
-//     res.status(201).json({ message: "✅ Product created successfully", images: uploadedImages });
-//   } catch (error) {
-//     console.error("❌ Error creating product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 
 
 app.post("/admin/products", async (req, res) => {
@@ -1998,8 +1650,7 @@ app.post("/admin/products", async (req, res) => {
 
 /**
  * ✅ Update Product
- */
-// app.put("/admin/product/:productId", async (req, res) => {
+
 //   try {
 //     const { productId } = req.params;
 //     const {
@@ -2318,217 +1969,6 @@ app.post("/create-order", async (req, res) => {
 });
 
 
-
-// app.post("/verify-payment", async (req, res) => {
-//   try {
-//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
-
-//     const sign = crypto
-//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-//       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-//       .digest("hex");
-
-//     if (sign !== razorpay_signature) {
-//       return res.status(400).json({ success: false, message: "Invalid signature" });
-//     }
-
-//     // ✅ Extract userId from JWT
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const { products, address, total_amount } = orderData;
-
-//     // ✅ Insert order
-//     const [orderRes] = await userDBPool.query(
-//       `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
-//        VALUES (?, ?, 'success', 'razorpay', 'confirmed', ?)`,
-//       [userId, total_amount, razorpay_payment_id]
-//     );
-
-//     const orderId = orderRes.insertId;
-
-//     // ✅ Insert address if available
-//     if (address) {
-//       const { full_name, phone_number, street_address, city, state, postal_code, country } = address;
-//       await userDBPool.query(
-//         `INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//         [orderId, userId, full_name, phone_number, street_address, city, state, postal_code, country || "India"]
-//       );
-//     }
-
-//     // ✅ Insert order items
-//     const orderItems = products.map(item => [orderId, item.product_id, item.quantity, item.price]);
-//     await userDBPool.query(
-//       `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
-//       [orderItems]
-//     );
-
-//     await userDBPool.query(`DELETE FROM Cart WHERE user_id = ?`, [userId]);
-
-
-//     res.status(200).json({ success: true, message: "Order verified and saved", orderId });
-//   } catch (error) {
-//     console.error("Payment verification failed:", error);
-//     res.status(500).json({ success: false, message: "Payment verification failed" });
-//   }
-// });
-
-
-
-
-
-// app.post("/verify-payment", async (req, res) => {
-//   try {
-//     const {
-//       razorpay_order_id,
-//       razorpay_payment_id,
-//       razorpay_signature,
-//       orderData,
-//     } = req.body;
-
-//     const sign = crypto
-//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-//       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-//       .digest("hex");
-
-//     if (sign !== razorpay_signature) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Invalid signature" });
-//     }
-
-//     // ✅ Extract userId from JWT
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token)
-//       return res.status(401).json({ success: false, message: "Unauthorized" });
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const { products, address, total_amount } = orderData;
-
-//     // ✅ Insert into orders
-//     const [orderRes] = await userDBPool.query(
-//       `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
-//        VALUES (?, ?, 'success', 'razorpay', 'confirmed', ?)`,
-//       [userId, total_amount, razorpay_payment_id]
-//     );
-
-//     const orderId = orderRes.insertId;
-
-//     // ✅ Insert address if available
-//     if (address) {
-//       const {
-//         full_name,
-//         phone_number,
-//         street_address,
-//         city,
-//         state,
-//         postal_code,
-//         country,
-//       } = address;
-
-//       await userDBPool.query(
-//         `INSERT INTO address_orders (order_id, user_id, full_name, phone_number, street_address, city, state, postal_code, country)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//         [
-//           orderId,
-//           userId,
-//           full_name,
-//           phone_number,
-//           street_address,
-//           city,
-//           state,
-//           postal_code,
-//           country || "India",
-//         ]
-//       );
-//     }
-
-//     // ✅ Insert order items
-//     const orderItems = products.map((item) => [
-//       orderId,
-//       item.product_id,
-//       item.quantity,
-//       item.price,
-//     ]);
-
-//     await userDBPool.query(
-//       `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
-//       [orderItems]
-//     );
-
-//     // ✅ Clear Cart
-//     await userDBPool.query(`DELETE FROM Cart WHERE user_id = ?`, [userId]);
-
-//     // ✅ Fetch full order to send email
-//     const [rows] = await userDBPool.query(
-//       `
-//       SELECT 
-//         o.order_id, o.total_amount, o.created_at,
-//         oi.product_id, oi.quantity, oi.price AS item_price,
-//         p.name AS product_name, p.images AS product_images,
-//         ao.full_name, ao.phone_number, ao.street_address, ao.city, ao.state, ao.postal_code, ao.country
-//       FROM orders o
-//       LEFT JOIN order_items oi ON o.order_id = oi.order_id
-//       LEFT JOIN products p ON oi.product_id = p.item_id
-//       LEFT JOIN address_orders ao ON o.order_id = ao.order_id
-//       WHERE o.order_id = ?
-//     `,
-//       [orderId]
-//     );
-
-//     if (rows.length > 0) {
-//       const order = {
-//         order_id: rows[0].order_id,
-//         total_amount: rows[0].total_amount,
-//         created_at: rows[0].created_at,
-//         address: {
-//           full_name: rows[0].full_name,
-//           phone_number: rows[0].phone_number,
-//           street_address: rows[0].street_address,
-//           city: rows[0].city,
-//           state: rows[0].state,
-//           postal_code: rows[0].postal_code,
-//           country: rows[0].country,
-//         },
-//         products: rows.map((row) => {
-//           let productImage = null;
-//           try {
-//             const imagesArray = JSON.parse(row.product_images);
-//             productImage = Array.isArray(imagesArray)
-//               ? imagesArray[0]
-//               : row.product_images;
-//           } catch {
-//             productImage = row.product_images;
-//           }
-
-//           return {
-//             product_id: row.product_id,
-//             name: row.product_name,
-//             image: productImage,
-//             quantity: row.quantity,
-//             price: row.item_price,
-//           };
-//         }),
-//       };
-
-//       // ✅ Send email to owner
-//       await sendInvoiceEmail(order);
-//     }
-
-//     res
-//       .status(200)
-//       .json({ success: true, message: "Order verified and saved", orderId });
-//   } catch (error) {
-//     console.error("Payment verification failed:", error);
-//     res.status(500).json({ success: false, message: "Payment verification failed" });
-//   }
-// });
 
 
 app.post("/verify-payment", async (req, res) => {
