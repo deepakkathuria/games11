@@ -1115,51 +1115,11 @@ app.delete("/cart/clear", async (req, res) => {
 
 
 
-// app.post("/cart/apply-promo", async (req, res) => {
-//   const { code, cartTotal } = req.body;
-
-//   try {
-//     const query = "SELECT * FROM promo_codes WHERE code = ?";
-//     const [promo] = await userDBPool.query(query, [code]);
-
-//     if (!promo.length) return res.status(400).json({ error: "Invalid promo code" });
-
-//     const promoData = promo[0];
-
-//     if (promoData.expiry_date && new Date(promoData.expiry_date) < new Date()) {
-//       return res.status(400).json({ error: "Promo code expired" });
-//     }
-
-//     if (cartTotal < promoData.min_cart_value) {
-//       return res.status(400).json({ error: `Minimum cart value should be Rs.${promoData.min_cart_value}` });
-//     }
-
-//     let discount = (cartTotal * promoData.discount_percent) / 100;
-
-//     if (promoData.max_discount_value && discount > promoData.max_discount_value) {
-//       discount = promoData.max_discount_value;
-//     }
-
-//     const discountedTotal = cartTotal - discount;
-
-//     return res.status(200).json({
-//       message: "Promo applied successfully",
-//       discount: Math.round(discount),
-//       total: Math.round(discountedTotal),
-//       promo: code,
-//     });
-//   } catch (err) {
-//     console.error("Promo error:", err);
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// });
-
-
 app.post("/cart/apply-promo", async (req, res) => {
   const { code, cartTotal } = req.body;
 
   try {
-    const query = "SELECT * FROM promo_codes WHERE LOWER(code) = LOWER(?)";
+    const query = "SELECT * FROM promo_codes WHERE code = ?";
     const [promo] = await userDBPool.query(query, [code]);
 
     if (!promo.length) return res.status(400).json({ error: "Invalid promo code" });
@@ -1193,6 +1153,9 @@ app.post("/cart/apply-promo", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
+
 
 
 // ------------------------------------------------------cart--------------------------------------------------------
