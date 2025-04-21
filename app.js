@@ -6,6 +6,8 @@ const axios = require("axios");
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
 
+const { OAuth2Client } = require("google-auth-library");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
 
 
@@ -466,37 +468,7 @@ app.post("/user/upload", upload.single("file"), async (req, res) => {
 
 
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.userId = user.user_id; // assuming token payload has user_id
-    next();
-  });
-};
-
-app.get("/api/user/basic", authenticateToken, async (req, res) => {
-  try {
-    const [rows] = await userDBPool.query(
-      "SELECT name, email FROM users WHERE user_id = ?",
-      [req.userId]
-    );
-
-    if (rows.length === 0) return res.status(404).json({ error: "User not found" });
-
-    const { name, email } = rows[0];
-    const [firstName, ...rest] = name.split(" ");
-    const lastName = rest.join(" ");
-
-    res.json({ first_name: firstName || "", last_name: lastName || "", email });
-  } catch (err) {
-    console.error("Error fetching user:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 
 // -----------------------------------------------------user routes----------------------------------------
@@ -2193,5 +2165,83 @@ app.post("/verify-payment", async (req, res) => {
   } catch (error) {
     console.error("Payment verification failed:", error);
     res.status(500).json({ success: false, message: "Payment verification failed" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------------------google login-----------------------------------------
+
+app.post("/auth/google-login", async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "Google token is required." });
+    }
+
+    // ✅ Verify token from frontend
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+
+    // ✅ Check if user already exists
+    const [userRows] = await userDBPool.query("SELECT * FROM users WHERE email = ?", [email]);
+
+    let user;
+    if (userRows.length > 0) {
+      user = userRows[0];
+    } else {
+      // ✅ Create new user if not exists
+      const hashedPassword = await bcrypt.hash(Date.now().toString(), 10);
+      const [insertResult] = await userDBPool.query(
+        "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+        [name, email, hashedPassword]
+      );
+
+      const [newUserRows] = await userDBPool.query(
+        "SELECT * FROM users WHERE user_id = ?",
+        [insertResult.insertId]
+      );
+      user = newUserRows[0];
+    }
+
+    // ✅ Create JWT token
+    const authToken = jwt.sign(
+      { id: user.user_id },
+      process.env.ACCESS_TOKEN_SECRET || "default_secret",
+      { algorithm: "HS256", expiresIn: "1h" }
+    );
+
+    return res.status(200).json({
+      message: "✅ Google login successful",
+      token: authToken,
+      user: {
+        id: user.user_id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Google login error:", error);
+    res.status(500).json({ message: "❌ Google authentication failed." });
   }
 });
