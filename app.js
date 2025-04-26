@@ -466,7 +466,27 @@ app.post("/user/upload", upload.single("file"), async (req, res) => {
   }
 });
 
+app.get("/auth/user/basic", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
 
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const query = "SELECT user_id, name, email FROM users WHERE user_id = ?";
+    const [rows] = await userDBPool.query(query, [userId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error("Error fetching user basic info:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
 
 
 
