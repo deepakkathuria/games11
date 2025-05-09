@@ -112,7 +112,7 @@ app.get('/api/analyze-url', async (req, res) => {
   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
 
   try {
-    console.log(`🔍 [Analyze] Fetching URL: ${url}`);mysq
+    console.log(`🔍 [Analyze] Fetching URL: ${url}`);
     const articleData = await extractArticleData(url);
     console.log('✅ [Analyze] Article Data:', articleData);
 
