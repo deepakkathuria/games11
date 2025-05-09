@@ -3,6 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
+const rateLimit = require("express-rate-limit");
+
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
 
@@ -21,6 +23,10 @@ const multer = require("multer");
 
 const { upload } = require("./config/multer"); // Ensure multer config is set up
 const bcrypt = require("bcrypt");
+const cheerio = require('cheerio');
+const Parser = require('rss-parser');
+const { OpenAI } = require('openai');
+
 
 
 
@@ -47,6 +53,8 @@ const sendInvoiceEmail = require("./utils/sendInvoiceEmail");
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.set('trust proxy', 1); // even for cross-origin frontend/backend
+
 
 const PORT = process.env.PORT || 5000;
 
