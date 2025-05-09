@@ -100,6 +100,60 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
+// const { checkAndProcessArticles } = require('./seoScheduler');
+
+// checkAndProcessArticles(); // Run once on startup
+
+// setInterval(() => {
+//   console.log('⏱️ Auto-running SEO analysis every 2 minutes...');
+//   checkAndProcessArticles();
+// }, 2 * 60 * 1000)
+
+
+
+
+// GET all saved reports
+// app.get('/api/reports', async (req, res) => {
+//   try {
+//     const [reports] = await pollDBPool.query(`
+//       SELECT id, title, url, table_text, rewrite_text, created_at 
+//       FROM seo_reports 
+//       ORDER BY created_at DESC
+//     `);
+//     res.json({ success: true, reports });
+//   } catch (err) {
+//     console.error('❌ [Get Reports] Error:', err.message);
+//     res.status(500).json({ success: false, error: 'Failed to fetch SEO reports' });
+//   }
+// });
+
+// // GET single report by URL
+// app.get('/api/reports/search', async (req, res) => {
+//   const { url } = req.query;
+//   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+
+//   try {
+//     const [result] = await pollDBPool.query(`
+//       SELECT id, title, url, table_text, rewrite_text, created_at 
+//       FROM seo_reports 
+//       WHERE url LIKE ?
+//       ORDER BY created_at DESC
+//       LIMIT 1
+//     `, [`%${url}%`]);
+
+//     if (result.length === 0) {
+//       return res.status(404).json({ success: false, message: 'No report found for this URL' });
+//     }
+
+//     res.json({ success: true, report: result[0] });
+//   } catch (err) {
+//     console.error('❌ [Search Report] Error:', err.message);
+//     res.status(500).json({ success: false, error: 'Failed to search report' });
+//   }
+// });
+
+
+
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -207,37 +261,37 @@ Return like this:
   return res.choices[0].message.content;
 }
 
-async function analyzeAndSuggest({ title, description, body }, competitors) {
-  const prompt = `
-You're an expert SEO content strategist.
+// async function analyzeAndSuggest({ title, description, body }, competitors) {
+//   const prompt = `
+// You're an expert SEO content strategist.
 
-Below is a cricket article we're analyzing. Compare it to these top-ranking competitors.
+// Below is a cricket article we're analyzing. Compare it to these top-ranking competitors.
 
-Your tasks:
-1. List SEO gaps in table format (Section | Issue | Suggestion)
-2. Write a better version of the article's intro (2–3 paragraphs) that incorporates those suggestions.
+// Your tasks:
+// 1. List SEO gaps in table format (Section | Issue | Suggestion)
+// 2. Write a better version of the article's intro (2–3 paragraphs) that incorporates those suggestions.
 
----
+// ---
 
-Article Title: ${title}
-Meta Description: ${description}
-Body:
-${body}
+// Article Title: ${title}
+// Meta Description: ${description}
+// Body:
+// ${body}
 
-Top Ranking Competitor Summaries:
-${competitors}
+// Top Ranking Competitor Summaries:
+// ${competitors}
 
-Return first a markdown table of SEO GAP REPORT, then a heading: "✅ Recommended Rewrite" and write the new version.
-`;
+// Return first a markdown table of SEO GAP REPORT, then a heading: "✅ Recommended Rewrite" and write the new version.
+// `;
 
-  const res = await openai.chat.completions.create({
-    model: 'gpt-4-turbo',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.3,
-  });
+//   const res = await openai.chat.completions.create({
+//     model: 'gpt-4-turbo',
+//     messages: [{ role: 'user', content: prompt }],
+//     temperature: 0.3,
+//   });
 
-  return res.choices[0].message.content;
-}
+//   return res.choices[0].message.content;
+// }
 
 
 
@@ -271,6 +325,96 @@ Return first a markdown table of SEO GAP REPORT, then a heading: "✅ Recommende
 
 
 
+async function analyzeAndSuggest({ title, description, body }, competitors) {
+  const prompt = `
+You're an expert SEO content strategist and writer.
+
+Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
+
+---
+
+### 🔧 Your Tasks:
+
+1. *SEO Gap Report*  
+   Identify all SEO issues in table format with columns:  
+   *Section | Issue | Suggestion*  
+   (e.g., Title too generic, meta missing target keyword, lacks internal links, etc.)
+
+2. *Writing Pattern Analysis*  
+   Analyze how top-ranking articles are written:
+   - Use of headings and subheadings  
+   - Tone (conversational, formal, stat-heavy, etc.)  
+   - Structure (FAQs, lists, stats tables, expert quotes)  
+   - Visual elements (tables, embedded content, etc.)
+
+   Summarize key differences in structure between our article and competitors.
+
+3. *Keyword Research*  
+   Based on article and competitors, identify:
+   - *Primary Keyword*
+   - *Secondary Keywords*
+   - *Long-tail opportunities*
+   - *Missed keyword intents* (e.g., "Dream11 team today," "player stats," "who will win today")
+
+   Present in markdown table:  
+   *Keyword | Type | Suggested Usage*
+
+4. *Recommended Rewrite*  
+   Write a fully optimized, rewritten version of the article incorporating:
+   - All SEO suggestions  
+   - Target keywords  
+   - Competitor-inspired structure and writing pattern  
+   - Better headlines and meta
+
+---
+
+### 🔍 Inputs
+
+*Article Title:*  
+${title}
+
+*Meta Description:*  
+${description}
+
+*Body:*  
+${body}
+
+*Top Ranking Competitor Summaries:*  
+${competitors}
+
+---
+
+### 🧠 Return the following output in order:
+
+#### 📊 SEO GAP REPORT (Markdown Table)
+| Section | Issue | Suggestion |
+|---------|-------|------------|
+
+---
+
+#### 📝 WRITING PATTERN ANALYSIS
+(Paragraph format comparing structure, tone, depth, etc.)
+
+---
+
+#### 🔑 KEYWORD RESEARCH SUMMARY
+| Keyword | Type | Suggested Usage |
+|---------|------|------------------|
+
+---
+
+#### ✅ RECOMMENDED REWRITE
+(Write the improved version of the article)
+`;
+
+  const res = await openai.chat.completions.create({
+    model: 'gpt-4-turbo',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+  });
+
+  return res.choices[0].message.content;
+}
 
 
 
@@ -279,27 +423,30 @@ Return first a markdown table of SEO GAP REPORT, then a heading: "✅ Recommende
 
 
 
-app.post("/api/polls", async (req, res) => {
-  const { title, description, match_id } = req.body;
 
-  if (!title || !match_id) {
-    return res.status(400).json({ message: "Invalid input. Provide a title and match_id." });
-  }
 
-  try {
-    // Insert poll into the database
-    const insertPollQuery = `
-      INSERT INTO polls (title, description, match_id, status) 
-      VALUES (?, ?, ?, 'active');
-    `;
-    const [pollResult] = await pollDBPool.query(insertPollQuery, [title, description || null, match_id]);
 
-    res.status(201).json({ message: "Poll created successfully", pollId: pollResult.insertId });
-  } catch (error) {
-    console.error("Error creating poll:", error.message);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
+  app.post("/api/polls", async (req, res) => {
+    const { title, description, match_id } = req.body;
+
+    if (!title || !match_id) {
+      return res.status(400).json({ message: "Invalid input. Provide a title and match_id." });
+    }
+
+    try {
+      // Insert poll into the database
+      const insertPollQuery = `
+        INSERT INTO polls (title, description, match_id, status) 
+        VALUES (?, ?, ?, 'active');
+      `;
+      const [pollResult] = await pollDBPool.query(insertPollQuery, [title, description || null, match_id]);
+
+      res.status(201).json({ message: "Poll created successfully", pollId: pollResult.insertId });
+    } catch (error) {
+      console.error("Error creating poll:", error.message);
+      res.status(500).json({ error: "Internal server error." });
+    }
+  });
 
 
 // **Vote API**
