@@ -3,7 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
-const rateLimit = require("express-rate-limit");
 
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
@@ -102,6 +101,7 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 
 
