@@ -99,58 +99,56 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
+// const { fetchAndProcessFeed } = require('./seoScheduler');
 
-// const { checkAndProcessArticles } = require('./seoScheduler');
-
-// checkAndProcessArticles(); // Run once on startup
+// fetchAndProcessFeed(); // Run once on server start
 
 // setInterval(() => {
-//   console.log('⏱️ Auto-running SEO analysis every 2 minutes...');
-//   checkAndProcessArticles();
-// }, 2 * 60 * 1000)
+//   console.log('⏱️ Cron: Running every 5 minutes...');
+//   fetchAndProcessFeed();
+// }, 5 * 60 * 1000);
 
 
+// 🔹 GET latest 5 reports
+app.get('/api/reports-json', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT id, title, url, full_gpt_text, created_at
+      FROM seo_reports_json
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('❌ [Fetch Reports] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch reports.' });
+  }
+});
 
+// 🔹 GET report by URL
+app.get('/api/reports-json/search', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'Missing URL.' });
 
-// GET all saved reports
-// app.get('/api/reports', async (req, res) => {
-//   try {
-//     const [reports] = await pollDBPool.query(`
-//       SELECT id, title, url, table_text, rewrite_text, created_at 
-//       FROM seo_reports 
-//       ORDER BY created_at DESC
-//     `);
-//     res.json({ success: true, reports });
-//   } catch (err) {
-//     console.error('❌ [Get Reports] Error:', err.message);
-//     res.status(500).json({ success: false, error: 'Failed to fetch SEO reports' });
-//   }
-// });
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT id, title, url, full_gpt_text, created_at
+      FROM seo_reports_json
+      WHERE url LIKE ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [`%${url}%`]);
 
-// // GET single report by URL
-// app.get('/api/reports/search', async (req, res) => {
-//   const { url } = req.query;
-//   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+    if (rows.length === 0) {
+      return res.json({ success: false, message: 'No report found for this URL.' });
+    }
 
-//   try {
-//     const [result] = await pollDBPool.query(`
-//       SELECT id, title, url, table_text, rewrite_text, created_at 
-//       FROM seo_reports 
-//       WHERE url LIKE ?
-//       ORDER BY created_at DESC
-//       LIMIT 1
-//     `, [`%${url}%`]);
-
-//     if (result.length === 0) {
-//       return res.status(404).json({ success: false, message: 'No report found for this URL' });
-//     }
-
-//     res.json({ success: true, report: result[0] });
-//   } catch (err) {
-//     console.error('❌ [Search Report] Error:', err.message);
-//     res.status(500).json({ success: false, error: 'Failed to search report' });
-//   }
-// });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('❌ [Search Report] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to search report.' });
+  }
+});
 
 
 
@@ -203,14 +201,31 @@ app.get('/api/feed', async (req, res) => {
 
 // === HELPERS ===
 
+// async function fetchLatestArticles(rssUrl, limit = 5) {
+//   const parser = new Parser();
+//   const feed = await parser.parseURL(rssUrl);
+//   return feed.items.slice(0, limit).map(item => ({
+//     title: item.title,
+//     link: item.link
+//   }));
+// }
+
 async function fetchLatestArticles(rssUrl, limit = 5) {
   const parser = new Parser();
   const feed = await parser.parseURL(rssUrl);
-  return feed.items.slice(0, limit).map(item => ({
+
+  const sortedItems = feed.items
+    .filter(item => item.pubDate)
+    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+    .slice(0, limit);
+
+  return sortedItems.map(item => ({
     title: item.title,
-    link: item.link
+    link: item.link,
+    pubDate: item.pubDate
   }));
 }
+
 
 async function extractArticleData(url) {
   try {
@@ -410,7 +425,8 @@ ${competitors}
   const res = await openai.chat.completions.create({
     model: 'gpt-4-turbo',
     messages: [{ role: 'user', content: prompt }],
-    temperature: 0.3,
+    temperature: 0,
+    seed: 42
   });
 
   return res.choices[0].message.content;
