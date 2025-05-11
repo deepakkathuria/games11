@@ -99,14 +99,14 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
-// const { fetchAndProcessFeed } = require('./seoScheduler');
+const { fetchAndProcessFeed } = require('./seoScheduler');
 
-// fetchAndProcessFeed(); // Run once on server start
+fetchAndProcessFeed(); // Run once on server start
 
-// setInterval(() => {
-//   console.log('⏱️ Cron: Running every 5 minutes...');
-//   fetchAndProcessFeed();
-// }, 5 * 60 * 1000);
+setInterval(() => {
+  console.log('⏱️ Cron: Running every 5 minutes...');
+  fetchAndProcessFeed();
+}, 5 * 60 * 1000);
 
 
 // 🔹 GET latest 5 reports

@@ -443,10 +443,44 @@ ${competitors}
   return res.choices[0].message.content;
 }
 
+// async function fetchAndProcessFeed() {
+//   const feed = await parser.parseURL('https://cricketaddictor.com/feed/');
+
+//   for (const item of feed.items.slice(0, 5)) {
+//     const url = item.link;
+
+//     const [existing] = await pollDBPool.query(`SELECT id FROM seo_reports_json WHERE url = ?`, [url]);
+//     if (existing.length > 0) {
+//       console.log(`⏩ Already processed: ${url}`);
+//       continue;
+//     }
+
+//     try {
+//       console.log(`🔍 Processing: ${url}`);
+//       const articleData = await extractArticleData(url);
+//       const competitors = await getSimulatedCompetitors(articleData.title);
+//       const fullGptText = await analyzeAndSuggest(articleData, competitors);
+
+//       const publishedDate = item.pubDate ? new Date(item.pubDate) : new Date();
+
+//       await pollDBPool.query(
+//         `INSERT INTO seo_reports_json (url, title, published_date, full_gpt_text)
+//          VALUES (?, ?, ?, ?)`,
+//         [url, articleData.title, publishedDate, fullGptText]
+//       );
+
+//       console.log(`✅ Saved full GPT report for: ${url}`);
+//     } catch (err) {
+//       console.error(`❌ Failed for ${url}:`, err.message);
+//     }
+//   }
+// }
+
+
 async function fetchAndProcessFeed() {
   const feed = await parser.parseURL('https://cricketaddictor.com/feed/');
 
-  for (const item of feed.items.slice(0, 5)) {
+  for (const item of feed.items) { // ⬅️ changed from .slice(0, 5)
     const url = item.link;
 
     const [existing] = await pollDBPool.query(`SELECT id FROM seo_reports_json WHERE url = ?`, [url]);
