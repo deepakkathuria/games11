@@ -99,24 +99,24 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
-const { fetchAndProcessFeed } = require('./seoScheduler');
+// const { fetchAndProcessFeed } = require('./seoScheduler');
 
-fetchAndProcessFeed(); // Run once on server start
+// fetchAndProcessFeed(); // Run once on server start
 
-setInterval(() => {
-  console.log('⏱️ Cron: Running every 5 minutes...');
-  fetchAndProcessFeed();
-}, 5 * 60 * 1000);
+// setInterval(() => {
+//   console.log('⏱️ Cron: Running every 5 minutes...');
+//   fetchAndProcessFeed();
+// }, 5 * 60 * 1000);
 
 
 // 🔹 GET latest 5 reports
 app.get('/api/reports-json', async (req, res) => {
   try {
     const [rows] = await pollDBPool.query(`
-      SELECT id, title, url, full_gpt_text, created_at
+      SELECT id, title, url, full_gpt_text,published_date, created_at
       FROM seo_reports_json
       ORDER BY created_at DESC
-      LIMIT 5
+      LIMIT 20
     `);
     res.json({ success: true, data: rows });
   } catch (err) {
