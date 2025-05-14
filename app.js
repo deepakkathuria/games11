@@ -3,6 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
+const { getSearchConsoleQueries } = require('./gscService');
+
 
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
@@ -158,7 +160,152 @@ app.get('/api/reports-json/search', async (req, res) => {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 
+app.get('/api/gsc/queries', async (req, res) => {
+  try {
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    const queries = await getSearchConsoleQueries(startDate, endDate);
+    res.json({ success: true, queries });
+  } catch (err) {
+    console.error('❌ GSC Query Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch GSC data.' });
+  }
+});
+
+
+
+app.get('/api/gsc/insight-deepseek', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+
+  try {
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const queries = await getSearchConsoleQueries(startDate, endDate);
+
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+    const title = $('title').text();
+    const meta = $('meta[name="description"]').attr('content') || '';
+    let body = '';
+    $('p').each((i, el) => {
+      body += $(el).text() + '\n';
+    });
+
+    const prompt = `
+You are an expert SEO strategist.
+
+GSC Queries:
+${queries.map(q => `- ${q.keys[0]} | Clicks: ${q.clicks}, Impressions: ${q.impressions}, CTR: ${(q.ctr * 100).toFixed(2)}%, Position: ${q.position.toFixed(2)}`).join('\n')}
+
+Title: ${title}
+Meta: ${meta}
+Content: ${body.slice(0, 3000)}
+
+Give:
+1. Queries needing optimization
+2. New keywords/topics
+3. Meta title & description
+4. H2/H3s
+5. Intro/conclusion rewrite
+6. Schema suggestions
+7. Internal links
+`;
+
+    const dsRes = await axios.post(
+      'https://api.deepseek.com/v1/chat/completions',
+      {
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 1500,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const output = dsRes.data.choices[0].message.content;
+
+    res.json({ success: true, data: output });
+  } catch (err) {
+    console.error('❌ DeepSeek Insight Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+
+
+
+app.get('/api/gsc/insight', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+
+  try {
+    // Dates
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Step 1: GSC queries
+    const queries = await getSearchConsoleQueries(startDate, endDate, 'https://cricketaddictor.com/');
+
+    // Step 2: Get page content
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+    const title = $('title').text();
+    const meta = $('meta[name="description"]').attr('content') || '';
+    let body = '';
+    $('p').each((i, el) => {
+      body += $(el).text() + '\n';
+    });
+
+    // Step 3: Format prompt
+    const formattedPrompt = `
+You are an expert SEO strategist and content optimization assistant.
+
+Based on the following data from Google Search Console for the URL "${url}":
+
+Top Queries (last 30 days):
+${queries.map(q => `- ${q.keys[0]} | Clicks: ${q.clicks}, Impressions: ${q.impressions}, CTR: ${(q.ctr * 100).toFixed(2)}%, Position: ${q.position.toFixed(2)}`).join('\n')}
+
+Page Title: ${title}
+Meta Description: ${meta}
+Page Content: ${body.slice(0, 3000)}
+
+Analyze and return:
+1. Top queries needing optimization
+2. Suggested new keywords / topics
+3. New meta title and description
+4. Suggested H2s/H3s
+5. Content improvements (intro/conclusion)
+6. Schema suggestions
+7. Internal link ideas
+
+Use bullet points and organize output.
+    `;
+
+    // Step 4: Send to GPT
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4-turbo',
+      messages: [{ role: 'user', content: formattedPrompt }],
+      temperature: 0.2,
+    });
+
+    res.json({
+      success: true,
+      data: completion.choices[0].message.content,
+    });
+  } catch (err) {
+    console.error('❌ GSC Insight Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // === ROUTE: GET /api/analyze-url ===
 app.get('/api/analyze-url', async (req, res) => {
