@@ -1,2 +1,5 @@
 /node_modules
 .env
+
+gsc_key.json
+gsc_key_temp.json

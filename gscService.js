@@ -1,73 +1,10 @@
-// // const { google } = require('googleapis');
-// // const key = require('./gsc-private-key.json'); // Your downloaded JSON file
-
-// // const VIEW_ID = 'https://searchconsole.googleapis.com/websites/https://cricketaddictor.com/; // Replace with your verified GSC property
-
-// // const jwt = new google.auth.JWT(
-// //   key.client_email,
-// //   null,
-// //   key.private_key,
-// //   ['https://www.googleapis.com/auth/webmasters.readonly']
-// // );
-
-// // const searchconsole = google.searchconsole({ version: 'v1', auth: jwt });
-
-// // async function getSearchConsoleQueries(startDate, endDate) {
-// //   await jwt.authorize();
-
-// //   const response = await searchconsole.searchanalytics.query({
-// //     siteUrl: 'https://cricketaddictor.com/', // Replace with your actual domain
-// //     requestBody: {
-// //       startDate,
-// //       endDate,
-// //       dimensions: ['query'],
-// //       rowLimit: 5000
-// //     }
-// //   });
-
-// //   return response.data.rows || [];
-// // }
-
-// // function extractContentGaps(rows) {
-// //   return rows
-// //     .filter(row => {
-// //       const ctr = row.clicks / (row.impressions || 1);
-// //       return (
-// //         row.impressions > 100 &&
-// //         (row.clicks === 0 || ctr < 0.01) &&
-// //         row.position > 20
-// //       );
-// //     })
-// //     .map(row => ({
-// //       keyword: row.keys[0],
-// //       clicks: row.clicks,
-// //       impressions: row.impressions,
-// //       ctr: ((row.clicks / (row.impressions || 1)) * 100).toFixed(2),
-// //       position: row.position.toFixed(1),
-// //       gap_reason:
-// //         row.clicks === 0
-// //           ? 'No Clicks'
-// //           : row.position > 30
-// //           ? 'Very Low Ranking'
-// //           : 'Low CTR'
-// //     }));
-// // }
-
-// // module.exports = { getSearchConsoleQueries, extractContentGaps };
 
 
-
-
-
-
-// // ✅ gscService.js
 // const { google } = require('googleapis');
 // const path = require('path');
+// const KEY_FILE = path.join(__dirname, 'gsc_key.json');
 
 // const SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly'];
-// const KEY_FILE = path.join(__dirname, 'gsc_key.json'); // Ensure your JSON is here
-
-
 // const SITE_URL = 'https://cricketaddictor.com/';
 
 // async function getSearchConsoleQueries(startDate, endDate) {
@@ -96,34 +33,55 @@
 
 
 
+require("dotenv").config();
 
-const { google } = require('googleapis');
+
+const fs = require('fs');
 const path = require('path');
-const KEY_FILE = path.join(__dirname, 'gsc_key.json');
+const { google } = require('googleapis');
 
 const SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly'];
 const SITE_URL = 'https://cricketaddictor.com/';
+const TEMP_KEY_PATH = path.join(__dirname, 'gsc_key_temp.json');
+
+// ✅ Decode and save base64 credentials from env to a temporary key file
+if (process.env.GSC_CREDENTIALS_BASE64 && !fs.existsSync(TEMP_KEY_PATH)) {
+  try {
+        console.log("📦 Decoding and writing GSC credentials...");
+
+    const decoded = Buffer.from(process.env.GSC_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+    fs.writeFileSync(TEMP_KEY_PATH, decoded);
+    console.log('✅ GSC credentials file created.');
+  } catch (err) {
+    console.error('❌ Failed to decode and write GSC credentials:', err);
+  }
+}
 
 async function getSearchConsoleQueries(startDate, endDate) {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: KEY_FILE,
-    scopes: SCOPES,
-  });
+  try {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: TEMP_KEY_PATH,
+      scopes: SCOPES,
+    });
 
-  const authClient = await auth.getClient();
-  const webmasters = google.webmasters({ version: 'v3', auth: authClient });
+    const authClient = await auth.getClient();
+    const webmasters = google.webmasters({ version: 'v3', auth: authClient });
 
-  const response = await webmasters.searchanalytics.query({
-    siteUrl: SITE_URL,
-    requestBody: {
-      startDate,
-      endDate,
-      dimensions: ['query'],
-      rowLimit: 100,
-    },
-  });
+    const response = await webmasters.searchanalytics.query({
+      siteUrl: SITE_URL,
+      requestBody: {
+        startDate,
+        endDate,
+        dimensions: ['query'],
+        rowLimit: 100,
+      },
+    });
 
-  return response.data.rows || [];
+    return response.data.rows || [];
+  } catch (error) {
+    console.error('❌ Error fetching GSC queries:', error.message);
+    throw error;
+  }
 }
 
 module.exports = { getSearchConsoleQueries };
