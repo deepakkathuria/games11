@@ -341,10 +341,13 @@ app.get('/api/analyze-url-deepseek', async (req, res) => {
     console.log(`🔍 [DeepSeek] Fetching URL: ${url}`);
 
     const articleData = await extractArticleData(url);
+    console.log('✅ [DeepSeek] Article Data:', articleData);
 
     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+    console.log('✅ [DeepSeek] Simulated Competitors fetched');
 
     const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
+    console.log('✅ [DeepSeek] Report generated');
 
     res.json({
       success: true,
