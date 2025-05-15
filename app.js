@@ -315,13 +315,10 @@ app.get('/api/analyze-url', async (req, res) => {
   try {
     console.log(`🔍 [Analyze] Fetching URL: ${url}`);
     const articleData = await extractArticleData(url);
-    console.log('✅ [Analyze] Article Data:', articleData);
 
     const competitors = await getSimulatedCompetitors(articleData.title);
-    console.log('✅ [Analyze] Simulated Competitors fetched');
 
     const seoReport = await analyzeAndSuggest(articleData, competitors);
-    console.log('✅ [Analyze] Report generated');
 
     res.json({
       success: true,
@@ -334,6 +331,165 @@ app.get('/api/analyze-url', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to analyze URL', message: error.message });
   }
 });
+
+
+app.get('/api/analyze-url-deepseek', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+
+  try {
+    console.log(`🔍 [DeepSeek] Fetching URL: ${url}`);
+
+    const articleData = await extractArticleData(url);
+
+    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+
+    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
+
+    res.json({
+      success: true,
+      title: articleData.title,
+      url,
+      seo_report: seoReport
+    });
+
+  } catch (error) {
+    console.error('❌ [DeepSeek Analyze] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+async function getSimulatedCompetitorsWithDeepSeek(keyword) {
+  const prompt = `
+You are an SEO expert. Based on this keyword: "${keyword}", simulate the top 4 competitor article summaries that are ranking on Google.
+
+Return like this:
+
+1. [Title] - [URL]
+   - H2s used:
+   - Content Highlights:
+   - Schema Used:
+`;
+
+  const dsRes = await axios.post(
+    'https://api.deepseek.com/v1/chat/completions',
+    {
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 800
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return dsRes.data.choices[0].message.content;
+}
+
+async function analyzeAndSuggestWithDeepSeek({ title, description, body }, competitors) {
+  const prompt = `
+You're an expert SEO content strategist and writer.
+
+Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
+
+---
+
+### 🔧 Your Tasks:
+
+1. *SEO Gap Report*  
+   Identify all SEO issues in table format with columns:  
+   *Section | Issue | Suggestion*  
+   (e.g., Title too generic, meta missing target keyword, lacks internal links, etc.)
+
+2. *Writing Pattern Analysis*  
+   Analyze how top-ranking articles are written:
+   - Use of headings and subheadings  
+   - Tone (conversational, formal, stat-heavy, etc.)  
+   - Structure (FAQs, lists, stats tables, expert quotes)  
+   - Visual elements (tables, embedded content, etc.)
+
+   Summarize key differences in structure between our article and competitors.
+
+3. *Keyword Research*  
+   Based on article and competitors, identify:
+   - *Primary Keyword*
+   - *Secondary Keywords*
+   - *Long-tail opportunities*
+   - *Missed keyword intents*
+
+   Present in markdown table:  
+   *Keyword | Type | Suggested Usage*
+
+4. *Recommended Rewrite*  
+   Write a fully optimized, rewritten version of the article incorporating:
+   - All SEO suggestions  
+   - Target keywords  
+   - Competitor-inspired structure  
+   - Better headlines and meta
+
+---
+
+### 🔍 Inputs
+
+*Article Title:*  
+${title}
+
+*Meta Description:*  
+${description}
+
+*Body:*  
+${body}
+
+*Top Ranking Competitor Summaries:*  
+${competitors}
+
+---
+
+### 🧠 Return the following output in order:
+
+#### 📊 SEO GAP REPORT (Markdown Table)
+| Section | Issue | Suggestion |
+|---------|-------|------------|
+
+---
+
+#### 📝 WRITING PATTERN ANALYSIS
+
+---
+
+#### 🔑 KEYWORD RESEARCH SUMMARY
+| Keyword | Type | Suggested Usage |
+|---------|------|------------------|
+
+---
+
+#### ✅ RECOMMENDED REWRITE
+`;
+
+  const dsRes = await axios.post(
+    'https://api.deepseek.com/v1/chat/completions',
+    {
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1800
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return dsRes.data.choices[0].message.content;
+}
+
 
 
 // === ROUTE: GET /api/feed ===
@@ -1498,12 +1654,10 @@ app.get("/cart", async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
-    console.log(userId,"savjadfg")
 
     // ✅ Fetch only active cart items
     const query = `SELECT * FROM Cart WHERE user_id = ? AND status = 'active'`;
     const [rows] = await userDBPool.query(query, [userId]);
-    console.log(query,[rows],"data")
 
     res.status(200).json({ cartItems: rows });
   } catch (error) {
@@ -2340,7 +2494,6 @@ app.delete("/admin/product/:productId", async (req, res) => {
         const publicId = match[1]; // e.g. "products/oz1ucu1l0dw3kkju8y35"
         try {
           await cloudinary.uploader.destroy(publicId);
-          console.log("✅ Deleted from Cloudinary:", publicId);
         } catch (err) {
           console.warn("❌ Cloudinary deletion failed for:", publicId, err.message);
         }
