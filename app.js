@@ -27,6 +27,8 @@ const bcrypt = require("bcrypt");
 const cheerio = require('cheerio');
 const Parser = require('rss-parser');
 const { OpenAI } = require('openai');
+const { v4: uuidv4 } = require("uuid");
+
 
 //
 
@@ -63,12 +65,6 @@ app.listen(PORT, () => {
   console.log(`✅ Server is running on http://localhost:${PORT}`);
 });
 
-// Cloudinary Configuration
-// cloudinary.config({
-//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-//   api_key: process.env.CLOUDINARY_API_KEY,
-//   api_secret: process.env.CLOUDINARY_API_SECRET,
-// });
 
 
 const cron = require('node-cron');
@@ -101,6 +97,7 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
+// -----------------------------------------------our db ----------------------------------------
 // const { fetchAndProcessFeed } = require('./seoScheduler');
 
 // fetchAndProcessFeed(); // Run once on server start
@@ -154,26 +151,108 @@ app.get('/api/reports-json/search', async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
 
 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// ---------------------------------------------------------gpt seo snalysis report -----------------------------------
+// app.get('/api/gsc/queries', async (req, res) => {
+//   try {
+//     const endDate = new Date().toISOString().split('T')[0];
+//     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-app.get('/api/gsc/queries', async (req, res) => {
-  try {
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const queries = await getSearchConsoleQueries(startDate, endDate);
-    res.json({ success: true, queries });
-  } catch (err) {
-    console.error('❌ GSC Query Error:', err.message);
-    res.status(500).json({ success: false, error: 'Failed to fetch GSC data.' });
-  }
-});
+//     const queries = await getSearchConsoleQueries(startDate, endDate);
+//     res.json({ success: true, queries });
+//   } catch (err) {
+//     console.error('❌ GSC Query Error:', err.message);
+//     res.status(500).json({ success: false, error: 'Failed to fetch GSC data.' });
+//   }
+// });
 
 
+
+// app.get('/api/gsc/insight', async (req, res) => {
+//   const { url } = req.query;
+//   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+
+//   try {
+//     // Dates
+//     const endDate = new Date().toISOString().split('T')[0];
+//     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+//     // Step 1: GSC queries
+//     const queries = await getSearchConsoleQueries(startDate, endDate, 'https://cricketaddictor.com/');
+
+//     // Step 2: Get page content
+//     const response = await axios.get(url);
+//     const $ = cheerio.load(response.data);
+//     const title = $('title').text();
+//     const meta = $('meta[name="description"]').attr('content') || '';
+//     let body = '';
+//     $('p').each((i, el) => {
+//       body += $(el).text() + '\n';
+//     });
+
+//     // Step 3: Format prompt
+//     const formattedPrompt = `
+// You are an expert SEO strategist and content optimization assistant.
+
+// Based on the following data from Google Search Console for the URL "${url}":
+
+// Top Queries (last 30 days):
+// ${queries.map(q => `- ${q.keys[0]} | Clicks: ${q.clicks}, Impressions: ${q.impressions}, CTR: ${(q.ctr * 100).toFixed(2)}%, Position: ${q.position.toFixed(2)}`).join('\n')}
+
+// Page Title: ${title}
+// Meta Description: ${meta}
+// Page Content: ${body.slice(0, 3000)}
+
+// Analyze and return:
+// 1. Top queries needing optimization
+// 2. Suggested new keywords / topics
+// 3. New meta title and description
+// 4. Suggested H2s/H3s
+// 5. Content improvements (intro/conclusion)
+// 6. Schema suggestions
+// 7. Internal link ideas
+
+// Use bullet points and organize output.
+//     `;
+
+//     // Step 4: Send to GPT
+//     const completion = await openai.chat.completions.create({
+//       model: 'gpt-4-turbo',
+//       messages: [{ role: 'user', content: formattedPrompt }],
+//       temperature: 0.2,
+//     });
+
+//     res.json({
+//       success: true,
+//       data: completion.choices[0].message.content,
+//     });
+//   } catch (err) {
+//     console.error('❌ GSC Insight Error:', err.message);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+// --------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+// ----------------------------------------------------gsc onsight deep seek report ---------------------------------
 
 app.get('/api/gsc/insight-deepseek', async (req, res) => {
   const { url } = req.query;
@@ -238,74 +317,16 @@ Give:
     res.status(500).json({ success: false, error: err.message });
   }
 });
+// -----------------------------------------------------------------------------------------------------------------
 
 
 
 
 
-app.get('/api/gsc/insight', async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
 
-  try {
-    // Dates
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Step 1: GSC queries
-    const queries = await getSearchConsoleQueries(startDate, endDate, 'https://cricketaddictor.com/');
 
-    // Step 2: Get page content
-    const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
-    const title = $('title').text();
-    const meta = $('meta[name="description"]').attr('content') || '';
-    let body = '';
-    $('p').each((i, el) => {
-      body += $(el).text() + '\n';
-    });
-
-    // Step 3: Format prompt
-    const formattedPrompt = `
-You are an expert SEO strategist and content optimization assistant.
-
-Based on the following data from Google Search Console for the URL "${url}":
-
-Top Queries (last 30 days):
-${queries.map(q => `- ${q.keys[0]} | Clicks: ${q.clicks}, Impressions: ${q.impressions}, CTR: ${(q.ctr * 100).toFixed(2)}%, Position: ${q.position.toFixed(2)}`).join('\n')}
-
-Page Title: ${title}
-Meta Description: ${meta}
-Page Content: ${body.slice(0, 3000)}
-
-Analyze and return:
-1. Top queries needing optimization
-2. Suggested new keywords / topics
-3. New meta title and description
-4. Suggested H2s/H3s
-5. Content improvements (intro/conclusion)
-6. Schema suggestions
-7. Internal link ideas
-
-Use bullet points and organize output.
-    `;
-
-    // Step 4: Send to GPT
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: [{ role: 'user', content: formattedPrompt }],
-      temperature: 0.2,
-    });
-
-    res.json({
-      success: true,
-      data: completion.choices[0].message.content,
-    });
-  } catch (err) {
-    console.error('❌ GSC Insight Error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+// ---------------------------------------------------------chat gpt analysis --------------------
 
 // === ROUTE: GET /api/analyze-url ===
 app.get('/api/analyze-url', async (req, res) => {
@@ -314,7 +335,7 @@ app.get('/api/analyze-url', async (req, res) => {
 
   try {
     console.log(`🔍 [Analyze] Fetching URL: ${url}`);
-    const articleData = await extractArticleData(url);
+    const articleData = await extractArticleData1(url);
 
     const competitors = await getSimulatedCompetitors(articleData.title);
 
@@ -333,206 +354,8 @@ app.get('/api/analyze-url', async (req, res) => {
 });
 
 
-app.get('/api/analyze-url-deepseek', async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
 
-  try {
-    console.log(`🔍 [DeepSeek] Fetching URL: ${url}`);
-
-    const articleData = await extractArticleData(url);
-
-    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
-
-    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
-
-    res.json({
-      success: true,
-      title: articleData.title,
-      url,
-      seo_report: seoReport
-    });
-
-  } catch (error) {
-    console.error('❌ [DeepSeek Analyze] Error:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-async function getSimulatedCompetitorsWithDeepSeek(keyword) {
-  const prompt = `
-You are an SEO expert. Based on this keyword: "${keyword}", simulate the top 4 competitor article summaries that are ranking on Google.
-
-Return like this:
-
-1. [Title] - [URL]
-   - H2s used:
-   - Content Highlights:
-   - Schema Used:
-`;
-
-  const dsRes = await axios.post(
-    'https://api.deepseek.com/v1/chat/completions',
-    {
-      model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  return dsRes.data.choices[0].message.content;
-}
-
-async function analyzeAndSuggestWithDeepSeek({ title, description, body }, competitors) {
-  const prompt = `
-You're an expert SEO content strategist and writer.
-
-Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
-
----
-
-### 🔧 Your Tasks:
-
-1. *SEO Gap Report*  
-   Identify all SEO issues in table format with columns:  
-   *Section | Issue | Suggestion*  
-   (e.g., Title too generic, meta missing target keyword, lacks internal links, etc.)
-
-2. *Writing Pattern Analysis*  
-   Analyze how top-ranking articles are written:
-   - Use of headings and subheadings  
-   - Tone (conversational, formal, stat-heavy, etc.)  
-   - Structure (FAQs, lists, stats tables, expert quotes)  
-   - Visual elements (tables, embedded content, etc.)
-
-   Summarize key differences in structure between our article and competitors.
-
-3. *Keyword Research*  
-   Based on article and competitors, identify:
-   - *Primary Keyword*
-   - *Secondary Keywords*
-   - *Long-tail opportunities*
-   - *Missed keyword intents*
-
-   Present in markdown table:  
-   *Keyword | Type | Suggested Usage*
-
-4. *Recommended Rewrite*  
-   Write a fully optimized, rewritten version of the article incorporating:
-   - All SEO suggestions  
-   - Target keywords  
-   - Competitor-inspired structure  
-   - Better headlines and meta
-
----
-
-### 🔍 Inputs
-
-*Article Title:*  
-${title}
-
-*Meta Description:*  
-${description}
-
-*Body:*  
-${body}
-
-*Top Ranking Competitor Summaries:*  
-${competitors}
-
----
-
-### 🧠 Return the following output in order:
-
-#### 📊 SEO GAP REPORT (Markdown Table)
-| Section | Issue | Suggestion |
-|---------|-------|------------|
-
----
-
-#### 📝 WRITING PATTERN ANALYSIS
-
----
-
-#### 🔑 KEYWORD RESEARCH SUMMARY
-| Keyword | Type | Suggested Usage |
-|---------|------|------------------|
-
----
-
-#### ✅ RECOMMENDED REWRITE
-`;
-
-  const dsRes = await axios.post(
-    'https://api.deepseek.com/v1/chat/completions',
-    {
-      model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
-      max_tokens: 1800
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  return dsRes.data.choices[0].message.content;
-}
-
-
-
-// === ROUTE: GET /api/feed ===
-app.get('/api/feed', async (req, res) => {
-  try {
-    const articles = await fetchLatestArticles('https://cricketaddictor.com/feed/', 5);
-    res.json({ success: true, articles });
-  } catch (err) {
-    console.error('❌ [Feed] RSS Error:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch RSS feed' });
-  }
-});
-
-
-// === HELPERS ===
-
-// async function fetchLatestArticles(rssUrl, limit = 5) {
-//   const parser = new Parser();
-//   const feed = await parser.parseURL(rssUrl);
-//   return feed.items.slice(0, limit).map(item => ({
-//     title: item.title,
-//     link: item.link
-//   }));
-// }
-
-async function fetchLatestArticles(rssUrl, limit = 5) {
-  const parser = new Parser();
-  const feed = await parser.parseURL(rssUrl);
-
-  const sortedItems = feed.items
-    .filter(item => item.pubDate)
-    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
-    .slice(0, limit);
-
-  return sortedItems.map(item => ({
-    title: item.title,
-    link: item.link,
-    pubDate: item.pubDate
-  }));
-}
-
-
-async function extractArticleData(url) {
+async function extractArticleData1(url) {
   try {
     const res = await axios.get(url, { timeout: 10000 });
     const $ = cheerio.load(res.data);
@@ -580,70 +403,6 @@ Return like this:
 
   return res.choices[0].message.content;
 }
-
-// async function analyzeAndSuggest({ title, description, body }, competitors) {
-//   const prompt = `
-// You're an expert SEO content strategist.
-
-// Below is a cricket article we're analyzing. Compare it to these top-ranking competitors.
-
-// Your tasks:
-// 1. List SEO gaps in table format (Section | Issue | Suggestion)
-// 2. Write a better version of the article's intro (2–3 paragraphs) that incorporates those suggestions.
-
-// ---
-
-// Article Title: ${title}
-// Meta Description: ${description}
-// Body:
-// ${body}
-
-// Top Ranking Competitor Summaries:
-// ${competitors}
-
-// Return first a markdown table of SEO GAP REPORT, then a heading: "✅ Recommended Rewrite" and write the new version.
-// `;
-
-//   const res = await openai.chat.completions.create({
-//     model: 'gpt-4-turbo',
-//     messages: [{ role: 'user', content: prompt }],
-//     temperature: 0.3,
-//   });
-
-//   return res.choices[0].message.content;
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// --------------------------  1. Create a Poll---------------------
-
-
-
-
-
-
 
 async function analyzeAndSuggest({ title, description, body }, competitors) {
   const prompt = `
@@ -736,6 +495,515 @@ ${competitors}
 
   return res.choices[0].message.content;
 }
+
+
+// -----------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------------deep seek analysis --------------------------------------------------
+
+
+
+
+// app.get('/api/analyze-url-deepseek', async (req, res) => {
+//   const { url } = req.query;
+//   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
+
+//   try {
+//     console.log(`🔍 [DeepSeek] Fetching URL: ${url}`);
+
+//     const articleData = await extractArticleData(url);
+
+//     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+
+//     const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
+
+//     res.json({
+//       success: true,
+//       title: articleData.title,
+//       url,
+//       seo_report: seoReport
+//     });
+
+//   } catch (error) {
+//     console.error('❌ [DeepSeek Analyze] Error:', error.message);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+
+// async function getSimulatedCompetitorsWithDeepSeek(keyword) {
+//   const prompt = `
+// You are an SEO expert. Based on this keyword: "${keyword}", simulate the top 4 competitor article summaries that are ranking on Google.
+
+// Return like this:
+
+// 1. [Title] - [URL]
+//    - H2s used:
+//    - Content Highlights:
+//    - Schema Used:
+// `;
+
+//   const dsRes = await axios.post(
+//     'https://api.deepseek.com/v1/chat/completions',
+//     {
+//       model: 'deepseek-chat',
+//       messages: [{ role: 'user', content: prompt }],
+//       temperature: 0.3,
+//       max_tokens: 800
+//     },
+//     {
+//       headers: {
+//         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+//         'Content-Type': 'application/json',
+//       },
+//     }
+//   );
+
+//   return dsRes.data.choices[0].message.content;
+// }
+
+
+
+// async function analyzeAndSuggestWithDeepSeek({ title, description, body }, competitors) {
+//   const prompt = `
+// You're an expert SEO content strategist and writer.
+
+// Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
+
+// ---
+
+// ### 🔧 Your Tasks:
+
+// 1. *SEO Gap Report*  
+//    Identify all SEO issues in table format with columns:  
+//    *Section | Issue | Suggestion*  
+//    (e.g., Title too generic, meta missing target keyword, lacks internal links, etc.)
+
+// 2. *Writing Pattern Analysis*  
+//    Analyze how top-ranking articles are written:
+//    - Use of headings and subheadings  
+//    - Tone (conversational, formal, stat-heavy, etc.)  
+//    - Structure (FAQs, lists, stats tables, expert quotes)  
+//    - Visual elements (tables, embedded content, etc.)
+
+//    Summarize key differences in structure between our article and competitors.
+
+// 3. *Keyword Research*  
+//    Based on article and competitors, identify:
+//    - *Primary Keyword*
+//    - *Secondary Keywords*
+//    - *Long-tail opportunities*
+//    - *Missed keyword intents*
+
+//    Present in markdown table:  
+//    *Keyword | Type | Suggested Usage*
+
+// 4. *Recommended Rewrite*  
+//    Write a fully optimized, rewritten version of the article incorporating:
+//    - All SEO suggestions  
+//    - Target keywords  
+//    - Competitor-inspired structure  
+//    - Better headlines and meta
+
+// ---
+
+// ### 🔍 Inputs
+
+// *Article Title:*  
+// ${title}
+
+// *Meta Description:*  
+// ${description}
+
+// *Body:*  
+// ${body}
+
+// *Top Ranking Competitor Summaries:*  
+// ${competitors}
+
+// ---
+
+// ### 🧠 Return the following output in order:
+
+// #### 📊 SEO GAP REPORT (Markdown Table)
+// | Section | Issue | Suggestion |
+// |---------|-------|------------|
+
+// ---
+
+// #### 📝 WRITING PATTERN ANALYSIS
+
+// ---
+
+// #### 🔑 KEYWORD RESEARCH SUMMARY
+// | Keyword | Type | Suggested Usage |
+// |---------|------|------------------|
+
+// ---
+
+// #### ✅ RECOMMENDED REWRITE
+// `;
+
+//   const dsRes = await axios.post(
+//     'https://api.deepseek.com/v1/chat/completions',
+//     {
+//       model: 'deepseek-chat',
+//       messages: [{ role: 'user', content: prompt }],
+//       temperature: 0.2,
+//       max_tokens: 1800
+//     },
+//     {
+//       headers: {
+//         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+//         'Content-Type': 'application/json',
+//       },
+//     }
+//   );
+
+//   return dsRes.data.choices[0].message.content;
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//new for productio issue timeout 
+
+
+
+
+
+
+
+const jobQueue = []; // 🟢 In-memory job queue
+
+// ✅ Extract Article Content
+async function extractArticleData(url) {
+  try {
+    const res = await axios.get(url, { timeout: 10000 });
+    const $ = cheerio.load(res.data);
+
+    const title = $("title").text().trim() || "No Title";
+    const metaDescription = $('meta[name="description"]').attr("content") || "No Description";
+
+    let content = "";
+    $("p").each((_, el) => {
+      content += $(el).text() + "\n";
+    });
+
+    if (!title || !content.trim()) {
+      throw new Error("No valid title or article content found.");
+    }
+
+    return {
+      title,
+      description: metaDescription,
+      body: content.slice(0, 3500),
+    };
+  } catch (err) {
+    console.error("❌ [extractArticleData] Failed:", err.message);
+    throw err;
+  }
+}
+
+// ✅ Generate Competitor Simulations with DeepSeek
+async function getSimulatedCompetitorsWithDeepSeek(keyword) {
+  const prompt = `
+You are an SEO expert. Based on this keyword: "${keyword}", simulate the top 4 competitor article summaries that are ranking on Google.
+
+Return like this:
+
+1. [Title] - [URL]
+   - H2s used:
+   - Content Highlights:
+   - Schema Used:
+`;
+
+  const dsRes = await axios.post(
+    "https://api.deepseek.com/v1/chat/completions",
+    {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 800,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return dsRes.data.choices[0].message.content;
+}
+
+// ✅ Analyze and Suggest SEO Improvement with DeepSeek
+async function analyzeAndSuggestWithDeepSeek({ title, description, body }, competitors) {
+  const prompt = `
+You're an expert SEO content strategist and writer.
+
+Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
+
+---
+
+### 🔧 Your Tasks:
+
+1. *SEO Gap Report*  
+   Identify all SEO issues in table format with columns:  
+   *Section | Issue | Suggestion*  
+
+2. *Writing Pattern Analysis*  
+
+3. *Keyword Research*  
+| Keyword | Type | Suggested Usage |
+
+4. *Recommended Rewrite*
+
+---
+
+### 🔍 Inputs
+
+*Article Title:*  
+${title}
+
+*Meta Description:*  
+${description}
+
+*Body:*  
+${body}
+
+*Top Ranking Competitor Summaries:*  
+${competitors}
+
+---
+
+### 🧠 Return the following output in order:
+
+#### 📊 SEO GAP REPORT (Markdown Table)
+| Section | Issue | Suggestion |
+|---------|-------|------------|
+
+---
+
+#### 📝 WRITING PATTERN ANALYSIS
+
+---
+
+#### 🔑 KEYWORD RESEARCH SUMMARY
+| Keyword | Type | Suggested Usage |
+|---------|------|------------------|
+
+---
+
+#### ✅ RECOMMENDED REWRITE
+`;
+
+  const dsRes = await axios.post(
+    "https://api.deepseek.com/v1/chat/completions",
+    {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1800,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return dsRes.data.choices[0].message.content;
+}
+
+// ✅ API to initiate a DeepSeek job
+app.post("/api/analyze-url-deepseek-job", async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ success: false, error: "Missing URL" });
+
+  try {
+    const [insertResult] = await pollDBPool.query(
+      `INSERT INTO seo_analysis_jobs (url, status, created_at) VALUES (?, 'queued', NOW())`,
+      [url]
+    );
+
+    const jobId = insertResult.insertId;
+    jobQueue.push({ jobId, url });
+
+    res.json({ success: true, jobId });
+  } catch (err) {
+    console.error("❌ [Job Queue] Insert Error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to queue job" });
+  }
+});
+
+// ✅ API to check job status/result
+app.get("/api/analyze-url-deepseek-status", async (req, res) => {
+  const { jobId } = req.query;
+  if (!jobId) return res.status(400).json({ success: false, error: "Missing jobId" });
+
+  try {
+    const [rows] = await pollDBPool.query(
+      `SELECT id, status, result, error FROM seo_analysis_jobs WHERE id = ?`,
+      [jobId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Job not found" });
+    }
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "DB error" });
+  }
+});
+
+// ✅ Job Processor Loop (every 5 sec)
+setInterval(async () => {
+  if (jobQueue.length === 0) return;
+
+  const job = jobQueue.shift();
+  try {
+    console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
+
+    const articleData = await extractArticleData(job.url);
+    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
+
+    await pollDBPool.query(
+      `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+      [seoReport, job.jobId]
+    );
+  } catch (err) {
+    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
+    await pollDBPool.query(
+      `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+      [err.message || "Unknown error", job.jobId]
+    );
+  }
+}, 5000);
+
+
+
+// GET all completed reports (latest 20 or more)
+app.get('/api/deepseek-reports', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT id, url, status, created_at 
+      FROM seo_analysis_jobs 
+      WHERE status = 'completed' 
+      ORDER BY created_at DESC 
+      LIMIT 20
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'DB fetch error' });
+  }
+});
+
+// GET report by ID
+app.get('/api/deepseek-reports/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pollDBPool.query(
+      `SELECT id, url, result FROM seo_analysis_jobs WHERE id = ? AND status = 'completed'`,
+      [id]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ success: false, error: 'Not found' });
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'DB fetch error' });
+  }
+});
+
+
+
+
+// --------------------------------------------------------------------------------------------------------
+
+
+// === ROUTE: GET /api/feed ===
+app.get('/api/feed', async (req, res) => {
+  try {
+    const articles = await fetchLatestArticles('https://cricketaddictor.com/feed/', 5);
+    res.json({ success: true, articles });
+  } catch (err) {
+    console.error('❌ [Feed] RSS Error:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch RSS feed' });
+  }
+});
+
+
+
+
+async function fetchLatestArticles(rssUrl, limit = 5) {
+  const parser = new Parser();
+  const feed = await parser.parseURL(rssUrl);
+
+  const sortedItems = feed.items
+    .filter(item => item.pubDate)
+    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+    .slice(0, limit);
+
+  return sortedItems.map(item => ({
+    title: item.title,
+    link: item.link,
+    pubDate: item.pubDate
+  }));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
