@@ -92,6 +92,126 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
+// -------------------------------------------------commentart apisssssssssssssssssss----------------------------
+
+
+
+
+
+
+
+
+
+// ----------------------------------------------------funny commentary (openai & deepseek) ---------------------------------
+
+app.get('/api/funny-commentary/:matchId/:inningNumber', async (req, res) => {
+  const { matchId, inningNumber } = req.params;
+  const provider = req.query.provider || 'openai';
+
+  try {
+    const entityURL = `https://api.entitysport.com/v2/matches/${matchId}/innings/${inningNumber}/commentary?token=${process.env.ENTITY_API_TOKEN}`;
+    const response = await axios.get(entityURL);
+    const data = response.data;
+
+    if (!data.commentaries || !Array.isArray(data.commentaries)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid commentary data' });
+    }
+
+    const rewrittenCommentaries = await Promise.all(
+      data.commentaries.map(async (item) => {
+        const original = item.commentary || item.text || "";
+        if (!original) return item;
+
+        try {
+          let funnyText = "";
+
+          if (provider === 'deepseek') {
+            funnyText = await rewriteUsingDeepSeek(original);
+          } else {
+            funnyText = await rewriteUsingOpenAI(original);
+          }
+
+          if (item.commentary) item.commentary = funnyText;
+          if (item.text) item.text = funnyText;
+
+        } catch (err) {
+          console.error(`❌ Failed to rewrite ball ${item.over}.${item.ball}:`, err.message);
+        }
+
+        return item;
+      })
+    );
+
+    data.commentaries = rewrittenCommentaries;
+    res.json(data);
+
+  } catch (err) {
+    console.error('❌ Commentary Fetch Error:', err.message);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch or rewrite commentary' });
+  }
+});
+
+
+// === 🔧 rewrite using OpenAI
+async function rewriteUsingOpenAI(originalText) {
+  const prompt = `Rewrite this cricket commentary in a funny or witty way (preserve the meaning):\n"${originalText}"`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.9,
+  });
+
+  return response.choices[0].message.content.trim();
+}
+
+// === 🔧 rewrite using DeepSeek
+async function rewriteUsingDeepSeek(originalText) {
+  const prompt = `Rewrite this cricket commentary in a funny, sarcastic or humorous way:\n"${originalText}"`;
+
+  const dsResponse = await axios.post(
+    'https://api.deepseek.com/v1/chat/completions',
+    {
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.9,
+      max_tokens: 150,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return dsResponse.data.choices[0].message.content.trim();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
