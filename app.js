@@ -187,7 +187,7 @@ async function rewriteUsingOpenAI(originalText) {
     messages: [
       {
         role: "user",
-        content: `Make this cricket commentary funny, engaging, and slightly sarcastic:\n"${originalText}"`,
+        content: `Create a funny and unique cricket commentary for this prompt:\n"${originalText}"`,
       },
     ],
     temperature: 0.9,
@@ -207,7 +207,7 @@ async function rewriteUsingDeepSeek(originalText) {
       messages: [
         {
           role: 'user',
-          content: `Rewrite this cricket commentary in a funnier and wittier way for fans:\n"${originalText}"`,
+        content: `Create a funny and unique cricket commentary for this prompt:\n"${originalText}"`,
         },
       ],
       temperature: 0.9,
