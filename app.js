@@ -104,78 +104,114 @@ cron.schedule('0 0 * * *', async () => {
 
 // ----------------------------------------------------funny commentary (openai & deepseek) ---------------------------------
 
+let commentaryCache = [];
+let lastEventIds = new Set();
+
 app.get('/api/funny-commentary/:matchId/:inningNumber', async (req, res) => {
   const { matchId, inningNumber } = req.params;
   const provider = req.query.provider || 'openai';
 
-  try {
-    const entityURL = `https://api.entitysport.com/v2/matches/${matchId}/innings/${inningNumber}/commentary?token=${process.env.ENTITY_API_TOKEN}`;
-    const response = await axios.get(entityURL);
-    const data = response.data;
+  console.log(`🎯 Request for match=${matchId}, inning=${inningNumber}, provider=${provider}`);
 
-    if (!data.commentaries || !Array.isArray(data.commentaries)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid commentary data' });
+  try {
+    const entityURL = `https://restapi.entitysport.com/v2/matches/${matchId}/innings/${inningNumber}/commentary?token=${process.env.ENTITY_API_TOKEN}`;
+    console.log(`📡 Fetching Entity API: ${entityURL}`);
+
+    const response = await axios.get(entityURL);
+    const entityData = response.data?.response;
+
+    if (!entityData || !Array.isArray(entityData.commentaries)) {
+      console.warn("⚠️ Invalid commentary format");
+      return res.status(400).json({ status: 'error', message: 'Invalid commentary structure from API' });
     }
 
-    const rewrittenCommentaries = await Promise.all(
-      data.commentaries.map(async (item) => {
-        const original = item.commentary || item.text || "";
-        if (!original) return item;
+    const commentaries = [...entityData.commentaries].sort((a, b) => {
+      const aVal = parseFloat(`${a.over}.${a.ball}`);
+      const bVal = parseFloat(`${b.over}.${b.ball}`);
+      return aVal - bVal;
+    });
+
+    const newBalls = commentaries.filter(c => c.event_id && !lastEventIds.has(c.event_id));
+    console.log(`🆕 Found ${newBalls.length} new ball(s) to rewrite`);
+
+    const rewritten = await Promise.all(
+      newBalls.map(async (item) => {
+        const original = item.commentary?.trim() || item.text?.trim() || "";
+        if (!original) return null;
 
         try {
-          let funnyText = "";
-
-          if (provider === 'deepseek') {
-            funnyText = await rewriteUsingDeepSeek(original);
+          let funny = "";
+          if (provider === "deepseek") {
+            funny = await rewriteUsingDeepSeek(original);
           } else {
-            funnyText = await rewriteUsingOpenAI(original);
+            funny = await rewriteUsingOpenAI(original);
           }
 
-          if (item.commentary) item.commentary = funnyText;
-          if (item.text) item.text = funnyText;
+          item.commentary = funny;
+          item.text = funny;
+          lastEventIds.add(item.event_id);
 
+          console.log(`✅ Rewritten [${item.over}.${item.ball}]`);
+
+          return item;
         } catch (err) {
-          console.error(`❌ Failed to rewrite ball ${item.over}.${item.ball}:`, err.message);
+          console.error(`❌ Rewrite failed [${item.over}.${item.ball}]`, err.message);
+          return null;
         }
-
-        return item;
       })
     );
 
-    data.commentaries = rewrittenCommentaries;
-    res.json(data);
+    // Store last 6 rewritten
+    const cleanedNew = rewritten.filter(Boolean);
+    commentaryCache = [...commentaryCache, ...cleanedNew].slice(-6);
+
+    res.json({
+      status: 'ok',
+      response: {
+        commentaries: commentaryCache
+      }
+    });
 
   } catch (err) {
-    console.error('❌ Commentary Fetch Error:', err.message);
+    console.error("❌ Commentary Fetch Error:", err.response?.data || err.message);
     res.status(500).json({ status: 'error', message: 'Failed to fetch or rewrite commentary' });
   }
 });
 
 
-// === 🔧 rewrite using OpenAI
 async function rewriteUsingOpenAI(originalText) {
-  const prompt = `Rewrite this cricket commentary in a funny or witty way (preserve the meaning):\n"${originalText}"`;
+  console.log("🧠 OpenAI:", originalText);
 
-  const response = await openai.chat.completions.create({
+  const res = await openai.chat.completions.create({
     model: "gpt-4",
-    messages: [{ role: "user", content: prompt }],
+    messages: [
+      {
+        role: "user",
+        content: `Make this cricket commentary funny, engaging, and slightly sarcastic:\n"${originalText}"`,
+      },
+    ],
     temperature: 0.9,
   });
 
-  return response.choices[0].message.content.trim();
+  return res.choices?.[0]?.message?.content?.trim() || originalText;
 }
 
-// === 🔧 rewrite using DeepSeek
-async function rewriteUsingDeepSeek(originalText) {
-  const prompt = `Rewrite this cricket commentary in a funny, sarcastic or humorous way:\n"${originalText}"`;
 
-  const dsResponse = await axios.post(
+async function rewriteUsingDeepSeek(originalText) {
+  console.log("🧠 DeepSeek:", originalText);
+
+  const response = await axios.post(
     'https://api.deepseek.com/v1/chat/completions',
     {
       model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        {
+          role: 'user',
+          content: `Rewrite this cricket commentary in a funnier and wittier way for fans:\n"${originalText}"`,
+        },
+      ],
       temperature: 0.9,
-      max_tokens: 150,
+      max_tokens: 300,
     },
     {
       headers: {
@@ -185,8 +221,10 @@ async function rewriteUsingDeepSeek(originalText) {
     }
   );
 
-  return dsResponse.data.choices[0].message.content.trim();
+  return response.data.choices?.[0]?.message?.content?.trim() || originalText;
 }
+
+
 
 
 
