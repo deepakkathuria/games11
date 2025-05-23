@@ -112,6 +112,18 @@ app.get('/api/gsc-ai-reports', async (req, res) => {
 });
 
 
+app.get('/api/gsc-content-refresh', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT * FROM gsc_content_refresh_recommendations
+      ORDER BY created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('❌ Content Refresh Fetch Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to load data' });
+  }
+});
 
 
 
