@@ -138,6 +138,19 @@ app.get('/api/gsc-low-ctr', async (req, res) => {
   }
 });
 
+app.get('/api/gsc-trending-keywords', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT * FROM gsc_trending_keywords ORDER BY created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('❌ Failed to fetch trending keywords:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to load data' });
+  }
+});
+
+
 
 
 
