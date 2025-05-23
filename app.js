@@ -150,6 +150,19 @@ app.get('/api/gsc-trending-keywords', async (req, res) => {
   }
 });
 
+app.get('/api/gsc-ranking-watchdog', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT * FROM gsc_ranking_watchdog_alerts ORDER BY created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('❌ Failed to fetch watchdog data:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to load data' });
+  }
+});
+
+
 
 
 
