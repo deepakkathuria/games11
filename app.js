@@ -92,158 +92,24 @@ cron.schedule('0 0 * * *', async () => {
 
 
 
-// -------------------------------------------------commentart apisssssssssssssssssss----------------------------
 
 
 
 
 
-
-
-
-
-// ----------------------------------------------------funny commentary (openai & deepseek) ---------------------------------
-
-let commentaryCache = [];
-let lastEventIds = new Set();
-
-app.get('/api/funny-commentary/:matchId/:inningNumber', async (req, res) => {
-  const { matchId, inningNumber } = req.params;
-  const provider = req.query.provider || 'openai';
-
-  console.log(`🎯 Request for match=${matchId}, inning=${inningNumber}, provider=${provider}`);
-
+app.get('/api/gsc-ai-reports', async (req, res) => {
   try {
-    const entityURL = `https://restapi.entitysport.com/v2/matches/${matchId}/innings/${inningNumber}/commentary?token=${process.env.ENTITY_API_TOKEN}`;
-    console.log(`📡 Fetching Entity API: ${entityURL}`);
-
-    const response = await axios.get(entityURL);
-    const entityData = response.data?.response;
-
-    if (!entityData || !Array.isArray(entityData.commentaries)) {
-      console.warn("⚠️ Invalid commentary format");
-      return res.status(400).json({ status: 'error', message: 'Invalid commentary structure from API' });
-    }
-
-    const commentaries = [...entityData.commentaries].sort((a, b) => {
-      const aVal = parseFloat(`${a.over}.${a.ball}`);
-      const bVal = parseFloat(`${b.over}.${b.ball}`);
-      return aVal - bVal;
-    });
-
-    const newBalls = commentaries.filter(c => c.event_id && !lastEventIds.has(c.event_id));
-    console.log(`🆕 Found ${newBalls.length} new ball(s) to rewrite`);
-
-    const rewritten = await Promise.all(
-      newBalls.map(async (item) => {
-        const original = item.commentary?.trim() || item.text?.trim() || "";
-        if (!original) return null;
-
-        try {
-          let funny = "";
-          if (provider === "deepseek") {
-            funny = await rewriteUsingDeepSeek(original);
-          } else {
-            funny = await rewriteUsingOpenAI(original);
-          }
-
-          item.commentary = funny;
-          item.text = funny;
-          lastEventIds.add(item.event_id);
-
-          console.log(`✅ Rewritten [${item.over}.${item.ball}]`);
-
-          return item;
-        } catch (err) {
-          console.error(`❌ Rewrite failed [${item.over}.${item.ball}]`, err.message);
-          return null;
-        }
-      })
-    );
-
-    // Store last 6 rewritten
-    const cleanedNew = rewritten.filter(Boolean);
-    commentaryCache = [...commentaryCache, ...cleanedNew].slice(-6);
-
-    res.json({
-      status: 'ok',
-      response: {
-        commentaries: commentaryCache
-      }
-    });
-
+    const [rows] = await pollDBPool.query(`
+      SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at 
+      FROM gsc_ai_recommendations 
+      ORDER BY created_at DESC
+    `);
+    res.json({ success: true, data: rows });
   } catch (err) {
-    console.error("❌ Commentary Fetch Error:", err.response?.data || err.message);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch or rewrite commentary' });
+    console.error('❌ GSC AI Report Fetch Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to load reports' });
   }
 });
-
-
-async function rewriteUsingOpenAI(originalText) {
-  console.log("🧠 OpenAI:", originalText);
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4",
-    messages: [
-      {
-        role: "user",
-        content: `Create a funny and unique cricket commentary for this prompt:\n"${originalText}"`,
-      },
-    ],
-    temperature: 0.9,
-  });
-
-  return res.choices?.[0]?.message?.content?.trim() || originalText;
-}
-
-
-async function rewriteUsingDeepSeek(originalText) {
-  console.log("🧠 DeepSeek:", originalText);
-
-  const response = await axios.post(
-    'https://api.deepseek.com/v1/chat/completions',
-    {
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'user',
-        content: `Create a funny and unique cricket commentary for this prompt:\n"${originalText}"`,
-        },
-      ],
-      temperature: 0.9,
-      max_tokens: 300,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  return response.data.choices?.[0]?.message?.content?.trim() || originalText;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

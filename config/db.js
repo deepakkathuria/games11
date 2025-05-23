@@ -25,6 +25,17 @@ const pollDBPool = mysql.createPool({
   queueLimit: 0,
 });
 
+const internalDBPool = mysql.createPool({
+  host: dbConfig.HOST,
+  user: dbConfig.USER,
+  password: dbConfig.PASSWORD,
+  database: dbConfig.INTERNAL_DB_NAME, // ✅ New DB
+  port: dbConfig.PORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
 // **Check Database Connection**
 const checkDBConnection = async () => {
   try {
@@ -35,6 +46,14 @@ const checkDBConnection = async () => {
     const pollConn = await pollDBPool.getConnection();
     console.log("✅ MySQL PollDB connected successfully!");
     pollConn.release();
+
+
+    const internalConn = await internalDBPool.getConnection();
+    console.log("✅ MySQL InternalLinks DB connected successfully!");
+    internalConn.release();
+
+
+
   } catch (error) {
     console.error("❌ MySQL Database connection failed:", error.message);
   }
@@ -43,4 +62,4 @@ const checkDBConnection = async () => {
 // **Run connection test**
 checkDBConnection();
 
-module.exports = { userDBPool, pollDBPool };
+module.exports = { userDBPool, pollDBPool,internalDBPool };

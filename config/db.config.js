@@ -10,6 +10,8 @@ const dbConfig = {
   // Separate Databases
   USER_DB_NAME: process.env.USER_DB_NAME, // User-related DB
   POLL_DB_NAME: process.env.POLL_DB_NAME, // Poll-related DB
+  INTERNAL_DB_NAME: process.env.INTERNAL_DB_NAME, // ✅ NEW ENTRY
+
 
   pool: {
     max: 10, // Increased pool size
