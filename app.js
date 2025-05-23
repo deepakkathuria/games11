@@ -164,6 +164,18 @@ app.get('/api/gsc-ranking-watchdog', async (req, res) => {
 
 
 
+app.get('/api/gsc-content-query-match', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT * FROM gsc_content_query_match ORDER BY created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('❌ Failed to load query match:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to load data' });
+  }
+});
+
 
 
 
