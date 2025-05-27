@@ -33,7 +33,7 @@ async function getGSCPageData(startDate, endDate) {
       startDate,
       endDate,
       dimensions: ['page'],
-      rowLimit: 100,
+      rowLimit: 1000,
     },
   });
 
@@ -123,7 +123,7 @@ async function runGscContentRefreshAutomation() {
     if (!newRow) continue;
 
     const posDrop = newRow.position - oldRow.position;
-    if (posDrop >= 3) {
+    if (posDrop >= 1) {
       drops.push({
         url,
         old_position: oldRow.position,

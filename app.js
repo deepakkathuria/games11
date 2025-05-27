@@ -88,6 +88,21 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   }
 });
 
+app.get("/api/gsc-new-article-rewrites", async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT id, url, keyword, impressions, clicks, ctr, position, ai_output, created_at 
+      FROM gsc_new_article_rewrites
+      ORDER BY created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error("❌ Error fetching new article SEO rewrites:", err.message);
+    res.status(500).json({ success: false, error: "Failed to load new article rewrites" });
+  }
+});
+
+
 app.get("/api/gsc-content-refresh", async (req, res) => {
   try {
     const [rows] = await pollDBPool.query(`
