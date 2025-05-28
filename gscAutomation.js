@@ -29,17 +29,26 @@ async function getSearchConsolePages(startDate, endDate) {
   const authClient = await auth.getClient();
   const webmasters = google.webmasters({ version: 'v3', auth: authClient });
 
-  const response = await webmasters.searchanalytics.query({
-    siteUrl: SITE_URL,
-    requestBody: {
-      startDate,
-      endDate,
-      dimensions: ['page'],
-      rowLimit: 100,
-    },
-  });
+  const allRows = [];
+  const pageSize = 500; // Max allowed per page
+  for (let startRow = 0; startRow < 5000; startRow += pageSize) {
+    const res = await webmasters.searchanalytics.query({
+      siteUrl: SITE_URL,
+      requestBody: {
+        startDate,
+        endDate,
+        dimensions: ['page'],
+        rowLimit: pageSize,
+        startRow,
+      },
+    });
 
-  return response.data.rows || [];
+    if (!res.data.rows || res.data.rows.length === 0) break;
+    allRows.push(...res.data.rows);
+    if (res.data.rows.length < pageSize) break;
+  }
+
+  return allRows;
 }
 
 async function getSearchConsoleQueries(startDate, endDate, pageUrl) {
@@ -128,27 +137,36 @@ async function runGscDeepSeekAutomation() {
 
   const pages = await getSearchConsolePages(startDate, endDate);
 
+  console.log(`📄 Total pages fetched from GSC: ${pages.length}`);
+
   const candidates = pages.filter(p =>
-    p.impressions > 5000 &&
-    p.ctr < 0.05 &&
-    p.clicks < 300
+    p.impressions > 5000 && p.ctr < 0.05 && p.clicks < 300 // You can loosen this to get more pages
   );
 
-  const total = candidates.length;
-  console.log(`🧠 Total pages selected for DeepSeek analysis: ${total}\n`);
+  console.log(`🧠 Pages selected after filter: ${candidates.length}\n`);
 
   const startTime = Date.now();
+  let processedCount = 0;
 
-  for (let i = 0; i < total; i++) {
+  for (let i = 0; i < candidates.length; i++) {
     const page = candidates[i];
     const url = page.keys[0];
     const index = i + 1;
-    const progress = ((index / total) * 100).toFixed(1);
 
     try {
+      const [existing] = await pollDBPool.query(
+        `SELECT id FROM gsc_ai_recommendations WHERE url = ? LIMIT 1`,
+        [url]
+      );
+
+      if (existing.length > 0) {
+        console.log(`⏩ (${index}/${candidates.length}) Skipped (already processed): ${url}`);
+        continue;
+      }
+
       const queries = await getSearchConsoleQueries(startDate, endDate, url);
       if (!queries.length) {
-        console.log(`⚠️  (${index}/${total}) Skipped (no GSC queries): ${url}`);
+        console.log(`⚠️  (${index}/${candidates.length}) Skipped (no GSC queries): ${url}`);
         continue;
       }
 
@@ -176,18 +194,20 @@ async function runGscDeepSeekAutomation() {
         ]
       );
 
+      processedCount++;
       const elapsed = (Date.now() - startTime) / 1000;
-      const avgTime = elapsed / index;
-      const remainingTime = ((total - index) * avgTime).toFixed(0);
+      const avgTime = elapsed / processedCount;
+      const remainingTime = ((candidates.length - index) * avgTime).toFixed(0);
+      const progress = ((index / candidates.length) * 100).toFixed(1);
 
-      console.log(`✅ (${index}/${total}) [${progress}%] Done: ${url}`);
+      console.log(`✅ (${index}/${candidates.length}) [${progress}%] Done: ${url}`);
       console.log(`   ⏱️ Estimated time left: ${remainingTime}s\n`);
     } catch (err) {
-      console.error(`❌ (${index}/${total}) Failed for ${url}:`, err.message);
+      console.error(`❌ (${index}/${candidates.length}) Failed for ${url}:`, err.message);
     }
   }
 
-  console.log(`🎉 Finished! Total pages processed: ${total}`);
+  console.log(`🎉 Finished! Total pages processed this run: ${processedCount}`);
 }
 
 // Run directly

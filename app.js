@@ -54,10 +54,57 @@ app.listen(PORT, () => {
 
 const cron = require("node-cron");
 const sendTelegramMessage = require("./utils/sendTelegramMessage");
-// const sendInvoiceEmail = require("./utils/sendInvoiceemail");
-// const pool = require('./db'); // Your database connection pool
+const { runGscDeepSeekAutomation } = require("./gscAutomation");
 
-// Schedule the job to run daily at midnight
+
+
+
+
+
+// Here's the layman logic of your updated script in 5-6 simple lines:
+
+// It connects to your Google Search Console and fetches up to 5000 pages that appeared in search results over the past week.
+
+// It filters pages that have high impressions but low clicks and CTR (i.e., underperforming pages).
+
+// It skips pages that were already analyzed earlier (avoids duplicates).
+
+// For each new underperforming page, it fetches related search queries and scrapes the content, title, and meta description.
+
+// It sends this info to DeepSeek AI, which suggests SEO improvements (keywords, meta, headings, etc.).
+
+// Finally, it saves all suggestions to your database for later use by your SEO/content team.
+
+//automation gec ai report 
+
+cron.schedule("0 9,16 * * *", async () => {
+  console.log("🚀 Starting scheduled GSC AI analysis...");
+  try {
+    await runGscDeepSeekAutomation();
+    console.log("✅ GSC AI analysis complete.");
+  } catch (error) {
+    console.error("❌ GSC AI automation failed:", error);
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 cron.schedule("0 0 * * *", async () => {
   try {
     const query = `

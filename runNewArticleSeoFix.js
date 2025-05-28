@@ -9,7 +9,7 @@ const TEMP_KEY_PATH = path.join(__dirname, 'gsc_key_temp.json');
 const SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly'];
 const SITE_URL = 'https://cricketaddictor.com/';
 
-// 🔐 Load GSC Key
+// Load service account key from base64 .env
 if (process.env.GSC_CREDENTIALS_BASE64 && !fs.existsSync(TEMP_KEY_PATH)) {
   try {
     const decoded = Buffer.from(process.env.GSC_CREDENTIALS_BASE64, 'base64').toString('utf-8');
@@ -24,13 +24,8 @@ const auth = new google.auth.GoogleAuth({
   scopes: SCOPES,
 });
 
-// 🔎 Get GSC Pages (last 24 hours)
-async function getPagesLast24Hours() {
-  const today = new Date();
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const startDate = yesterday.toISOString().split('T')[0];
-  const endDate = today.toISOString().split('T')[0];
-
+// Fetch pages from the last 4 days
+async function getPagesLastXDays(startDate, endDate) {
   const authClient = await auth.getClient();
   const webmasters = google.webmasters({ version: 'v3', auth: authClient });
 
@@ -47,7 +42,6 @@ async function getPagesLast24Hours() {
   return response.data.rows || [];
 }
 
-// 🔍 Get top query for a URL
 async function getTopQuery(startDate, endDate, pageUrl) {
   const authClient = await auth.getClient();
   const webmasters = google.webmasters({ version: 'v3', auth: authClient });
@@ -68,21 +62,23 @@ async function getTopQuery(startDate, endDate, pageUrl) {
   return response.data.rows?.[0]?.keys?.[0] || 'Unknown';
 }
 
-// ✂️ Truncate text
 function truncate(str, max = 2000) {
   return str.length > max ? str.slice(0, max) + '...' : str;
 }
 
-// 📰 Extract article body
 async function getArticleBody(url) {
-  const res = await axios.get(url);
-  const $ = cheerio.load(res.data);
-  let content = '';
-  $('p').each((_, el) => content += $(el).text() + '\n');
-  return truncate(content);
+  try {
+    const res = await axios.get(url);
+    const $ = cheerio.load(res.data);
+    let content = '';
+    $('p').each((_, el) => content += $(el).text() + '\n');
+    return truncate(content);
+  } catch (err) {
+    console.error(`❌ Failed to fetch article content from ${url}:`, err.message);
+    return 'No content extracted';
+  }
 }
 
-// 🔠 Detect article type and intent
 function getArticleType(url) {
   if (url.includes("fantasy")) return "Fantasy Tips";
   if (url.includes("preview")) return "Pre-Match Preview";
@@ -102,14 +98,15 @@ function getIntent(type) {
   }
 }
 
-// 🚀 Main script
 async function runNewArticleSeoFix() {
+  const startDate = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const today = new Date().toISOString().split('T')[0];
-  const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  const pages = await getPagesLast24Hours();
-  const filtered = pages.filter(p => p.impressions > 100 && p.ctr < 0.02);
-  console.log(`🎯 New articles with high impressions, low CTR: ${filtered.length}`);
+  const pages = await getPagesLastXDays(startDate, today);
+  console.log(`📦 GSC Pages from last 4 days: ${pages.length}`);
+
+  const filtered = pages.filter(p => p.impressions > 10 && p.ctr < 0.02);
+  console.log(`🎯 Articles matching relaxed filter: ${filtered.length}`);
 
   for (let i = 0; i < filtered.length; i++) {
     const page = filtered[i];
@@ -119,7 +116,20 @@ async function runNewArticleSeoFix() {
     const ctr = page.ctr;
     const position = page.position;
 
+    console.log(`➡️ (${i + 1}/${filtered.length}) ${url}`);
+
     try {
+      // 🛑 CHECK IF ALREADY PROCESSED
+      const [existing] = await pollDBPool.query(
+        `SELECT id FROM gsc_new_article_rewrites WHERE url = ? LIMIT 1`,
+        [url]
+      );
+
+      if (existing.length > 0) {
+        console.log(`⏩ Skipping (already processed): ${url}`);
+        continue; // skip to next article
+      }
+
       const keyword = await getTopQuery(startDate, today, url);
       const content = await getArticleBody(url);
       const articleType = getArticleType(url);
@@ -128,14 +138,14 @@ async function runNewArticleSeoFix() {
       const prompt = `
 You are a professional SEO strategist and editor.
 
-Below is performance data from Google Search Console for an article published in the last 24 hours on CricketAddictor. The content has high visibility but low engagement. Your goal is to help this page improve its CTR, keyword targeting, and ranking.
+Below is performance data from Google Search Console for an article published recently on CricketAddictor. The content has high visibility but low engagement. Your goal is to help this page improve its CTR, keyword targeting, and ranking.
 
 ---
 
 🔎 Page URL: ${url}
 📅 Date: ${today}
 🔑 Primary Search Query: ${keyword}
-📊 Performance (Last 24 Hours):
+📊 Performance (Last Few Days):
 - Impressions: ${impressions}
 - Clicks: ${clicks}
 - CTR: ${(ctr * 100).toFixed(2)}%
@@ -191,9 +201,9 @@ Ensure the output follows Google's Helpful Content and EEAT guidelines.
         [url, keyword, impressions, clicks, ctr, position, ai_output]
       );
 
-      console.log(`✅ (${i + 1}/${filtered.length}) Done: ${url}`);
+      console.log(`✅ Saved SEO output for: ${url}`);
     } catch (err) {
-      console.error(`❌ Error on ${url}:`, err.message);
+      console.error(`❌ Error processing ${url}:`, err.message);
     }
   }
 
