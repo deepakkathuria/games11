@@ -25,6 +25,8 @@ const cheerio = require("cheerio");
 const Parser = require("rss-parser");
 const { OpenAI } = require("openai");
 const { v4: uuidv4 } = require("uuid");
+const moment = require('moment-timezone');
+
 
 //
 
@@ -78,13 +80,16 @@ const { runGscDeepSeekAutomation } = require("./gscAutomation");
 //automation gec ai report 
 
 cron.schedule("0 9,16 * * *", async () => {
-  console.log("🚀 Starting scheduled GSC AI analysis...");
+  const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
+  console.log(`🚀 [${now} IST] Starting scheduled GSC AI analysis...`);
   try {
     await runGscDeepSeekAutomation();
     console.log("✅ GSC AI analysis complete.");
   } catch (error) {
     console.error("❌ GSC AI automation failed:", error);
   }
+}, {
+  timezone: "Asia/Kolkata"
 });
 
 
@@ -135,19 +140,6 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   }
 });
 
-app.get("/api/gsc-new-article-rewrites", async (req, res) => {
-  try {
-    const [rows] = await pollDBPool.query(`
-      SELECT id, url, keyword, impressions, clicks, ctr, position, ai_output, created_at 
-      FROM gsc_new_article_rewrites
-      ORDER BY created_at DESC
-    `);
-    res.json({ success: true, data: rows });
-  } catch (err) {
-    console.error("❌ Error fetching new article SEO rewrites:", err.message);
-    res.status(500).json({ success: false, error: "Failed to load new article rewrites" });
-  }
-});
 
 
 app.get("/api/gsc-content-refresh", async (req, res) => {
