@@ -63,7 +63,6 @@ const { runGscDeepSeekAutomation } = require("./gscAutomation");
 
 
 
-// Here's the layman logic of your updated script in 5-6 simple lines:
 
 // It connects to your Google Search Console and fetches up to 5000 pages that appeared in search results over the past week.
 
@@ -95,6 +94,55 @@ cron.schedule("0 9,16 * * *", async () => {
 
 
 
+// 1. Looks at your site’s performance for the last 14 days
+// It compares:
+
+// 🔹 This week (last 7 days)
+
+// 🔹 Last week (7–14 days ago)
+
+// 2. Finds pages that are doing worse
+// If a page's ranking got worse (e.g., from position #5 to #10),
+
+// Then it adds that page to a list for analysis
+
+// 3. Checks what keyword that page is ranking for
+// It finds the main search keyword (e.g., "India vs Australia Preview")
+
+// 4. Asks DeepSeek AI: "How do I fix this page?"
+// It sends the AI:
+
+// What page is dropping
+
+// How its ranking, clicks, and impressions changed
+
+// The keyword it's targeting
+
+// And asks the AI:
+
+// 🔧 What to improve in title/meta
+
+// 🧱 What section to rewrite
+
+// 📝 What new headings to add
+
+// 🔗 What internal links to add
+
+
+
+
+
+cron.schedule("0 9 * * MON", async () => {
+  console.log("🚀 Starting weekly GSC content refresh analysis...");
+  try {
+    await runGscContentRefreshAutomation();
+    console.log("✅ Weekly GSC refresh complete.");
+  } catch (error) {
+    console.error("❌ Refresh script failed:", error);
+  }
+}, {
+  timezone: "Asia/Kolkata"
+});
 
 
 
@@ -127,13 +175,26 @@ cron.schedule("0 0 * * *", async () => {
 });
 
 app.get("/api/gsc-ai-reports", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 80;
+  const offset = (page - 1) * limit;
+
   try {
     const [rows] = await pollDBPool.query(`
       SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at 
       FROM gsc_ai_recommendations 
       ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const [countResult] = await pollDBPool.query(`
+      SELECT COUNT(*) AS total FROM gsc_ai_recommendations
     `);
-    res.json({ success: true, data: rows });
+
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ success: true, data: rows, page, totalPages });
   } catch (err) {
     console.error("❌ GSC AI Report Fetch Error:", err.message);
     res.status(500).json({ success: false, error: "Failed to load reports" });
@@ -142,18 +203,33 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
 
 
 
+
 app.get("/api/gsc-content-refresh", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 80;
+  const offset = (page - 1) * limit;
+
   try {
     const [rows] = await pollDBPool.query(`
       SELECT * FROM gsc_content_refresh_recommendations
       ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const [countResult] = await pollDBPool.query(`
+      SELECT COUNT(*) AS total FROM gsc_content_refresh_recommendations
     `);
-    res.json({ success: true, data: rows });
+
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ success: true, data: rows, page, totalPages });
   } catch (err) {
     console.error("❌ Content Refresh Fetch Error:", err.message);
     res.status(500).json({ success: false, error: "Failed to load data" });
   }
 });
+
 
 app.get("/api/gsc-low-ctr", async (req, res) => {
   try {
@@ -984,18 +1060,33 @@ setInterval(async () => {
 
 // GET all completed reports (latest 20 or more)
 app.get("/api/deepseek-reports", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 80;
+  const offset = (page - 1) * limit;
+
   try {
     const [rows] = await pollDBPool.query(`
-    SELECT id, url, status, created_at 
-     FROM seo_analysis_jobs 
-     WHERE status = 'completed' 
-    ORDER BY created_at DESC
+      SELECT id, url, status, created_at
+      FROM seo_analysis_jobs
+      WHERE status = 'completed'
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    // Get total count
+    const [countRows] = await pollDBPool.query(`
+      SELECT COUNT(*) AS total FROM seo_analysis_jobs WHERE status = 'completed'
     `);
-    res.json({ success: true, data: rows });
+    
+    const total = countRows[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ success: true, data: rows, total, totalPages, page });
   } catch (err) {
     res.status(500).json({ success: false, error: "DB fetch error" });
   }
 });
+
 
 // GET report by ID
 app.get("/api/deepseek-reports/:id", async (req, res) => {
