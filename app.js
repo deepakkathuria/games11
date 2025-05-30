@@ -180,12 +180,12 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const [rows] = await pollDBPool.query(`
-      SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at, article_published_at
-      FROM gsc_ai_recommendations 
-      ORDER BY COALESCE(article_published_at, created_at) DESC
-      LIMIT ? OFFSET ?
-    `, [limit, offset]);
+const [rows] = await pollDBPool.query(`
+  SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at, article_published_at
+  FROM gsc_ai_recommendations 
+  ORDER BY COALESCE(article_published_at, created_at) DESC, created_at DESC
+  LIMIT ? OFFSET ?
+`, [limit, offset]);
 
     const [countResult] = await pollDBPool.query(`
       SELECT COUNT(*) AS total FROM gsc_ai_recommendations
