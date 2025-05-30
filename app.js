@@ -132,18 +132,17 @@ cron.schedule("0 9,16 * * *", async () => {
 
 
 
-cron.schedule("0 9 * * MON", async () => {
-  console.log("🚀 Starting weekly GSC content refresh analysis...");
+cron.schedule("0 */3 * * *", async () => {
+  console.log("🚀 Starting GSC content refresh analysis (every 3 hours)...");
   try {
     await runGscContentRefreshAutomation();
-    console.log("✅ Weekly GSC refresh complete.");
+    console.log("✅ GSC refresh complete.");
   } catch (error) {
     console.error("❌ Refresh script failed:", error);
   }
 }, {
   timezone: "Asia/Kolkata"
 });
-
 
 
 
@@ -225,8 +224,14 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
 
   try {
     const [rows] = await pollDBPool.query(`
-      SELECT * FROM gsc_content_refresh_recommendations
-      ORDER BY created_at DESC
+      SELECT id, url, keyword, old_position, new_position, old_clicks, new_clicks,
+             old_impressions, new_impressions, deepseek_output,
+             article_published_at, created_at
+      FROM gsc_content_refresh_recommendations
+      ORDER BY 
+        article_published_at IS NULL,
+        article_published_at DESC,
+        created_at DESC
       LIMIT ? OFFSET ?
     `, [limit, offset]);
 
@@ -243,6 +248,7 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to load data" });
   }
 });
+
 
 
 app.get("/api/gsc-low-ctr", async (req, res) => {
