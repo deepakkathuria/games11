@@ -181,9 +181,9 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
 
   try {
     const [rows] = await pollDBPool.query(`
-      SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at 
+      SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at, article_published_at
       FROM gsc_ai_recommendations 
-      ORDER BY created_at DESC
+      ORDER BY COALESCE(article_published_at, created_at) DESC
       LIMIT ? OFFSET ?
     `, [limit, offset]);
 
@@ -200,6 +200,7 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to load reports" });
   }
 });
+
 
 
 
