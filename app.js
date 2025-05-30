@@ -180,12 +180,24 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-const [rows] = await pollDBPool.query(`
-  SELECT id, url, impressions, clicks, ctr, position, deepseek_output, created_at, article_published_at
-  FROM gsc_ai_recommendations 
-  ORDER BY COALESCE(article_published_at, created_at) DESC, created_at DESC
-  LIMIT ? OFFSET ?
-`, [limit, offset]);
+    const [rows] = await pollDBPool.query(`
+      SELECT 
+        id, 
+        url, 
+        impressions, 
+        clicks, 
+        ctr, 
+        position, 
+        deepseek_output, 
+        created_at, 
+        article_published_at
+      FROM gsc_ai_recommendations 
+      ORDER BY 
+        article_published_at IS NULL,  -- ✅ Puts published articles first
+        article_published_at DESC,     -- ✅ Sorts them by most recent publish date
+        created_at DESC                -- ✅ Tie-breaker for older entries
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
 
     const [countResult] = await pollDBPool.query(`
       SELECT COUNT(*) AS total FROM gsc_ai_recommendations
@@ -200,6 +212,7 @@ const [rows] = await pollDBPool.query(`
     res.status(500).json({ success: false, error: "Failed to load reports" });
   }
 });
+
 
 
 
