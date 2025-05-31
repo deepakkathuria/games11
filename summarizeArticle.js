@@ -7,7 +7,6 @@ const { pollDBPool } = require("./config/db");
 const FEED_URL = "https://cricketaddictor.com/feed";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
-// Fetch article URLs from RSS feed
 async function getArticleLinksFromFeed() {
   const res = await axios.get(FEED_URL);
   const $ = cheerio.load(res.data, { xmlMode: true });
@@ -24,7 +23,6 @@ async function getArticleLinksFromFeed() {
   return urls.slice(0, 10);
 }
 
-// Extract article content (limit 3500 chars)
 async function extractArticleData(url) {
   try {
     const res = await axios.get(url, { timeout: 10000 });
@@ -39,30 +37,40 @@ async function extractArticleData(url) {
 
     return content.slice(0, 3500);
   } catch (err) {
-    console.error(`❌ Failed to extract article content from ${url}:`, err.message);
     throw err;
   }
 }
 
-// Call DeepSeek to get all summaries with explicit headings
 async function getSummariesFromDeepSeek(body) {
   const prompt = `
-Rewrite this cricket article into 4 strictly fact-based summaries.
+You are an expert cricket journalist writing for a leading sports media brand known for credible, insightful, and fan-friendly reporting.
 
-Use these exact headings before each summary section:
+Your job is to rewrite the following cricket article into 4 fact-based summaries that are clear, human-written, and rich in value. Your tone must be conversational, informative, and easy to read. Use active voice, short paragraphs, and avoid robotic phrasing. The summaries should demonstrate Experience, Expertise, Authority, and Trust (EEAT) as outlined by Google guidelines.
 
-### 60-word version
+Also, add contextual value wherever it’s appropriate—such as quick background facts, relevant past stats, or implications—but only if it’s verifiable and helps the user understand better.
 
-### 100-word version
+Each section must start with these exact subheadings:
 
-### 250-word version
+60-word version  
+(A quick snapshot of the article)
 
-### 600–900 word version
+100-word version  
+(A bite-sized overview with one key extra detail or insight)
 
-Each summary must be factual, neutral, and contain only information in the article.
-No blank or placeholder text allowed.
+250-word version  
+(A full summary with match context, names, and any essential stat)
 
-Article:
+600–900 word version  
+(A comprehensive report using the original info + value-added insights. Keep it 100% factual and EEAT-aligned. Make it feel like it was written by a knowledgeable cricket writer. Don’t overhype.)
+
+Additional Notes:  
+- Do NOT fabricate any details.  
+- Do NOT add personal opinions.  
+- Do NOT use passive or corporate tone.  
+- Make each version look distinctly human-written and pass AI content detectors.  
+- Use brand voice consistently.
+
+Cricket Article:  
 ${body}
 `;
 
@@ -85,16 +93,14 @@ ${body}
   return res.data.choices[0].message.content;
 }
 
-// Extract text under markdown heading, flexible on spaces/dashes
 function extractBlock(text, label) {
-  const pattern = label.replace(/[-\s]/g, "[-\\s]*"); // allow dashes/spaces flexibly
+  const pattern = label.replace(/[-\s]/g, "[-\\s]*");
   const regex = new RegExp(`#*\\s*${pattern}[\\s\\S]*?(?=\\n#+\\s|$)`, "i");
   const match = text.match(regex);
   if (!match) return "";
   return match[0].replace(new RegExp(`^#*\\s*${pattern}`, "i"), "").trim();
 }
 
-// Try multiple labels until one returns non-empty summary
 function tryExtractAnyOf(text, labels) {
   for (const label of labels) {
     const block = extractBlock(text, label);
@@ -103,7 +109,6 @@ function tryExtractAnyOf(text, labels) {
   return "";
 }
 
-// Check if article already processed
 async function alreadyExists(url) {
   const [rows] = await pollDBPool.query(
     `SELECT id FROM article_summaries_simplified WHERE url = ? LIMIT 1`,
@@ -112,51 +117,30 @@ async function alreadyExists(url) {
   return rows.length > 0;
 }
 
-// Process single article: extract, summarize, save
 async function processArticle(url) {
   const body = await extractArticleData(url);
   const aiResponse = await getSummariesFromDeepSeek(body);
 
-  console.log(`\n🧠 Full DeepSeek response for ${url}:\n${aiResponse}\n`);
-
   const summary_60 = tryExtractAnyOf(aiResponse, [
     "60-word version",
     "60 word version",
-    "60-word summary",
-    "60 word summary",
   ]);
   const summary_100 = tryExtractAnyOf(aiResponse, [
     "100-word version",
     "100 word version",
-    "100-word summary",
-    "100 word summary",
   ]);
   const summary_250 = tryExtractAnyOf(aiResponse, [
     "250-word version",
     "250 word version",
-    "250-word summary",
-    "250 word summary",
   ]);
   const summary_900 = tryExtractAnyOf(aiResponse, [
     "600–900 word version",
     "600 to 900 word version",
     "600-900 word version",
-    "600–900 word summary",
-    "600 to 900 word summary",
-    "600-900 word summary",
   ]);
-
-  console.log("---- Extracted Summaries ----");
-  console.log("60-word summary:\n", summary_60 || "[EMPTY]");
-  console.log("100-word summary:\n", summary_100 || "[EMPTY]");
-  console.log("250-word summary:\n", summary_250 || "[EMPTY]");
-  console.log("900-word summary:\n", summary_900 || "[EMPTY]");
 
   if (!summary_60 && !summary_100 && !summary_250) {
     throw new Error("All summaries blank (60, 100, 250 are empty)");
-  }
-  if (!summary_900) {
-    console.warn(`⚠️ Warning: 600–900 word summary missing for URL: ${url}`);
   }
 
   await pollDBPool.query(
@@ -165,55 +149,38 @@ async function processArticle(url) {
      VALUES (?, ?, ?, ?, ?)`,
     [url, summary_60, summary_100, summary_250, summary_900]
   );
-
-  console.log(`✅ Saved summaries for ${url}`);
 }
 
-// Main loop with progress bar
 async function main() {
-  console.log("⏳ Fetching article feed...");
+  console.log("🔄 Starting article processing...");
+
   const urls = await getArticleLinksFromFeed();
-  console.log(`🔗 Found ${urls.length} articles.\n`);
 
   const progressBar = new cliProgress.SingleBar(
-    { format: "📊 {bar} | {value}/{total} Articles | {status}" },
+    {},
     cliProgress.Presets.shades_classic
   );
 
-  let processed = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  progressBar.start(urls.length, 0, { status: "Starting..." });
+  progressBar.start(urls.length, 0);
 
   for (const url of urls) {
     try {
       if (await alreadyExists(url)) {
-        skipped++;
-        progressBar.increment(1, { status: "⏭️ Skipped" });
+        progressBar.increment();
         continue;
       }
 
       await processArticle(url);
-      processed++;
-      progressBar.increment(1, { status: "✅ Saved" });
-    } catch (err) {
-      failed++;
-      progressBar.increment(1, { status: "❌ Failed" });
-      console.error(`❌ Error processing ${url}:\n`, err?.stack || err.message || err);
+      progressBar.increment();
+    } catch (_) {
+      progressBar.increment();
     }
   }
 
   progressBar.stop();
 
-  console.log("\n📌 Summary:");
-  console.log(`✅ Processed: ${processed}`);
-  console.log(`⏭️ Skipped:   ${skipped}`);
-  console.log(`❌ Failed:    ${failed}`);
-  console.log("🏁 Done.");
+  console.log("✅ All articles processed.");
 }
 
-if (require.main === module) {
-  main();
-}
-c
+module.exports = main;
+
