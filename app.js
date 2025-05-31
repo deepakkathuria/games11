@@ -57,6 +57,7 @@ app.listen(PORT, () => {
 const cron = require("node-cron");
 const sendTelegramMessage = require("./utils/sendTelegramMessage");
 const { runGscDeepSeekAutomation } = require("./gscAutomation");
+const { runGscContentRefreshAutomation } = require("./runGscContentRefreshAutomation");
 
 
 
@@ -84,6 +85,12 @@ cron.schedule("0 9,16 * * *", async () => {
   try {
     await runGscDeepSeekAutomation();
     console.log("✅ GSC AI analysis complete.");
+      await runGscContentRefreshAutomation();
+    console.log("✅ GSC refresh complete.");
+        await runGscTrendingKeywords();
+      console.log("✅ keyword.");
+
+
   } catch (error) {
     console.error("❌ GSC AI automation failed:", error);
   }
@@ -132,18 +139,40 @@ cron.schedule("0 9,16 * * *", async () => {
 
 
 
-cron.schedule("0 */3 * * *", async () => {
-  console.log("🚀 Starting GSC content refresh analysis (every 3 hours)...");
-  try {
-    await runGscContentRefreshAutomation();
-    console.log("✅ GSC refresh complete.");
-  } catch (error) {
-    console.error("❌ Refresh script failed:", error);
-  }
-}, {
-  timezone: "Asia/Kolkata"
-});
 
+
+// ----------------------- news summary
+app.get("/api/article_summaries", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10; // adjust as needed
+    const offset = (page - 1) * limit;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT id, url, summary_60, summary_100, summary_250, summary_900, created_at
+       FROM article_summaries_simplified
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+
+    const [[{ total = 0 }]] = await pollDBPool.query(
+      `SELECT COUNT(*) as total FROM article_summaries_simplified`
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      page,
+      totalPages: Math.ceil(total / limit),
+      total,
+    });
+  } catch (err) {
+    console.error("❌ API error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+// -------------------------------------------------
 
 
 
@@ -266,14 +295,28 @@ app.get("/api/gsc-low-ctr", async (req, res) => {
 app.get("/api/gsc-trending-keywords", async (req, res) => {
   try {
     const [rows] = await pollDBPool.query(`
-      SELECT * FROM gsc_trending_keywords ORDER BY created_at DESC
+      SELECT 
+        id, 
+        keywords_json, 
+        ai_output, 
+        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS published_date
+      FROM gsc_trending_keywords
+      ORDER BY created_at DESC
     `);
-    res.json({ success: true, data: rows });
+
+    // Optional: parse keywords_json for frontend
+    const formattedRows = rows.map(row => ({
+      ...row,
+      keywords: JSON.parse(row.keywords_json),
+    }));
+
+    res.json({ success: true, data: formattedRows });
   } catch (err) {
     console.error("❌ Failed to fetch trending keywords:", err.message);
     res.status(500).json({ success: false, error: "Failed to load data" });
   }
 });
+
 
 app.get("/api/gsc-ranking-watchdog", async (req, res) => {
   try {
@@ -363,84 +406,6 @@ app.get("/api/reports-json/search", async (req, res) => {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ---------------------------------------------------------gpt seo snalysis report -----------------------------------
-// app.get('/api/gsc/queries', async (req, res) => {
-//   try {
-//     const endDate = new Date().toISOString().split('T')[0];
-//     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-//     const queries = await getSearchConsoleQueries(startDate, endDate);
-//     res.json({ success: true, queries });
-//   } catch (err) {
-//     console.error('❌ GSC Query Error:', err.message);
-//     res.status(500).json({ success: false, error: 'Failed to fetch GSC data.' });
-//   }
-// });
-
-// app.get('/api/gsc/insight', async (req, res) => {
-//   const { url } = req.query;
-//   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
-
-//   try {
-//     // Dates
-//     const endDate = new Date().toISOString().split('T')[0];
-//     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-//     // Step 1: GSC queries
-//     const queries = await getSearchConsoleQueries(startDate, endDate, 'https://cricketaddictor.com/');
-
-//     // Step 2: Get page content
-//     const response = await axios.get(url);
-//     const $ = cheerio.load(response.data);
-//     const title = $('title').text();
-//     const meta = $('meta[name="description"]').attr('content') || '';
-//     let body = '';
-//     $('p').each((i, el) => {
-//       body += $(el).text() + '\n';
-//     });
-
-//     // Step 3: Format prompt
-//     const formattedPrompt = `
-// You are an expert SEO strategist and content optimization assistant.
-
-// Based on the following data from Google Search Console for the URL "${url}":
-
-// Top Queries (last 30 days):
-// ${queries.map(q => `- ${q.keys[0]} | Clicks: ${q.clicks}, Impressions: ${q.impressions}, CTR: ${(q.ctr * 100).toFixed(2)}%, Position: ${q.position.toFixed(2)}`).join('\n')}
-
-// Page Title: ${title}
-// Meta Description: ${meta}
-// Page Content: ${body.slice(0, 3000)}
-
-// Analyze and return:
-// 1. Top queries needing optimization
-// 2. Suggested new keywords / topics
-// 3. New meta title and description
-// 4. Suggested H2s/H3s
-// 5. Content improvements (intro/conclusion)
-// 6. Schema suggestions
-// 7. Internal link ideas
-
-// Use bullet points and organize output.
-//     `;
-
-//     // Step 4: Send to GPT
-//     const completion = await openai.chat.completions.create({
-//       model: 'gpt-4-turbo',
-//       messages: [{ role: 'user', content: formattedPrompt }],
-//       temperature: 0.2,
-//     });
-
-//     res.json({
-//       success: true,
-//       data: completion.choices[0].message.content,
-//     });
-//   } catch (err) {
-//     console.error('❌ GSC Insight Error:', err.message);
-//     res.status(500).json({ success: false, error: err.message });
-//   }
-// });
-// --------------------------------------------------------------------------------------------------------------------------
 
 // ----------------------------------------------------gsc onsight deep seek report ---------------------------------
 
