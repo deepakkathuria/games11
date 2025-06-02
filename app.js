@@ -848,29 +848,50 @@ ${competitors}
 const jobQueue = []; // 🟢 In-memory job queue
 
 // ✅ Manual Content Analysis Job (Pre-Publish)
+// ✅ API to queue manual (PrePublish) content SEO job using DeepSeek
 app.post("/api/analyze-article-content-deepseek-job", async (req, res) => {
-  const { title, url = "", content } = req.body;
+  const { title, url, content } = req.body;
 
   if (!title || !content) {
-    return res.status(400).json({ success: false, error: "Missing title or content" });
+    return res
+      .status(400)
+      .json({ success: false, error: "Title and content are required." });
   }
 
+  // Generate slugified placeholder URL if not provided
+  const slugUrl =
+    url?.trim() ||
+    `PREPUBLISH_${title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")}`;
+
   try {
-    // Save to DB
     const [insertResult] = await pollDBPool.query(
       `INSERT INTO seo_analysis_jobs (url, status, created_at) VALUES (?, 'queued', NOW())`,
-      [url || "manual"]
+      [slugUrl]
     );
 
     const jobId = insertResult.insertId;
-    jobQueue.push({ jobId, title, content, type: "manual" });
 
-    res.json({ success: true, jobId });
+    // Push job to queue with all relevant data
+    jobQueue.push({
+      jobId,
+      mode: "manual",
+      url: slugUrl,
+      title,
+      content,
+    });
+
+    return res.json({ success: true, jobId });
   } catch (err) {
-    console.error("❌ [Manual Job Insert Error]:", err.message);
-    res.status(500).json({ success: false, error: "DB insert failed" });
+    console.error("❌ Failed to queue PrePublish job:", err.message);
+    return res
+      .status(500)
+      .json({ success: false, error: "Server error. Could not queue job." });
   }
 });
+
 
 
 // ✅ Extract Article Content
@@ -1106,27 +1127,35 @@ setInterval(async () => {
     console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
 
     let articleData;
-    if (job.type === "manual") {
+    if (job.mode === "manual") {
+      // PrePublish: data is directly provided
       articleData = {
         title: job.title,
-        description: "",
+        description: "", // optional
         body: job.content.slice(0, 3500),
       };
     } else {
+      // Feed: fetch and extract content
       articleData = await extractArticleData(job.url);
     }
 
-    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
-    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
+    const competitors = await getSimulatedCompetitorsWithDeepSeek(
+      articleData.title
+    );
+
+    const seoReport = await analyzeAndSuggestWithDeepSeek(
+      articleData,
+      competitors
+    );
 
     await pollDBPool.query(
       `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
       [seoReport, job.jobId]
     );
   } catch (err) {
-    console.error(`❌ Job Failed [${job.jobId}]:`, err.message);
+    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
     await pollDBPool.query(
-      `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+      `UPDATE seo_analgysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
       [err.message || "Unknown error", job.jobId]
     );
   }
