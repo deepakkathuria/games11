@@ -110,18 +110,18 @@ cron.schedule("0 9,16 * * *", async () => {
 
 
 
-// cron.schedule("*/5 * * * *", async () => {
-//   const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-//   console.log(`🕒 [${now} IST] Running DeepSeek Summary Automation...`);
-//   try {
-//     await runDeepSeekSummaryAutomation();
-//     console.log("✅ DeepSeek summary task complete.");
-//   } catch (err) {
-//     console.error("❌ DeepSeek summary task failed:", err.message);
-//   }
-// }, {
-//   timezone: "Asia/Kolkata"
-// })
+cron.schedule("*/5 * * * *", async () => {
+  const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
+  console.log(`🕒 [${now} IST] Running DeepSeek Summary Automation...`);
+  try {
+    await runDeepSeekSummaryAutomation();
+    console.log("✅ DeepSeek summary task complete.");
+  } catch (err) {
+    console.error("❌ DeepSeek summary task failed:", err.message);
+  }
+}, {
+  timezone: "Asia/Kolkata"
+})
 
 
 // 1. Looks at your site’s performance for the last 14 days
@@ -847,6 +847,32 @@ ${competitors}
 
 const jobQueue = []; // 🟢 In-memory job queue
 
+// ✅ Manual Content Analysis Job (Pre-Publish)
+app.post("/api/analyze-article-content-deepseek-job", async (req, res) => {
+  const { title, url = "", content } = req.body;
+
+  if (!title || !content) {
+    return res.status(400).json({ success: false, error: "Missing title or content" });
+  }
+
+  try {
+    // Save to DB
+    const [insertResult] = await pollDBPool.query(
+      `INSERT INTO seo_analysis_jobs (url, status, created_at) VALUES (?, 'queued', NOW())`,
+      [url || "manual"]
+    );
+
+    const jobId = insertResult.insertId;
+    jobQueue.push({ jobId, title, content, type: "manual" });
+
+    res.json({ success: true, jobId });
+  } catch (err) {
+    console.error("❌ [Manual Job Insert Error]:", err.message);
+    res.status(500).json({ success: false, error: "DB insert failed" });
+  }
+});
+
+
 // ✅ Extract Article Content
 async function extractArticleData(url) {
   try {
@@ -1037,6 +1063,41 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 });
 
 // ✅ Job Processor Loop (every 5 sec)
+// setInterval(async () => {
+//   if (jobQueue.length === 0) return;
+
+//   const job = jobQueue.shift();
+//   try {
+//     console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
+
+//     const articleData = await extractArticleData(job.url);
+//     const competitors = await getSimulatedCompetitorsWithDeepSeek(
+//       articleData.title
+//     );
+//     const seoReport = await analyzeAndSuggestWithDeepSeek(
+//       articleData,
+//       competitors
+//     );
+
+//     await pollDBPool.query(
+//       `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+//       [seoReport, job.jobId]
+//     );
+//   } catch (err) {
+//     console.error(`❌ Job Failed [${job.jobId}]`, err.message);
+//     await pollDBPool.query(
+//       `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+//       [err.message || "Unknown error", job.jobId]
+//     );
+//   }
+// }, 5000);
+
+
+
+
+
+
+
 setInterval(async () => {
   if (jobQueue.length === 0) return;
 
@@ -1044,27 +1105,34 @@ setInterval(async () => {
   try {
     console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
 
-    const articleData = await extractArticleData(job.url);
-    const competitors = await getSimulatedCompetitorsWithDeepSeek(
-      articleData.title
-    );
-    const seoReport = await analyzeAndSuggestWithDeepSeek(
-      articleData,
-      competitors
-    );
+    let articleData;
+    if (job.type === "manual") {
+      articleData = {
+        title: job.title,
+        description: "",
+        body: job.content.slice(0, 3500),
+      };
+    } else {
+      articleData = await extractArticleData(job.url);
+    }
+
+    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
 
     await pollDBPool.query(
       `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
       [seoReport, job.jobId]
     );
   } catch (err) {
-    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
+    console.error(`❌ Job Failed [${job.jobId}]:`, err.message);
     await pollDBPool.query(
       `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
       [err.message || "Unknown error", job.jobId]
     );
   }
 }, 5000);
+
+
 
 // GET all completed reports (latest 20 or more)
 app.get("/api/deepseek-reports", async (req, res) => {
