@@ -92,12 +92,12 @@ cron.schedule("0 9,16 * * *", async () => {
     console.log("✅ GSC AI analysis complete.");
       await runGscContentRefreshAutomation();
     console.log("✅ GSC refresh complete.");
-        await runGscTrendingKeywords();
-      console.log("✅ keyword.");
+    //     await runGscTrendingKeywords();
+    //   console.log("✅ keyword.");
 
-    await runGscLowCtrFixAutomation()
+    // await runGscLowCtrFixAutomation()
 
-    await runGscRankingWatchdog()
+    // await runGscRankingWatchdog()
 
 
 
