@@ -1181,6 +1181,30 @@ app.get("/api/deepseek-reports/:id", async (req, res) => {
     res.status(500).json({ success: false, error: "DB fetch error" });
   }
 });
+
+
+
+// ✅ GET DeepSeek Report by Job ID
+app.get("/api/deepseek-reports/:jobId", async (req, res) => {
+  const { jobId } = req.params;
+
+  try {
+    const [rows] = await pollDBPool.query(
+      `SELECT id, status, result, error FROM seo_analysis_jobs WHERE id = ?`,
+      [jobId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Job not found" });
+    }
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error("❌ Error fetching report:", err.message);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
 //
 // --------------------------------------------------------------------------------------------------------
 
