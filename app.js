@@ -850,40 +850,26 @@ const jobQueue = []; // 🟢 In-memory job queue
 // ✅ Manual Content Analysis Job (Pre-Publish)
 // ✅ API to queue manual (PrePublish) content SEO job using DeepSeek
 // ✅ API to submit manual article analysis job (Pre-Publish)
-app.post("/api/analyze-article-content-deepseek-job", async (req, res) => {
-  const { title, url, content } = req.body;
-
-  if (!title || !content) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Title and content are required." });
-  }
-
+app.post('/api/analyze-article-content-deepseek-job', async (req, res) => {
   try {
-    const slugified = "PREPUBLISH_" + title.toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 200); // keep slug short
+    const { title, content } = req.body;
+    const urlSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const url = `PREPUBLISH_${urlSlug}`;
 
-    const [insertResult] = await pollDBPool.query(
-      `INSERT INTO seo_analysis_jobs (url, status, created_at) VALUES (?, 'queued', NOW())`,
-      [slugified]
+    const [result] = await pool.query(
+      `INSERT INTO seo_prepublish_jobs (title, url, content, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'queued', NOW(), NOW())`,
+      [title, url, content]
     );
 
-    const jobId = insertResult.insertId;
+    const jobId = result.insertId;
 
-    // Push job with manual mode flag and direct content
-    jobQueue.push({
-      jobId,
-      mode: "manual",
-      title,
-      content,
-    });
+    jobQueue.push({ jobId, content, url, title, mode: 'manual' });
 
     res.json({ success: true, jobId });
-  } catch (err) {
-    console.error("❌ [PrePublish Job Queue] Insert Error:", err.message);
-    res.status(500).json({ success: false, error: "Failed to queue job" });
+  } catch (error) {
+    console.error("Error creating prepublish job:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -1114,48 +1100,37 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 
 
 
-
 setInterval(async () => {
   if (jobQueue.length === 0) return;
 
   const job = jobQueue.shift();
+
   try {
-    console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
-
-    let articleData;
-    if (job.mode === "manual") {
-      // PrePublish: data is directly provided
-      articleData = {
-        title: job.title,
-        description: "", // optional
-        body: job.content.slice(0, 3500),
-      };
-    } else {
-      // Feed: fetch and extract content
-      articleData = await extractArticleData(job.url);
-    }
-
-    const competitors = await getSimulatedCompetitorsWithDeepSeek(
-      articleData.title
+    await pool.query(
+      `UPDATE ${job.mode === 'manual' ? 'seo_prepublish_jobs' : 'seo_analysis_jobs'}
+       SET status = 'processing', updated_at = NOW()
+       WHERE id = ?`,
+      [job.jobId]
     );
 
-    const seoReport = await analyzeAndSuggestWithDeepSeek(
-      articleData,
-      competitors
-    );
+    const seoReport = await analyzeContentWithDeepSeek(job.content || "", job.url);
 
-    await pollDBPool.query(
-      `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+    await pool.query(
+      `UPDATE ${job.mode === 'manual' ? 'seo_prepublish_jobs' : 'seo_analysis_jobs'}
+       SET status = 'completed', result = ?, updated_at = NOW()
+       WHERE id = ?`,
       [seoReport, job.jobId]
     );
   } catch (err) {
-    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
-    await pollDBPool.query(
-      `UPDATE seo_analgysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
-      [err.message || "Unknown error", job.jobId]
+    await pool.query(
+      `UPDATE ${job.mode === 'manual' ? 'seo_prepublish_jobs' : 'seo_analysis_jobs'}
+       SET status = 'failed', error = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [err.message, job.jobId]
     );
+    console.error("Job processing failed:", err);
   }
-}, 5000);
+}, 3000); // Poll every 3 seconds
 
 
 
@@ -1189,23 +1164,47 @@ app.get("/api/deepseek-reports", async (req, res) => {
 });
 
 
-// GET report by ID
-app.get("/api/deepseek-reports/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [rows] = await pollDBPool.query(
-      `SELECT id, url, result FROM seo_analysis_jobs WHERE id = ? AND status = 'completed'`,
-      [id]
-    );
+// // GET report by ID
+// app.get("/api/deepseek-reports/:id", async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     const [rows] = await pollDBPool.query(
+//       `SELECT id, url, result FROM seo_analysis_jobs WHERE id = ? AND status = 'completed'`,
+//       [id]
+//     );
 
-    if (rows.length === 0)
-      return res.status(404).json({ success: false, error: "Not found" });
+//     if (rows.length === 0)
+//       return res.status(404).json({ success: false, error: "Not found" });
 
-    res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    res.status(500).json({ success: false, error: "DB fetch error" });
+//     res.json({ success: true, data: rows[0] });
+//   } catch (err) {
+//     res.status(500).json({ success: false, error: "DB fetch error" });
+//   }
+// });
+
+
+app.get('/api/deepseek-reports/:id', async (req, res) => {
+  const jobId = req.params.id;
+
+  const [feedJob] = await pool.query(
+    `SELECT id, url, result, status, error FROM seo_analysis_jobs WHERE id = ?`, [jobId]
+  );
+
+  if (feedJob.length) {
+    return res.json({ success: true, data: feedJob[0] });
   }
+
+  const [manualJob] = await pool.query(
+    `SELECT id, url, result, status, error FROM seo_prepublish_jobs WHERE id = ?`, [jobId]
+  );
+
+  if (manualJob.length) {
+    return res.json({ success: true, data: manualJob[0] });
+  }
+
+  return res.status(404).json({ success: false, error: "Job not found." });
 });
+
 
 
 
