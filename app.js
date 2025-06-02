@@ -844,7 +844,7 @@ ${competitors}
 // }
 
 //new for productio issue timeout
-
+cmd
 const jobQueue = []; // 🟢 In-memory job queue
 
 // ✅ Manual Content Analysis Job (Pre-Publish)
@@ -856,7 +856,7 @@ app.post('/api/analyze-article-content-deepseek-job', async (req, res) => {
     const urlSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const url = `PREPUBLISH_${urlSlug}`;
 
-    const [result] = await pool.query(
+    const [result] = await pollDBPool.query(
       `INSERT INTO seo_prepublish_jobs (title, url, content, status, created_at, updated_at)
        VALUES (?, ?, ?, 'queued', NOW(), NOW())`,
       [title, url, content]
@@ -1106,7 +1106,7 @@ setInterval(async () => {
   const job = jobQueue.shift();
 
   try {
-    await pool.query(
+    await pollDBPool.query(
       `UPDATE ${job.mode === 'manual' ? 'seo_prepublish_jobs' : 'seo_analysis_jobs'}
        SET status = 'processing', updated_at = NOW()
        WHERE id = ?`,
@@ -1115,14 +1115,14 @@ setInterval(async () => {
 
     const seoReport = await analyzeContentWithDeepSeek(job.content || "", job.url);
 
-    await pool.query(
+    await pollDBPool.query(
       `UPDATE ${job.mode === 'manual' ? 'seo_prepublish_jobs' : 'seo_analysis_jobs'}
        SET status = 'completed', result = ?, updated_at = NOW()
        WHERE id = ?`,
       [seoReport, job.jobId]
     );
   } catch (err) {
-    await pool.query(
+    await pollDBPool.query(
       `UPDATE ${job.mode === 'manual' ? 'seo_prepublish_jobs' : 'seo_analysis_jobs'}
        SET status = 'failed', error = ?, updated_at = NOW()
        WHERE id = ?`,
@@ -1186,7 +1186,7 @@ app.get("/api/deepseek-reports", async (req, res) => {
 app.get('/api/deepseek-reports/:id', async (req, res) => {
   const jobId = req.params.id;
 
-  const [feedJob] = await pool.query(
+  const [feedJob] = await pollDBPool.query(
     `SELECT id, url, result, status, error FROM seo_analysis_jobs WHERE id = ?`, [jobId]
   );
 
@@ -1194,7 +1194,7 @@ app.get('/api/deepseek-reports/:id', async (req, res) => {
     return res.json({ success: true, data: feedJob[0] });
   }
 
-  const [manualJob] = await pool.query(
+  const [manualJob] = await pollDBPool.query(
     `SELECT id, url, result, status, error FROM seo_prepublish_jobs WHERE id = ?`, [jobId]
   );
 
