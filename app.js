@@ -110,18 +110,18 @@ cron.schedule("0 9,16 * * *", async () => {
 
 
 
-cron.schedule("*/5 * * * *", async () => {
-  const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  console.log(`🕒 [${now} IST] Running DeepSeek Summary Automation...`);
-  try {
-    await runDeepSeekSummaryAutomation();
-    console.log("✅ DeepSeek summary task complete.");
-  } catch (err) {
-    console.error("❌ DeepSeek summary task failed:", err.message);
-  }
-}, {
-  timezone: "Asia/Kolkata"
-})
+// cron.schedule("*/5 * * * *", async () => {
+//   const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
+//   console.log(`🕒 [${now} IST] Running DeepSeek Summary Automation...`);
+//   try {
+//     await runDeepSeekSummaryAutomation();
+//     console.log("✅ DeepSeek summary task complete.");
+//   } catch (err) {
+//     console.error("❌ DeepSeek summary task failed:", err.message);
+//   }
+// }, {
+//   timezone: "Asia/Kolkata"
+// })
 
 
 // 1. Looks at your site’s performance for the last 14 days
