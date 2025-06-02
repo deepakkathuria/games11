@@ -849,6 +849,7 @@ const jobQueue = []; // 🟢 In-memory job queue
 
 // ✅ Manual Content Analysis Job (Pre-Publish)
 // ✅ API to queue manual (PrePublish) content SEO job using DeepSeek
+// ✅ API to submit manual article analysis job (Pre-Publish)
 app.post("/api/analyze-article-content-deepseek-job", async (req, res) => {
   const { title, url, content } = req.body;
 
@@ -858,39 +859,34 @@ app.post("/api/analyze-article-content-deepseek-job", async (req, res) => {
       .json({ success: false, error: "Title and content are required." });
   }
 
-  // Generate slugified placeholder URL if not provided
-  const slugUrl =
-    url?.trim() ||
-    `PREPUBLISH_${title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")}`;
-
   try {
+    const slugified = "PREPUBLISH_" + title.toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 200); // keep slug short
+
     const [insertResult] = await pollDBPool.query(
       `INSERT INTO seo_analysis_jobs (url, status, created_at) VALUES (?, 'queued', NOW())`,
-      [slugUrl]
+      [slugified]
     );
 
     const jobId = insertResult.insertId;
 
-    // Push job to queue with all relevant data
+    // Push job with manual mode flag and direct content
     jobQueue.push({
       jobId,
       mode: "manual",
-      url: slugUrl,
       title,
       content,
     });
 
-    return res.json({ success: true, jobId });
+    res.json({ success: true, jobId });
   } catch (err) {
-    console.error("❌ Failed to queue PrePublish job:", err.message);
-    return res
-      .status(500)
-      .json({ success: false, error: "Server error. Could not queue job." });
+    console.error("❌ [PrePublish Job Queue] Insert Error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to queue job" });
   }
 });
+
 
 
 
