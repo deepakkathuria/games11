@@ -844,7 +844,7 @@ ${competitors}
 // }
 
 //new for productio issue timeout
-cmd
+
 const jobQueue = []; // 🟢 In-memory job queue
 
 // ✅ Manual Content Analysis Job (Pre-Publish)
