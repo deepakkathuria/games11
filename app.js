@@ -25,8 +25,7 @@ const cheerio = require("cheerio");
 const Parser = require("rss-parser");
 const { OpenAI } = require("openai");
 const { v4: uuidv4 } = require("uuid");
-const moment = require('moment-timezone');
-
+const moment = require("moment-timezone");
 
 //
 
@@ -57,18 +56,14 @@ app.listen(PORT, () => {
 const cron = require("node-cron");
 const sendTelegramMessage = require("./utils/sendTelegramMessage");
 const { runGscDeepSeekAutomation } = require("./gscAutomation");
-const { runGscContentRefreshAutomation } = require("./runGscContentRefreshAutomation");
+const {
+  runGscContentRefreshAutomation,
+} = require("./runGscContentRefreshAutomation");
 
-const {runGscLowCtrFixAutomation} = require("./runGscLowCtrFixAutomation")
+const { runGscLowCtrFixAutomation } = require("./runGscLowCtrFixAutomation");
 
-const {runGscRankingWatchdog} = require('./runGscRankingWatchdog')
+const { runGscRankingWatchdog } = require("./runGscRankingWatchdog");
 const runDeepSeekSummaryAutomation = require("./summarizeArticle");
-
-
-
-
-
-
 
 // It connects to your Google Search Console and fetches up to 5000 pages that appeared in search results over the past week.
 
@@ -82,33 +77,32 @@ const runDeepSeekSummaryAutomation = require("./summarizeArticle");
 
 // Finally, it saves all suggestions to your database for later use by your SEO/content team.
 
-//automation gec ai report 
+//automation gec ai report
 
-cron.schedule("0 9,16 * * *", async () => {
-  const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  console.log(`🚀 [${now} IST] Starting scheduled GSC AI analysis...`);
-  try {
-    await runGscDeepSeekAutomation();
-    console.log("✅ GSC AI analysis complete.");
+cron.schedule(
+  "0 9,16 * * *",
+  async () => {
+    const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
+    console.log(`🚀 [${now} IST] Starting scheduled GSC AI analysis...`);
+    try {
+      await runGscDeepSeekAutomation();
+      console.log("✅ GSC AI analysis complete.");
       await runGscContentRefreshAutomation();
-    console.log("✅ GSC refresh complete.");
-        await runGscTrendingKeywords();
+      console.log("✅ GSC refresh complete.");
+      await runGscTrendingKeywords();
       console.log("✅ keyword.");
 
-    await runGscLowCtrFixAutomation()
+      await runGscLowCtrFixAutomation();
 
-    await runGscRankingWatchdog()
-
-
-
-  } catch (error) {
-    console.error("❌ GSC AI automation failed:", error);
+      await runGscRankingWatchdog();
+    } catch (error) {
+      console.error("❌ GSC AI automation failed:", error);
+    }
+  },
+  {
+    timezone: "Asia/Kolkata",
   }
-}, {
-  timezone: "Asia/Kolkata"
-});
-
-
+);
 
 // cron.schedule("*/5 * * * *", async () => {
 //   const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
@@ -122,9 +116,6 @@ cron.schedule("0 9,16 * * *", async () => {
 // }, {
 //   timezone: "Asia/Kolkata"
 // })
-
-
-
 
 // 1. Looks at your site’s performance for the last 14 days
 // It compares:
@@ -160,12 +151,6 @@ cron.schedule("0 9,16 * * *", async () => {
 
 // 🔗 What internal links to add
 
-
-
-
-
-
-
 // ----------------------- news summary
 app.get("/api/article_summaries", async (req, res) => {
   try {
@@ -199,18 +184,6 @@ app.get("/api/article_summaries", async (req, res) => {
 });
 // -------------------------------------------------
 
-
-
-
-
-
-
-
-
-
-
-
-
 cron.schedule("0 0 * * *", async () => {
   try {
     const query = `
@@ -227,9 +200,6 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
-
-
-
 // -----------------------------------------------------------------------------------gsc report from db apis---------------------
 app.get("/api/gsc-ai-reports", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
@@ -237,7 +207,8 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const [rows] = await pollDBPool.query(`
+    const [rows] = await pollDBPool.query(
+      `
       SELECT 
         id, 
         url, 
@@ -254,7 +225,9 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
         article_published_at DESC,     -- ✅ Sorts them by most recent publish date
         created_at DESC                -- ✅ Tie-breaker for older entries
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `,
+      [limit, offset]
+    );
 
     const [countResult] = await pollDBPool.query(`
       SELECT COUNT(*) AS total FROM gsc_ai_recommendations
@@ -276,7 +249,8 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const [rows] = await pollDBPool.query(`
+    const [rows] = await pollDBPool.query(
+      `
       SELECT id, url, keyword, old_position, new_position, old_clicks, new_clicks,
              old_impressions, new_impressions, deepseek_output,
              article_published_at, created_at
@@ -286,7 +260,9 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
         article_published_at DESC,
         created_at DESC
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `,
+      [limit, offset]
+    );
 
     const [countResult] = await pollDBPool.query(`
       SELECT COUNT(*) AS total FROM gsc_content_refresh_recommendations
@@ -327,7 +303,7 @@ app.get("/api/gsc-trending-keywords", async (req, res) => {
     `);
 
     // Optional: parse keywords_json for frontend
-    const formattedRows = rows.map(row => ({
+    const formattedRows = rows.map((row) => ({
       ...row,
       keywords: JSON.parse(row.keywords_json),
     }));
@@ -363,15 +339,6 @@ app.get("/api/gsc-content-query-match", async (req, res) => {
   }
 });
 // -------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
 
 // -----------------------------------------------our db ----------------------------------------
 // const { fetchAndProcessFeed } = require('./seoScheduler');
@@ -436,7 +403,6 @@ app.get("/api/reports-json/search", async (req, res) => {
 // -----------------------------------------------------------------------------------------------------
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 
 // ----------------------------------------------------gsc onsight deep seek report ---------------------------------
 
@@ -515,13 +481,6 @@ Give:
 });
 // -----------------------------------------------------------------------------------------------------------------------------
 
-
-
-
-
-
-
-
 // ---------------------------------------------------------chat gpt analysis ---------------------------------------------------
 
 // === ROUTE: GET /api/analyze-url ===
@@ -546,13 +505,11 @@ app.get("/api/analyze-url", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ [Analyze] Error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Failed to analyze URL",
-        message: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      error: "Failed to analyze URL",
+      message: error.message,
+    });
   }
 });
 
@@ -700,18 +657,7 @@ ${competitors}
 
 // -------------------------------------------------------------------------------------------------------------------------------
 
-
-
-
-
-
-
-
-
-
-
 // -----------------------------deep seek analysis AUTOMATION FROM FEED/PUBLISH BOTH -----------------------------------------------------------------------------------
-
 
 //new for productio issue timeout
 
@@ -779,7 +725,7 @@ Return like this:
   return dsRes.data.choices[0].message.content;
 }
 
-// ✅ Analyze and Suggest SEO Improvement with DeepSeek
+// ✅ Analyze and Suggest SEO Improvement with DeepSeek automate 
 async function analyzeAndSuggestWithDeepSeek(
   { title, description, body },
   competitors
@@ -862,6 +808,93 @@ ${competitors}
   return dsRes.data.choices[0].message.content;
 }
 
+
+
+async function analyzeAndSuggestWithDeepSeekm(
+  { title, description, body },
+  competitors
+) {
+  const prompt = `
+You're an expert SEO content strategist and writer.
+
+Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
+
+---
+
+### 🔧 Your Tasks:
+
+1. *SEO Gap Report*  
+   Identify all SEO issues in table format with columns:  
+   *Section | Issue | Suggestion*  
+
+2. *Writing Pattern Analysis*  
+
+3. *Keyword Research*  
+| Keyword | Type | Suggested Usage |
+
+4. *Recommended Rewrite*
+
+---
+
+### 🔍 Inputs
+
+*Article Title:*  
+${title}
+
+*Meta Description:*  
+${description}
+
+*Body:*  
+${body}
+
+*Top Ranking Competitor Summaries:*  
+${competitors}
+
+---
+
+### 🧠 Return the following output in order:
+
+#### 📊 SEO GAP REPORT (Markdown Table)
+| Section | Issue | Suggestion |
+|---------|-------|------------|
+
+---
+
+#### 📝 WRITING PATTERN ANALYSIS
+
+---
+
+#### 🔑 KEYWORD RESEARCH SUMMARY
+| Keyword | Type | Suggested Usage |
+|---------|------|------------------|
+
+---
+
+#### ✅ RECOMMENDED REWRITE
+`;
+
+  const dsRes = await axios.post(
+    "https://api.deepseek.com/v1/chat/completions",
+    {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1800,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return dsRes.data.choices[0].message.content;
+}
+
+
+
+
 // ✅ API to initiate a DeepSeek job
 app.post("/api/analyze-url-deepseek-job", async (req, res) => {
   const { url } = req.body;
@@ -906,6 +939,8 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
   }
 });
 
+
+//feed one 
 // ✅ Job Processor Loop (every 5 sec)
 // setInterval(async () => {
 //   if (jobQueue.length === 0) return;
@@ -936,28 +971,100 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 //   }
 // }, 5000);
 
+
+//manual one set iinetrave---------------
+// ------------------------------------------------
+
+// setInterval(async () => {
+//   if (jobQueue.length === 0) return;
+
+//   const job = jobQueue.shift();
+//   try {
+//     console.log(`🔄 Processing ${job.type.toUpperCase()} Job: ${job.jobId}`);
+
+//     const articleData = {
+//       title: job.title,
+//       description: job.description || "",
+//       body: job.body,
+//     };
+
+//     const competitors = await getSimulatedCompetitorsWithDeepSeek(
+//       articleData.title
+//     );
+//     const seoReport = await analyzeAndSuggestWithDeepSeek(
+//       articleData,
+//       competitors
+//     );
+
+//     await pollDBPool.query(
+//       `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+//       [seoReport, job.jobId]
+//     );
+
+//     console.log(`✅ Job Completed: ${job.jobId}`);
+//   } catch (err) {
+//     console.error(`❌ Manual Job Failed [${job.jobId}]`, err.message);
+//     await pollDBPool.query(
+//       `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+//       [err.message || "Unknown error", job.jobId]
+//     );
+//   }
+// }, 5000);
+
+// ------------------------------------------------
+
 setInterval(async () => {
   if (jobQueue.length === 0) return;
 
-  const job = jobQueue.shift();
-  try {
-    console.log(`🔄 Processing ${job.type.toUpperCase()} Job: ${job.jobId}`);
+  const job = jobQueue.find(j => j.source !== "manual_seo_jobs");
+  if (!job) return;
 
+  jobQueue = jobQueue.filter(j => j !== job); // remove from queue
+
+  try {
+    console.log(`🔄 Processing FEED Job: ${job.jobId}`);
+    const articleData = await extractArticleData(job.url);
+    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
+    await pollDBPool.query(
+      `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+      [seoReport, job.jobId]
+    );
+  } catch (err) {
+    console.error(`❌ Feed Job Failed [${job.jobId}]`, err.message);
+    await pollDBPool.query(
+      `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+      [err.message || "Unknown error", job.jobId]
+    );
+  }
+}, 5000);
+
+
+setInterval(async () => {
+  if (jobQueue.length === 0) return;
+
+  const job = jobQueue.find(j => j.source === "manual_seo_jobs");
+  if (!job) return;
+
+  jobQueue = jobQueue.filter(j => j !== job); // remove from queue
+
+  try {
+    console.log(`🔄 Processing MANUAL Job: ${job.jobId}`);
     const articleData = {
       title: job.title,
       description: job.description || "",
-      body: job.body
+      body: job.body,
     };
-
     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
-    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
-
+    const seoReport = await analyzeAndSuggestWithDeepSeekm(
+      articleData,
+      competitors,
+      job.language || "en"
+    );
     await pollDBPool.query(
       `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
       [seoReport, job.jobId]
     );
-
-    console.log(`✅ Job Completed: ${job.jobId}`);
   } catch (err) {
     console.error(`❌ Manual Job Failed [${job.jobId}]`, err.message);
     await pollDBPool.query(
@@ -968,6 +1075,7 @@ setInterval(async () => {
 }, 5000);
 
 
+
 // GET all completed reports (latest 20 or more)
 app.get("/api/deepseek-reports", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
@@ -975,19 +1083,22 @@ app.get("/api/deepseek-reports", async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const [rows] = await pollDBPool.query(`
+    const [rows] = await pollDBPool.query(
+      `
       SELECT id, url, status, created_at
       FROM seo_analysis_jobs
       WHERE status = 'completed'
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `,
+      [limit, offset]
+    );
 
     // Get total count
     const [countRows] = await pollDBPool.query(`
       SELECT COUNT(*) AS total FROM seo_analysis_jobs WHERE status = 'completed'
     `);
-    
+
     const total = countRows[0].total;
     const totalPages = Math.ceil(total / limit);
 
@@ -996,7 +1107,6 @@ app.get("/api/deepseek-reports", async (req, res) => {
     res.status(500).json({ success: false, error: "DB fetch error" });
   }
 });
-
 
 // GET report by ID
 app.get("/api/deepseek-reports/:id", async (req, res) => {
@@ -1016,9 +1126,6 @@ app.get("/api/deepseek-reports/:id", async (req, res) => {
   }
 });
 
-
-
-
 app.get("/api/manual-seo-reports/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -1036,20 +1143,22 @@ app.get("/api/manual-seo-reports/:id", async (req, res) => {
   }
 });
 
-
 app.get("/api/manual-seo-reports", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = 50;
   const offset = (page - 1) * limit;
 
   try {
-    const [rows] = await pollDBPool.query(`
+    const [rows] = await pollDBPool.query(
+      `
       SELECT id, title, url, status, created_at
       FROM manual_seo_jobs
       WHERE status = 'completed'
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `,
+      [limit, offset]
+    );
 
     const [countRows] = await pollDBPool.query(`
       SELECT COUNT(*) AS total FROM manual_seo_jobs WHERE status = 'completed'
@@ -1063,7 +1172,6 @@ app.get("/api/manual-seo-reports", async (req, res) => {
     res.status(500).json({ success: false, error: "DB fetch error" });
   }
 });
-
 
 app.get("/api/manual-seo-status", async (req, res) => {
   const { jobId } = req.query;
@@ -1085,12 +1193,13 @@ app.get("/api/manual-seo-status", async (req, res) => {
   }
 });
 
-
 app.post("/api/manual-seo-job", async (req, res) => {
   const { title, url, description, body } = req.body;
 
   if (!title || !body) {
-    return res.status(400).json({ success: false, error: "Title and body are required" });
+    return res
+      .status(400)
+      .json({ success: false, error: "Title and body are required" });
   }
 
   try {
@@ -1108,7 +1217,7 @@ app.post("/api/manual-seo-job", async (req, res) => {
       source: "manual_seo_jobs",
       title,
       description: description || "",
-      body
+      body,
     });
 
     res.json({ success: true, jobId });
@@ -1118,32 +1227,7 @@ app.post("/api/manual-seo-job", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ---------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
 
 // --------------------------------------------------------------------------------------------------------
 
@@ -1198,12 +1282,10 @@ app.post("/api/polls", async (req, res) => {
       match_id,
     ]);
 
-    res
-      .status(201)
-      .json({
-        message: "Poll created successfully",
-        pollId: pollResult.insertId,
-      });
+    res.status(201).json({
+      message: "Poll created successfully",
+      pollId: pollResult.insertId,
+    });
   } catch (error) {
     console.error("Error creating poll:", error.message);
     res.status(500).json({ error: "Internal server error." });
@@ -1216,11 +1298,9 @@ app.post("/api/polls/:pollId/vote", async (req, res) => {
   const { team_id, user_id } = req.body;
 
   if (!pollId || !team_id || !user_id) {
-    return res
-      .status(400)
-      .json({
-        message: "Missing required fields: pollId, team_id, or user_id.",
-      });
+    return res.status(400).json({
+      message: "Missing required fields: pollId, team_id, or user_id.",
+    });
   }
 
   try {
@@ -1446,12 +1526,10 @@ app.post("/api/saveForm1", async (req, res) => {
       ];
 
       const [result] = await pollDBPool.query(insertQuery, insertValues);
-      res
-        .status(201)
-        .json({
-          message: "Form data saved successfully!",
-          predictionId: result.insertId,
-        });
+      res.status(201).json({
+        message: "Form data saved successfully!",
+        predictionId: result.insertId,
+      });
     }
   } catch (error) {
     console.error("Error saving form data:", error);
@@ -1650,11 +1728,9 @@ app.post("/reviews/create", async (req, res) => {
     ]);
 
     if (existingReview.length > 0) {
-      return res
-        .status(400)
-        .json({
-          error: "You have already submitted a review for this product",
-        });
+      return res.status(400).json({
+        error: "You have already submitted a review for this product",
+      });
     }
 
     // Insert new review
@@ -1957,11 +2033,9 @@ app.post("/orders/:orderId/address", async (req, res) => {
       return res.status(404).json({ error: "Order not found" });
     }
     if (orderCheck[0].user_id !== userId) {
-      return res
-        .status(403)
-        .json({
-          error: "You do not have permission to add an address to this order",
-        });
+      return res.status(403).json({
+        error: "You do not have permission to add an address to this order",
+      });
     }
 
     // Insert Address
@@ -2650,15 +2724,17 @@ app.get("/admin/products", async (req, res) => {
     const filters = [];
     const values = [];
 
-    if (category) {
-      filters.push("category = ?");
-      values.push(category);
-    }
+ if (category) {
+  category = category.trim().toLowerCase();
+  filters.push("LOWER(TRIM(category)) = ?");
+  values.push(category);
+}
 
-    if (subcategory) {
-      filters.push("subcategory = ?");
-      values.push(subcategory);
-    }
+if (subcategory) {
+  subcategory = subcategory.trim().toLowerCase();
+  filters.push("LOWER(TRIM(subcategory)) = ?");
+  values.push(subcategory);
+}
 
     if (is_trendy !== undefined) {
       filters.push("is_trendy = ?");
@@ -2772,8 +2848,10 @@ app.post("/admin/products", async (req, res) => {
       name,
       price,
       slug,
-      category,
-      subcategory || null,
+      // category,
+      // subcategory || null,
+      category?.trim().toLowerCase(),
+      subcategory?.trim().toLowerCase() || null,
       is_trendy,
       is_unique,
       isNew || 0,
@@ -2789,12 +2867,10 @@ app.post("/admin/products", async (req, res) => {
       sold_out, // ✅ NEW
     ]);
 
-    res
-      .status(201)
-      .json({
-        message: "✅ Product created successfully",
-        images: uploadedImages,
-      });
+    res.status(201).json({
+      message: "✅ Product created successfully",
+      images: uploadedImages,
+    });
   } catch (error) {
     console.error("❌ Error creating product:", error);
     res.status(500).json({ error: "Database error" });
@@ -2879,8 +2955,8 @@ app.put("/admin/product/:productId", async (req, res) => {
       name,
       price,
       slug,
-      category,
-      subcategory || null,
+     category?.trim().toLowerCase(),
+  subcategory?.trim().toLowerCase() || null,
       is_trendy,
       is_unique,
       isNew || 0,
@@ -2897,12 +2973,10 @@ app.put("/admin/product/:productId", async (req, res) => {
       productId,
     ]);
 
-    res
-      .status(200)
-      .json({
-        message: "✅ Product updated successfully",
-        images: updatedImages,
-      });
+    res.status(200).json({
+      message: "✅ Product updated successfully",
+      images: updatedImages,
+    });
   } catch (error) {
     console.error("❌ Error updating product:", error);
     res.status(500).json({ error: "Database error" });
@@ -2977,10 +3051,20 @@ app.get("/admin/categories", async (req, res) => {
     const [rows] = await userDBPool.query(query);
 
     const result = {};
+
     rows.forEach(({ category, subcategory }) => {
-      if (!category) return;
-      if (!result[category]) result[category] = new Set();
-      if (subcategory) result[category].add(subcategory);
+      const normalizedCategory = category?.trim().toLowerCase();
+      const normalizedSubcategory = subcategory?.trim().toLowerCase();
+
+      if (!normalizedCategory) return;
+
+      if (!result[normalizedCategory]) {
+        result[normalizedCategory] = new Set();
+      }
+
+      if (normalizedSubcategory) {
+        result[normalizedCategory].add(normalizedSubcategory);
+      }
     });
 
     // Convert Sets to Arrays
