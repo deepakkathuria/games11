@@ -1015,18 +1015,18 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 
 setInterval(async () => {
   if (jobQueue.length === 0) {
-    console.log("⏳ No jobs in queue...");
+    console.log(`[service] [${new Date().toLocaleString()}] ⏳ No jobs in queue...`);
     return;
   }
 
   const job = jobQueue.shift();
 
   if (!job.source) {
-    console.error(`❌ Missing 'source' in job:`, job);
+    console.error(`[service] [${new Date().toLocaleString()}] ❌ Missing 'source' in job:`, job);
     return;
   }
 
-  console.log(`🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
+  console.log(`[service] [${new Date().toLocaleString()}] 🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
 
   try {
     let articleData;
@@ -1035,6 +1035,10 @@ setInterval(async () => {
       console.log(`🌐 Extracting content from URL: ${job.url}`);
       articleData = await extractArticleData(job.url);
     } else if (job.source === "manual_seo_jobs") {
+      if (!job.title || !job.body) {
+        throw new Error("Missing title or body in manual job");
+      }
+
       console.log(`📝 Using manual content for analysis`);
       articleData = {
         title: job.title,
@@ -1042,14 +1046,14 @@ setInterval(async () => {
         body: job.body || "",
       };
     } else {
-      console.warn(`⚠️ Unknown job source: ${job.source}`);
+      console.warn(`[service] ⚠️ Unknown job source: ${job.source}`);
       return;
     }
 
-    console.log(`📈 Getting simulated competitors...`);
+    console.log(`📈 Fetching competitor data...`);
     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
 
-    console.log(`🧠 Analyzing with DeepSeek [lang: ${job.language || "en"}]...`);
+    console.log(`🧠 Running DeepSeek Analysis [lang: ${job.language || "en"}]`);
     const seoReport = await analyzeAndSuggestWithDeepSeek(
       articleData,
       competitors,
@@ -1064,7 +1068,7 @@ setInterval(async () => {
     await pollDBPool.query(updateQuery, [seoReport, job.jobId]);
     console.log(`✅ Job Completed: ${job.jobId}`);
   } catch (err) {
-    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
+    console.error(`[service] ❌ Job Failed [${job.jobId}]`, err.message);
 
     const failQuery =
       job.source === "seo_analysis_jobs"
