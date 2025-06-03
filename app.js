@@ -124,6 +124,8 @@ cron.schedule("0 9,16 * * *", async () => {
 // })
 
 
+
+
 // 1. Looks at your site’s performance for the last 14 days
 // It compares:
 
@@ -225,6 +227,10 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
+
+
+
+// -----------------------------------------------------------------------------------gsc report from db apis---------------------
 app.get("/api/gsc-ai-reports", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = 80;
@@ -264,11 +270,6 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   }
 });
 
-
-
-
-
-
 app.get("/api/gsc-content-refresh", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = 80;
@@ -300,8 +301,6 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to load data" });
   }
 });
-
-
 
 app.get("/api/gsc-low-ctr", async (req, res) => {
   try {
@@ -340,7 +339,6 @@ app.get("/api/gsc-trending-keywords", async (req, res) => {
   }
 });
 
-
 app.get("/api/gsc-ranking-watchdog", async (req, res) => {
   try {
     const [rows] = await pollDBPool.query(`
@@ -364,6 +362,16 @@ app.get("/api/gsc-content-query-match", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to load data" });
   }
 });
+// -------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
 
 // -----------------------------------------------our db ----------------------------------------
 // const { fetchAndProcessFeed } = require('./seoScheduler');
@@ -505,9 +513,16 @@ Give:
     res.status(500).json({ success: false, error: err.message });
   }
 });
-// -----------------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------------------------------
 
-// ---------------------------------------------------------chat gpt analysis --------------------
+
+
+
+
+
+
+
+// ---------------------------------------------------------chat gpt analysis ---------------------------------------------------
 
 // === ROUTE: GET /api/analyze-url ===
 app.get("/api/analyze-url", async (req, res) => {
@@ -683,165 +698,20 @@ ${competitors}
   return res.choices[0].message.content;
 }
 
-// -----------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------
 
-// -----------------------------deep seek analysis --------------------------------------------------
 
-// app.get('/api/analyze-url-deepseek', async (req, res) => {
-//   const { url } = req.query;
-//   if (!url) return res.status(400).json({ success: false, error: 'Missing URL' });
 
-//   try {
-//     console.log(`🔍 [DeepSeek] Fetching URL: ${url}`);
 
-//     const articleData = await extractArticleData(url);
 
-//     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
 
-//     const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
 
-//     res.json({
-//       success: true,
-//       title: articleData.title,
-//       url,
-//       seo_report: seoReport
-//     });
 
-//   } catch (error) {
-//     console.error('❌ [DeepSeek Analyze] Error:', error.message);
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// });
 
-// async function getSimulatedCompetitorsWithDeepSeek(keyword) {
-//   const prompt = `
-// You are an SEO expert. Based on this keyword: "${keyword}", simulate the top 4 competitor article summaries that are ranking on Google.
 
-// Return like this:
 
-// 1. [Title] - [URL]
-//    - H2s used:
-//    - Content Highlights:
-//    - Schema Used:
-// `;
+// -----------------------------deep seek analysis AUTOMATION FROM FEED/PUBLISH BOTH -----------------------------------------------------------------------------------
 
-//   const dsRes = await axios.post(
-//     'https://api.deepseek.com/v1/chat/completions',
-//     {
-//       model: 'deepseek-chat',
-//       messages: [{ role: 'user', content: prompt }],
-//       temperature: 0.3,
-//       max_tokens: 800
-//     },
-//     {
-//       headers: {
-//         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-//         'Content-Type': 'application/json',
-//       },
-//     }
-//   );
-
-//   return dsRes.data.choices[0].message.content;
-// }
-
-// async function analyzeAndSuggestWithDeepSeek({ title, description, body }, competitors) {
-//   const prompt = `
-// You're an expert SEO content strategist and writer.
-
-// Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
-
-// ---
-
-// ### 🔧 Your Tasks:
-
-// 1. *SEO Gap Report*
-//    Identify all SEO issues in table format with columns:
-//    *Section | Issue | Suggestion*
-//    (e.g., Title too generic, meta missing target keyword, lacks internal links, etc.)
-
-// 2. *Writing Pattern Analysis*
-//    Analyze how top-ranking articles are written:
-//    - Use of headings and subheadings
-//    - Tone (conversational, formal, stat-heavy, etc.)
-//    - Structure (FAQs, lists, stats tables, expert quotes)
-//    - Visual elements (tables, embedded content, etc.)
-
-//    Summarize key differences in structure between our article and competitors.
-
-// 3. *Keyword Research*
-//    Based on article and competitors, identify:
-//    - *Primary Keyword*
-//    - *Secondary Keywords*
-//    - *Long-tail opportunities*
-//    - *Missed keyword intents*
-
-//    Present in markdown table:
-//    *Keyword | Type | Suggested Usage*
-
-// 4. *Recommended Rewrite*
-//    Write a fully optimized, rewritten version of the article incorporating:
-//    - All SEO suggestions
-//    - Target keywords
-//    - Competitor-inspired structure
-//    - Better headlines and meta
-
-// ---
-
-// ### 🔍 Inputs
-
-// *Article Title:*
-// ${title}
-
-// *Meta Description:*
-// ${description}
-
-// *Body:*
-// ${body}
-
-// *Top Ranking Competitor Summaries:*
-// ${competitors}
-
-// ---
-
-// ### 🧠 Return the following output in order:
-
-// #### 📊 SEO GAP REPORT (Markdown Table)
-// | Section | Issue | Suggestion |
-// |---------|-------|------------|
-
-// ---
-
-// #### 📝 WRITING PATTERN ANALYSIS
-
-// ---
-
-// #### 🔑 KEYWORD RESEARCH SUMMARY
-// | Keyword | Type | Suggested Usage |
-// |---------|------|------------------|
-
-// ---
-
-// #### ✅ RECOMMENDED REWRITE
-// `;
-
-//   const dsRes = await axios.post(
-//     'https://api.deepseek.com/v1/chat/completions',
-//     {
-//       model: 'deepseek-chat',
-//       messages: [{ role: 'user', content: prompt }],
-//       temperature: 0.2,
-//       max_tokens: 1800
-//     },
-//     {
-//       headers: {
-//         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-//         'Content-Type': 'application/json',
-//       },
-//     }
-//   );
-
-//   return dsRes.data.choices[0].message.content;
-// }
 
 //new for productio issue timeout
 
@@ -1037,34 +907,66 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 });
 
 // ✅ Job Processor Loop (every 5 sec)
+// setInterval(async () => {
+//   if (jobQueue.length === 0) return;
+
+//   const job = jobQueue.shift();
+//   try {
+//     console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
+
+//     const articleData = await extractArticleData(job.url);
+//     const competitors = await getSimulatedCompetitorsWithDeepSeek(
+//       articleData.title
+//     );
+//     const seoReport = await analyzeAndSuggestWithDeepSeek(
+//       articleData,
+//       competitors
+//     );
+
+//     await pollDBPool.query(
+//       `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+//       [seoReport, job.jobId]
+//     );
+//   } catch (err) {
+//     console.error(`❌ Job Failed [${job.jobId}]`, err.message);
+//     await pollDBPool.query(
+//       `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+//       [err.message || "Unknown error", job.jobId]
+//     );
+//   }
+// }, 5000);
+
 setInterval(async () => {
   if (jobQueue.length === 0) return;
 
   const job = jobQueue.shift();
   try {
-    console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
+    console.log(`🔄 Processing ${job.type.toUpperCase()} Job: ${job.jobId}`);
 
-    const articleData = await extractArticleData(job.url);
-    const competitors = await getSimulatedCompetitorsWithDeepSeek(
-      articleData.title
-    );
-    const seoReport = await analyzeAndSuggestWithDeepSeek(
-      articleData,
-      competitors
-    );
+    const articleData = {
+      title: job.title,
+      description: job.description || "",
+      body: job.body
+    };
+
+    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
+    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
 
     await pollDBPool.query(
-      `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
+      `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
       [seoReport, job.jobId]
     );
+
+    console.log(`✅ Job Completed: ${job.jobId}`);
   } catch (err) {
-    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
+    console.error(`❌ Manual Job Failed [${job.jobId}]`, err.message);
     await pollDBPool.query(
-      `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
+      `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
       [err.message || "Unknown error", job.jobId]
     );
   }
 }, 5000);
+
 
 // GET all completed reports (latest 20 or more)
 app.get("/api/deepseek-reports", async (req, res) => {
@@ -1113,7 +1015,136 @@ app.get("/api/deepseek-reports/:id", async (req, res) => {
     res.status(500).json({ success: false, error: "DB fetch error" });
   }
 });
-//
+
+
+
+
+app.get("/api/manual-seo-reports/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pollDBPool.query(
+      `SELECT id, title, url, result FROM manual_seo_jobs WHERE id = ? AND status = 'completed'`,
+      [id]
+    );
+
+    if (rows.length === 0)
+      return res.status(404).json({ success: false, error: "Not found" });
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "DB fetch error" });
+  }
+});
+
+
+app.get("/api/manual-seo-reports", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 50;
+  const offset = (page - 1) * limit;
+
+  try {
+    const [rows] = await pollDBPool.query(`
+      SELECT id, title, url, status, created_at
+      FROM manual_seo_jobs
+      WHERE status = 'completed'
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const [countRows] = await pollDBPool.query(`
+      SELECT COUNT(*) AS total FROM manual_seo_jobs WHERE status = 'completed'
+    `);
+
+    const total = countRows[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ success: true, data: rows, total, totalPages, page });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "DB fetch error" });
+  }
+});
+
+
+app.get("/api/manual-seo-status", async (req, res) => {
+  const { jobId } = req.query;
+  if (!jobId)
+    return res.status(400).json({ success: false, error: "Missing jobId" });
+
+  try {
+    const [rows] = await pollDBPool.query(
+      `SELECT id, title, url, status, result, error FROM manual_seo_jobs WHERE id = ?`,
+      [jobId]
+    );
+
+    if (rows.length === 0)
+      return res.status(404).json({ success: false, error: "Job not found" });
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "DB error" });
+  }
+});
+
+
+app.post("/api/manual-seo-job", async (req, res) => {
+  const { title, url, description, body } = req.body;
+
+  if (!title || !body) {
+    return res.status(400).json({ success: false, error: "Title and body are required" });
+  }
+
+  try {
+    const [result] = await pollDBPool.query(
+      `INSERT INTO manual_seo_jobs (title, url, status, created_at)
+       VALUES (?, ?, 'queued', NOW())`,
+      [title, url || null]
+    );
+
+    const jobId = result.insertId;
+
+    jobQueue.push({
+      jobId,
+      type: "manual",
+      source: "manual_seo_jobs",
+      title,
+      description: description || "",
+      body
+    });
+
+    res.json({ success: true, jobId });
+  } catch (err) {
+    console.error("❌ Failed to insert manual job:", err.message);
+    res.status(500).json({ success: false, error: "DB insert failed" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
 // --------------------------------------------------------------------------------------------------------
 
 // === ROUTE: GET /api/feed ===
