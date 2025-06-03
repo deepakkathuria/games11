@@ -908,7 +908,13 @@ app.post("/api/analyze-url-deepseek-job", async (req, res) => {
     );
 
     const jobId = insertResult.insertId;
-    jobQueue.push({ jobId, url });
+
+    // ✅ FIX: include 'source' field
+    jobQueue.push({
+      jobId,
+      url,
+      source: "seo_analysis_jobs", // 🔥 Required to route the job properly
+    });
 
     res.json({ success: true, jobId });
   } catch (err) {
@@ -916,6 +922,7 @@ app.post("/api/analyze-url-deepseek-job", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to queue job" });
   }
 });
+
 
 // ✅ API to check job status/result
 app.get("/api/analyze-url-deepseek-status", async (req, res) => {
