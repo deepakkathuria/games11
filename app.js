@@ -1016,61 +1016,37 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 setInterval(async () => {
   if (jobQueue.length === 0) return;
 
-  const job = jobQueue.find(j => j.source !== "manual_seo_jobs");
-  if (!job) return;
-
-  jobQueue = jobQueue.filter(j => j !== job); // remove from queue
+  const job = jobQueue.shift();
+  console.log(`🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
 
   try {
-    console.log(`🔄 Processing FEED Job: ${job.jobId}`);
-    const articleData = await extractArticleData(job.url);
+    const articleData =
+      job.source === "seo_analysis_jobs"
+        ? await extractArticleData(job.url)
+        : {
+            title: job.title,
+            description: job.description || "",
+            body: job.body,
+          };
+
     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
-    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors);
-    await pollDBPool.query(
-      `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
-      [seoReport, job.jobId]
-    );
+    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors, job.language || "en");
+
+    const updateQuery = job.source === "seo_analysis_jobs"
+      ? `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`
+      : `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`;
+
+    await pollDBPool.query(updateQuery, [seoReport, job.jobId]);
+
+    console.log(`✅ Job Completed: ${job.jobId}`);
   } catch (err) {
-    console.error(`❌ Feed Job Failed [${job.jobId}]`, err.message);
-    await pollDBPool.query(
-      `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
-      [err.message || "Unknown error", job.jobId]
-    );
-  }
-}, 5000);
+    console.error(`❌ Job Failed [${job.jobId}]`, err.message);
 
+    const failQuery = job.source === "seo_analysis_jobs"
+      ? `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`
+      : `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`;
 
-setInterval(async () => {
-  if (jobQueue.length === 0) return;
-
-  const job = jobQueue.find(j => j.source === "manual_seo_jobs");
-  if (!job) return;
-
-  jobQueue = jobQueue.filter(j => j !== job); // remove from queue
-
-  try {
-    console.log(`🔄 Processing MANUAL Job: ${job.jobId}`);
-    const articleData = {
-      title: job.title,
-      description: job.description || "",
-      body: job.body,
-    };
-    const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
-    const seoReport = await analyzeAndSuggestWithDeepSeekm(
-      articleData,
-      competitors,
-      job.language || "en"
-    );
-    await pollDBPool.query(
-      `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
-      [seoReport, job.jobId]
-    );
-  } catch (err) {
-    console.error(`❌ Manual Job Failed [${job.jobId}]`, err.message);
-    await pollDBPool.query(
-      `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
-      [err.message || "Unknown error", job.jobId]
-    );
+    await pollDBPool.query(failQuery, [err.message || "Unknown error", job.jobId]);
   }
 }, 5000);
 
