@@ -1014,37 +1014,62 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 // ------------------------------------------------
 
 setInterval(async () => {
-  if (jobQueue.length === 0) return;
+  if (jobQueue.length === 0) {
+    console.log("⏳ No jobs in queue...");
+    return;
+  }
 
   const job = jobQueue.shift();
+
+  if (!job.source) {
+    console.error(`❌ Missing 'source' in job:`, job);
+    return;
+  }
+
   console.log(`🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
 
   try {
-    const articleData =
-      job.source === "seo_analysis_jobs"
-        ? await extractArticleData(job.url)
-        : {
-            title: job.title,
-            description: job.description || "",
-            body: job.body,
-          };
+    let articleData;
 
+    if (job.source === "seo_analysis_jobs") {
+      console.log(`🌐 Extracting content from URL: ${job.url}`);
+      articleData = await extractArticleData(job.url);
+    } else if (job.source === "manual_seo_jobs") {
+      console.log(`📝 Using manual content for analysis`);
+      articleData = {
+        title: job.title,
+        description: job.description || "",
+        body: job.body || "",
+      };
+    } else {
+      console.warn(`⚠️ Unknown job source: ${job.source}`);
+      return;
+    }
+
+    console.log(`📈 Getting simulated competitors...`);
     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
-    const seoReport = await analyzeAndSuggestWithDeepSeek(articleData, competitors, job.language || "en");
 
-    const updateQuery = job.source === "seo_analysis_jobs"
-      ? `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`
-      : `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`;
+    console.log(`🧠 Analyzing with DeepSeek [lang: ${job.language || "en"}]...`);
+    const seoReport = await analyzeAndSuggestWithDeepSeek(
+      articleData,
+      competitors,
+      job.language || "en"
+    );
+
+    const updateQuery =
+      job.source === "seo_analysis_jobs"
+        ? `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`
+        : `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`;
 
     await pollDBPool.query(updateQuery, [seoReport, job.jobId]);
-
     console.log(`✅ Job Completed: ${job.jobId}`);
   } catch (err) {
     console.error(`❌ Job Failed [${job.jobId}]`, err.message);
 
-    const failQuery = job.source === "seo_analysis_jobs"
-      ? `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`
-      : `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`;
+    const failQuery =
+      job.source === "seo_analysis_jobs"
+        ? `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`
+        : `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`;
 
     await pollDBPool.query(failQuery, [err.message || "Unknown error", job.jobId]);
   }
