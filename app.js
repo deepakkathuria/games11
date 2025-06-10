@@ -4,13 +4,15 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const { getSearchConsoleQueries } = require("./gscService");
+const fs = require('fs');
+
 
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
 
 const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const { pollDBPool, userDBPool } = require("./config/db"); // Import database pools
+const { pollDBPool, userDBPool,internalDBPool } = require("./config/db"); // Import database pools
 
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
@@ -78,6 +80,98 @@ const runDeepSeekSummaryAutomation = require("./summarizeArticle");
 // Finally, it saves all suggestions to your database for later use by your SEO/content team.
 
 //automation gec ai report
+
+
+
+
+
+const vectorstore = require("./embeddings/vectorstore.json");
+// const { internalDBPool } = require("./config/db");
+// const axios = require("axios");
+const cosineSimilarity = (a, b) => {
+  const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const normA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const normB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  return dot / (normA * normB);
+};
+
+app.post("/chat", async (req, res) => {
+  const { question } = req.body;
+  if (!question) return res.status(400).json({ answer: "❌ No question provided." });
+
+  try {
+    // Get embedding for question
+    const response = await axios.post("http://localhost:11434/api/embeddings", {
+      model: "nomic-embed-text",
+      prompt: question,
+    });
+
+    const userEmbedding = response.data.embedding;
+
+    // Find most relevant article
+    let bestMatch = null;
+    let bestScore = -Infinity;
+
+    for (const item of vectorstore) {
+      const score = cosineSimilarity(userEmbedding, item.embedding);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = item;
+      }
+    }
+
+    // Fetch article content
+    const [rows] = await internalDBPool.query(
+      `SELECT title, content FROM blog_posts WHERE id = ? LIMIT 1`,
+      [bestMatch.id]
+    );
+
+    const content = rows[0]?.content || "";
+
+    // Send to DeepSeek for summarization
+    const dsResponse = await axios.post(
+      "https://api.deepseek.com/v1/chat/completions",
+      {
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: "Answer the question based on this article:" },
+          { role: "user", content: `${question}\n\nArticle: ${content}` },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return res.json({
+      source: bestMatch.slug,
+      answer: dsResponse.data.choices[0].message.content,
+    });
+  } catch (err) {
+    console.error("❌ Chat error:", err.message);
+    res.status(500).json({ answer: "❌ Internal Server Error" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 cron.schedule(
   "0 9,16 * * *",
@@ -1084,45 +1178,45 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 
 setInterval(async () => {
   if (jobQueue.length === 0) {
-    console.log(`[service] [${new Date().toLocaleString()}] ⏳ No jobs in queue...`);
+    // console.log(`[service] [${new Date().toLocaleString()}] ⏳ No jobs in queue...`);
     return;
   }
 
   const job = jobQueue.shift();
 
   if (!job.source) {
-    console.error(`[service] [${new Date().toLocaleString()}] ❌ Missing 'source' in job:`, job);
+    // console.error(`[service] [${new Date().toLocaleString()}] ❌ Missing 'source' in job:`, job);
     return;
   }
 
-  console.log(`[service] [${new Date().toLocaleString()}] 🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
+  // console.log(`[service] [${new Date().toLocaleString()}] 🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
 
   try {
     let articleData;
 
     if (job.source === "seo_analysis_jobs") {
-      console.log(`🌐 Extracting content from URL: ${job.url}`);
+      // console.log(`🌐 Extracting content from URL: ${job.url}`);
       articleData = await extractArticleData(job.url);
     } else if (job.source === "manual_seo_jobs") {
       if (!job.title || !job.body) {
         throw new Error("Missing title or body in manual job");
       }
 
-      console.log(`📝 Using manual content for analysis`);
+      // console.log(`📝 Using manual content for analysis`);
       articleData = {
         title: job.title,
         description: job.description || "",
         body: job.body || "",
       };
     } else {
-      console.warn(`[service] ⚠️ Unknown job source: ${job.source}`);
+      // console.warn(`[service] ⚠️ Unknown job source: ${job.source}`);
       return;
     }
 
-    console.log(`📈 Fetching competitor data...`);
+    // console.log(`📈 Fetching competitor data...`);
     const competitors = await getSimulatedCompetitorsWithDeepSeek(articleData.title);
 
-    console.log(`🧠 Running DeepSeek Analysis [lang: ${job.language || "en"}]`);
+    // console.log(`🧠 Running DeepSeek Analysis [lang: ${job.language || "en"}]`);
     const seoReport = await analyzeAndSuggestWithDeepSeek(
       articleData,
       competitors,
@@ -3396,3 +3490,29 @@ app.post("/auth/google-login", async (req, res) => {
     res.status(500).json({ message: "❌ Google authentication failed." });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
