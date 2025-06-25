@@ -966,91 +966,6 @@ ${competitors}
 
 
 
-async function analyzeAndSuggestWithDeepSeekm(
-  { title, description, body },
-  competitors
-) {
-  const prompt = `
-You're an expert SEO content strategist and writer.
-
-Your job is to deeply analyze a cricket article and improve its search performance by comparing it with top-ranking competitors.
-
----
-
-### 🔧 Your Tasks:
-
-1. *SEO Gap Report*  
-   Identify all SEO issues in table format with columns:  
-   *Section | Issue | Suggestion*  
-
-2. *Writing Pattern Analysis*  
-
-3. *Keyword Research*  
-| Keyword | Type | Suggested Usage |
-
-4. *Recommended Rewrite*
-
----
-
-### 🔍 Inputs
-
-*Article Title:*  
-${title}
-
-*Meta Description:*  
-${description}
-
-*Body:*  
-${body}
-
-*Top Ranking Competitor Summaries:*  
-${competitors}
-
----
-
-### 🧠 Return the following output in order:
-
-#### 📊 SEO GAP REPORT (Markdown Table)
-| Section | Issue | Suggestion |
-|---------|-------|------------|
-
----
-
-#### 📝 WRITING PATTERN ANALYSIS
-
----
-
-#### 🔑 KEYWORD RESEARCH SUMMARY
-| Keyword | Type | Suggested Usage |
-|---------|------|------------------|
-
----
-
-#### ✅ RECOMMENDED REWRITE
-`;
-
-  const dsRes = await axios.post(
-    "https://api.deepseek.com/v1/chat/completions",
-    {
-      model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-      max_tokens: 1800,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  return dsRes.data.choices[0].message.content;
-}
-
-
-
-
 // ✅ API to initiate a DeepSeek job
 app.post("/api/analyze-url-deepseek-job", async (req, res) => {
   const { url } = req.body;
@@ -1103,106 +1018,32 @@ app.get("/api/analyze-url-deepseek-status", async (req, res) => {
 });
 
 
-//feed one 
-// ✅ Job Processor Loop (every 5 sec)
-// setInterval(async () => {
-//   if (jobQueue.length === 0) return;
 
-//   const job = jobQueue.shift();
-//   try {
-//     console.log(`🔄 Processing DeepSeek Job: ${job.jobId}`);
-
-//     const articleData = await extractArticleData(job.url);
-//     const competitors = await getSimulatedCompetitorsWithDeepSeek(
-//       articleData.title
-//     );
-//     const seoReport = await analyzeAndSuggestWithDeepSeek(
-//       articleData,
-//       competitors
-//     );
-
-//     await pollDBPool.query(
-//       `UPDATE seo_analysis_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
-//       [seoReport, job.jobId]
-//     );
-//   } catch (err) {
-//     console.error(`❌ Job Failed [${job.jobId}]`, err.message);
-//     await pollDBPool.query(
-//       `UPDATE seo_analysis_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
-//       [err.message || "Unknown error", job.jobId]
-//     );
-//   }
-// }, 5000);
-
-
-//manual one set iinetrave---------------
-// ------------------------------------------------
-
-// setInterval(async () => {
-//   if (jobQueue.length === 0) return;
-
-//   const job = jobQueue.shift();
-//   try {
-//     console.log(`🔄 Processing ${job.type.toUpperCase()} Job: ${job.jobId}`);
-
-//     const articleData = {
-//       title: job.title,
-//       description: job.description || "",
-//       body: job.body,
-//     };
-
-//     const competitors = await getSimulatedCompetitorsWithDeepSeek(
-//       articleData.title
-//     );
-//     const seoReport = await analyzeAndSuggestWithDeepSeek(
-//       articleData,
-//       competitors
-//     );
-
-//     await pollDBPool.query(
-//       `UPDATE manual_seo_jobs SET status = 'completed', result = ?, updated_at = NOW() WHERE id = ?`,
-//       [seoReport, job.jobId]
-//     );
-
-//     console.log(`✅ Job Completed: ${job.jobId}`);
-//   } catch (err) {
-//     console.error(`❌ Manual Job Failed [${job.jobId}]`, err.message);
-//     await pollDBPool.query(
-//       `UPDATE manual_seo_jobs SET status = 'failed', error = ?, updated_at = NOW() WHERE id = ?`,
-//       [err.message || "Unknown error", job.jobId]
-//     );
-//   }
-// }, 5000);
 
 // ------------------------------------------------
 
 setInterval(async () => {
   if (jobQueue.length === 0) {
-    // console.log(`[service] [${new Date().toLocaleString()}] ⏳ No jobs in queue...`);
     return;
   }
 
   const job = jobQueue.shift();
 
   if (!job.source) {
-    // console.error(`[service] [${new Date().toLocaleString()}] ❌ Missing 'source' in job:`, job);
     return;
   }
 
-  // console.log(`[service] [${new Date().toLocaleString()}] 🔄 Processing ${job.source.toUpperCase()} Job: ${job.jobId}`);
 
   try {
     let articleData;
 
     if (job.source === "seo_analysis_jobs") {
-      // console.log(`🌐 Extracting content from URL: ${job.url}`);
       articleData = await extractArticleData(job.url);
     } else if (job.source === "manual_seo_jobs") {
       if (!job.title || !job.body) {
         throw new Error("Missing title or body in manual job");
       }
 
-      // console.log(`📝 Using manual content for analysis`);
       articleData = {
         title: job.title,
         description: job.description || "",
@@ -1395,9 +1236,6 @@ app.post("/api/manual-seo-job", async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------------------------------------------------------------
-
-// --------------------------------------------------------------------------------------------------------
 
 // === ROUTE: GET /api/feed ===
 app.get("/api/feed", async (req, res) => {
@@ -1428,6 +1266,138 @@ async function fetchLatestArticles(rssUrl, limit = 5) {
     pubDate: item.pubDate,
   }));
 }
+
+
+
+
+
+
+// ---------------------------------------- JOURNALIST REWRITE MODE (English Only) -----------------------------------------
+// MAIN SMART REWRITE FUNCTIONALITY
+// 1. Extract article content
+async function extractFullArticleData(url) {
+  try {
+    const res = await axios.get(url, { timeout: 10000 });
+    const $ = cheerio.load(res.data);
+
+    const title = $("title").text().trim() || "Untitled";
+    const metaDescription =
+      $('meta[name="description"]').attr("content") || "No Description";
+
+    let body = "";
+    $("p").each((_, el) => {
+      body += $(el).text() + "\n";
+    });
+
+    if (!title || !body.trim()) throw new Error("No article content found.");
+
+    return {
+      title,
+      description: metaDescription,
+      body: body.slice(0, 3500),
+    };
+  } catch (err) {
+    console.error("❌ Error extracting article:", err.message);
+    throw err;
+  }
+}
+
+// 2. Generate rewrite with cricket journalist prompt
+async function sendSmartJournalistPrompt(articleData, keyword = "cricket") {
+  const prompt = `
+You're a seasoned cricket journalist writing for Cricket Addictor. Rewrite the following article with natural tone, personal commentary, and subtle analysis, as if you're reporting after watching the game live.
+
+Instructions:
+- Do NOT write like a machine or use robotic formatting.
+- Avoid predictable patterns — vary sentence structure, flow, and pacing naturally.
+- Add your own observations, interpretation of events, and logical assumptions where appropriate.
+- Feel free to reference past matches or similar controversies if it adds perspective.
+- Use mild idiomatic language and natural transitions like any human sportswriter would.
+- Maintain keyword presence organically:
+  - Keywords: ${keyword}, ICC Code of Conduct, ball-change, Headingley Test
+  - English Standard: 10th or 12th Max.
+  - Use simple, direct language for Indian readers
+  - If there is any rule of Cricket mentioned, use the exact way as written in ICC’s Rule Book.
+
+Tone to follow: Similar to journalists like Jarrod Kimber or Harsha Bhogle — observational, human, and sometimes slightly opinionated.
+
+Avoid any phrases like “as an AI” or overuse of filler phrases.
+
+---
+
+Now rewrite the following article accordingly:
+
+${articleData.body}
+`;
+
+  const response = await axios.post(
+    "https://api.deepseek.com/v1/chat/completions",
+    {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 2000,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return response.data.choices[0].message.content;
+}
+
+// 3. API Route
+app.post("/api/smart-journalist-rewrite", async (req, res) => {
+  const { url, keyword = "cricket" } = req.body;
+  console.log("HITTT")
+  if (!url) {
+    return res.status(400).json({ success: false, error: "URL required" });
+  }
+
+  try {
+    const articleData = await extractFullArticleData(url);
+    const rewritten = await sendSmartJournalistPrompt(articleData, keyword);
+    console.log(rewritten,"dkfhkhdfkdhkfhk")
+    return res.json({
+      success: true,
+      originalTitle: articleData.title,
+      metaDescription: articleData.description,
+      rewrittenArticle: rewritten,
+    });
+  } catch (err) {
+    console.error("❌ Rewrite failed:", err.message);
+    return res.status(500).json({ success: false, error: "Rewrite failed" });
+  }
+});
+
+
+
+
+
+// ------------------------------------------------------------------seo analyzer ends here ----------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+// ----------------------------------------------My game 11 --------------------------------------------------------
+
+
+
+
+
+
+
+
 
 app.post("/api/polls", async (req, res) => {
   const { title, description, match_id } = req.body;
@@ -1723,7 +1693,47 @@ app.get("/api/getMatchData/:matchId", async (req, res) => {
   }
 });
 
-// -------------------------------different learning pj------------------------------------------------------------
+
+
+
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -------------------------------different learning pj  dummy ecommerce apis----------------------------------------------------------------------------
 
 // --------------------------------------------------user routes---------------------------------------------------
 app.get("/user", async (req, res) => {
@@ -2254,12 +2264,7 @@ app.get("/orders/:orderId/address", async (req, res) => {
   }
 });
 
-/**
- * Update an Address (PATCH /orders/:orderId/address)
- */
-/**
- * Update an Address (PATCH /orders/address/:addressId)
- */
+
 app.patch("/orders/address/:addressId", async (req, res) => {
   try {
     const { addressId } = req.params;
@@ -2476,44 +2481,6 @@ app.delete("/cart/clear", async (req, res) => {
   }
 });
 
-// app.post("/cart/apply-promo", async (req, res) => {
-//   const { code, cartTotal } = req.body;
-
-//   try {
-//     const query = "SELECT * FROM promo_codes WHERE code = ?";
-//     const [promo] = await userDBPool.query(query, [code]);
-
-//     if (!promo.length) return res.status(400).json({ error: "Invalid promo code" });
-
-//     const promoData = promo[0];
-
-//     if (promoData.expiry_date && new Date(promoData.expiry_date) < new Date()) {
-//       return res.status(400).json({ error: "Promo code expired" });
-//     }
-
-//     if (cartTotal < promoData.min_cart_value) {
-//       return res.status(400).json({ error: `Minimum cart value should be Rs.${promoData.min_cart_value}` });
-//     }
-
-//     let discount = (cartTotal * promoData.discount_percent) / 100;
-
-//     if (promoData.max_discount_value && discount > promoData.max_discount_value) {
-//       discount = promoData.max_discount_value;
-//     }
-
-//     const discountedTotal = cartTotal - discount;
-
-//     return res.status(200).json({
-//       message: "Promo applied successfully",
-//       discount: Math.round(discount),
-//       total: Math.round(discountedTotal),
-//       promo: code,
-//     });
-//   } catch (err) {
-//     console.error("Promo error:", err);
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// });
 
 app.post("/cart/apply-promo", async (req, res) => {
   const { code, cartTotal } = req.body;
@@ -3502,7 +3469,7 @@ app.post("/auth/google-login", async (req, res) => {
 
 
 
-
+// -----------------------------------------------------------------------------------------------------------------------------------------
 
 
 
