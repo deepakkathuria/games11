@@ -1303,38 +1303,91 @@ async function extractFullArticleData(url) {
 }
 
 // 2. Generate rewrite with cricket journalist prompt
-async function sendSmartJournalistPrompt(articleData, keyword = "cricket") {
-  const prompt = `
+// async function sendSmartJournalistPrompt(articleData, keyword = "cricket") {
+//   const prompt = `
+// You're a seasoned cricket journalist writing for Cricket Addictor. Rewrite the following article with natural tone, personal commentary, and subtle analysis, as if you're reporting after watching the game live.
+
+// Instructions:
+// - Do NOT write like a machine or use robotic formatting.
+// - Avoid predictable patterns — vary sentence structure, flow, and pacing naturally.
+// - Add your own observations, interpretation of events, and logical assumptions where appropriate.
+// - Feel free to reference past matches or similar controversies if it adds perspective.
+// - Use mild idiomatic language and natural transitions like any human sportswriter would.
+// - Maintain keyword presence organically:
+//   - Keywords: ${keyword}, ICC Code of Conduct, ball-change, Headingley Test
+//   - English Standard: 10th or 12th Max.
+//   - Use simple, direct language for Indian readers
+//   - If there is any rule of Cricket mentioned, use the exact way as written in ICC’s Rule Book.
+
+// Tone to follow: Similar to journalists like Jarrod Kimber or Harsha Bhogle — observational, human, and sometimes slightly opinionated.
+
+// Avoid any phrases like “as an AI” or overuse of filler phrases.
+
+// ---
+
+// Now rewrite the following article accordingly:
+
+// ${articleData.body}
+// `;
+
+//   const response = await axios.post(
+//     "https://api.deepseek.com/v1/chat/completions",
+//     {
+//       model: "deepseek-chat",
+//       messages: [{ role: "user", content: prompt }],
+//       temperature: 0.7,
+//       max_tokens: 2000,
+//     },
+//     {
+//       headers: {
+//         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+//         "Content-Type": "application/json",
+//       },
+//     }
+//   );
+
+//   return response.data.choices[0].message.content;
+// }
+
+async function sendSmartJournalistPrompt(
+  articleData,
+  keyword = "cricket",
+  customPrompt = null
+) {
+  let promptText;
+
+  if (customPrompt) {
+    // If they included {{body}}, just replace as before:
+    if (/{{\s*body\s*}}/i.test(customPrompt)) {
+      promptText = customPrompt.replace(
+        /{{\s*body\s*}}/gi,
+        articleData.body
+      );
+    } else {
+      // No {{body}} placeholder?  Append the article automatically:
+      promptText = `${customPrompt.trim()}
+
+Article:
+${articleData.body}`;
+    }
+  } else {
+    // No custom prompt at all: use your original full template
+    promptText = `
 You're a seasoned cricket journalist writing for Cricket Addictor. Rewrite the following article with natural tone, personal commentary, and subtle analysis, as if you're reporting after watching the game live.
 
-Instructions:
-- Do NOT write like a machine or use robotic formatting.
-- Avoid predictable patterns — vary sentence structure, flow, and pacing naturally.
-- Add your own observations, interpretation of events, and logical assumptions where appropriate.
-- Feel free to reference past matches or similar controversies if it adds perspective.
-- Use mild idiomatic language and natural transitions like any human sportswriter would.
-- Maintain keyword presence organically:
-  - Keywords: ${keyword}, ICC Code of Conduct, ball-change, Headingley Test
-  - English Standard: 10th or 12th Max.
-  - Use simple, direct language for Indian readers
-  - If there is any rule of Cricket mentioned, use the exact way as written in ICC’s Rule Book.
-
-Tone to follow: Similar to journalists like Jarrod Kimber or Harsha Bhogle — observational, human, and sometimes slightly opinionated.
-
-Avoid any phrases like “as an AI” or overuse of filler phrases.
-
----
+…
 
 Now rewrite the following article accordingly:
 
 ${articleData.body}
 `;
+  }
 
   const response = await axios.post(
     "https://api.deepseek.com/v1/chat/completions",
     {
       model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: promptText }],
       temperature: 0.7,
       max_tokens: 2000,
     },
@@ -1349,29 +1402,145 @@ ${articleData.body}
   return response.data.choices[0].message.content;
 }
 
+
 // 3. API Route
+// app.post("/api/smart-journalist-rewrite", async (req, res) => {
+//   const { url, keyword = "cricket" } = req.body;
+//   console.log("HITTT")
+//   if (!url) {
+//     return res.status(400).json({ success: false, error: "URL required" });
+//   }
+
+//   try {
+//     const articleData = await extractFullArticleData(url);
+//     const rewritten = await sendSmartJournalistPrompt(articleData, keyword);
+//     console.log(rewritten,"dkfhkhdfkdhkfhk")
+//     return res.json({
+//       success: true,
+//       originalTitle: articleData.title,
+//       metaDescription: articleData.description,
+//       rewrittenArticle: rewritten,
+//     });
+//   } catch (err) {
+//     console.error("❌ Rewrite failed:", err.message);
+//     return res.status(500).json({ success: false, error: "Rewrite failed" });
+//   }
+// });
+
+
+
 app.post("/api/smart-journalist-rewrite", async (req, res) => {
   const { url, keyword = "cricket" } = req.body;
-  console.log("HITTT")
-  if (!url) {
-    return res.status(400).json({ success: false, error: "URL required" });
-  }
+  if (!url) return res.status(400).json({ success: false, error: "URL required" });
 
   try {
     const articleData = await extractFullArticleData(url);
-    const rewritten = await sendSmartJournalistPrompt(articleData, keyword);
-    console.log(rewritten,"dkfhkhdfkdhkfhk")
-    return res.json({
+
+    // ← NEW: load the active prompt from MySQL
+    const [[active]] = await internalDBPool.query(
+      "SELECT content FROM prompts WHERE is_active = 1 LIMIT 1"
+    );
+    const template = active?.content || null;
+
+    const rewritten = await sendSmartJournalistPrompt(
+      articleData,
+      keyword,
+      template
+    );
+
+    res.json({
       success: true,
       originalTitle: articleData.title,
       metaDescription: articleData.description,
       rewrittenArticle: rewritten,
     });
   } catch (err) {
-    console.error("❌ Rewrite failed:", err.message);
-    return res.status(500).json({ success: false, error: "Rewrite failed" });
+    console.error("❌ Rewrite failed:", err);
+    res.status(500).json({ success: false, error: "Rewrite failed" });
   }
 });
+
+
+
+
+
+
+
+// =============================== Prompt Management on app ==================
+
+// GET active prompt
+app.get("/api/prompts/active", async (req, res) => {
+  try {
+    const [rows] = await internalDBPool.query(
+      "SELECT id, title, content FROM prompts WHERE is_active = 1 LIMIT 1"
+    );
+    res.json(rows[0] || null);
+  } catch (err) {
+    console.error("❌ GET /api/prompts/active failed", err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// GET all prompts (history)
+app.get("/api/prompts", async (req, res) => {
+  try {
+    const [rows] = await internalDBPool.query(
+      "SELECT id, title, is_active, created_at FROM prompts ORDER BY created_at DESC"
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ GET /api/prompts failed", err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// POST create & optionally activate
+app.post("/api/prompts", async (req, res) => {
+  const { title = "Untitled", content, activate = true } = req.body;
+  if (!content) return res.status(400).json({ error: "content required" });
+
+  const conn = internalDBPool;
+  try {
+    await conn.query("START TRANSACTION");
+
+    if (activate) {
+      await conn.query("UPDATE prompts SET is_active = 0 WHERE is_active = 1");
+    }
+
+    const [result] = await conn.query(
+      "INSERT INTO prompts (title, content, is_active) VALUES (?, ?, ?)",
+      [title, content, activate ? 1 : 0]
+    );
+
+    await conn.query("COMMIT");
+    res.json({ id: result.insertId, title, is_active: activate });
+  } catch (err) {
+    await conn.query("ROLLBACK");
+    console.error("❌ POST /api/prompts failed", err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// PATCH activate an existing prompt
+app.patch("/api/prompts/:id/activate", async (req, res) => {
+  const { id } = req.params;
+  const conn = internalDBPool;
+  try {
+    await conn.query("START TRANSACTION");
+    await conn.query("UPDATE prompts SET is_active = 0 WHERE is_active = 1");
+    await conn.query("UPDATE prompts SET is_active = 1 WHERE id = ?", [id]);
+    await conn.query("COMMIT");
+    res.json({ success: true });
+  } catch (err) {
+    await conn.query("ROLLBACK");
+    console.error(`❌ PATCH /api/prompts/${id}/activate failed`, err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+
+
+
 
 
 
