@@ -1437,7 +1437,7 @@ app.post("/api/smart-journalist-rewrite", async (req, res) => {
     const articleData = await extractFullArticleData(url);
 
     // ← NEW: load the active prompt from MySQL
-    const [[active]] = await internalDBPool.query(
+    const [[active]] = await pollDBPool.query(
       "SELECT content FROM prompts WHERE is_active = 1 LIMIT 1"
     );
     const template = active?.content || null;
@@ -1471,7 +1471,7 @@ app.post("/api/smart-journalist-rewrite", async (req, res) => {
 // GET active prompt
 app.get("/api/prompts/active", async (req, res) => {
   try {
-    const [rows] = await internalDBPool.query(
+    const [rows] = await pollDBPool.query(
       "SELECT id, title, content FROM prompts WHERE is_active = 1 LIMIT 1"
     );
     res.json(rows[0] || null);
@@ -1484,7 +1484,7 @@ app.get("/api/prompts/active", async (req, res) => {
 // GET all prompts (history)
 app.get("/api/prompts", async (req, res) => {
   try {
-    const [rows] = await internalDBPool.query(
+    const [rows] = await pollDBPool.query(
       "SELECT id, title, is_active, created_at FROM prompts ORDER BY created_at DESC"
     );
     res.json(rows);
@@ -1499,23 +1499,25 @@ app.post("/api/prompts", async (req, res) => {
   const { title = "Untitled", content, activate = true } = req.body;
   if (!content) return res.status(400).json({ error: "content required" });
 
-  const conn = internalDBPool;
   try {
-    await conn.query("START TRANSACTION");
+    // Use the same pool for transactions
+    await pollDBPool.query("START TRANSACTION");
 
     if (activate) {
-      await conn.query("UPDATE prompts SET is_active = 0 WHERE is_active = 1");
+      await pollDBPool.query(
+        "UPDATE prompts SET is_active = 0 WHERE is_active = 1"
+      );
     }
 
-    const [result] = await conn.query(
+    const [result] = await pollDBPool.query(
       "INSERT INTO prompts (title, content, is_active) VALUES (?, ?, ?)",
       [title, content, activate ? 1 : 0]
     );
 
-    await conn.query("COMMIT");
+    await pollDBPool.query("COMMIT");
     res.json({ id: result.insertId, title, is_active: activate });
   } catch (err) {
-    await conn.query("ROLLBACK");
+    await pollDBPool.query("ROLLBACK");
     console.error("❌ POST /api/prompts failed", err);
     res.status(500).json({ error: "Internal error" });
   }
@@ -1524,22 +1526,23 @@ app.post("/api/prompts", async (req, res) => {
 // PATCH activate an existing prompt
 app.patch("/api/prompts/:id/activate", async (req, res) => {
   const { id } = req.params;
-  const conn = internalDBPool;
   try {
-    await conn.query("START TRANSACTION");
-    await conn.query("UPDATE prompts SET is_active = 0 WHERE is_active = 1");
-    await conn.query("UPDATE prompts SET is_active = 1 WHERE id = ?", [id]);
-    await conn.query("COMMIT");
+    await pollDBPool.query("START TRANSACTION");
+    await pollDBPool.query(
+      "UPDATE prompts SET is_active = 0 WHERE is_active = 1"
+    );
+    await pollDBPool.query(
+      "UPDATE prompts SET is_active = 1 WHERE id = ?",
+      [id]
+    );
+    await pollDBPool.query("COMMIT");
     res.json({ success: true });
   } catch (err) {
-    await conn.query("ROLLBACK");
+    await pollDBPool.query("ROLLBACK");
     console.error(`❌ PATCH /api/prompts/${id}/activate failed`, err);
     res.status(500).json({ error: "Internal error" });
   }
 });
-
-
-
 
 
 
