@@ -159,6 +159,79 @@ app.post("/chat", async (req, res) => {
 
 
 
+/* =====================================================================
+   POST /api/translate-url-deepseek     ->  returns Hindi article
+   =================================================================== */
+app.post("/api/translate-url-deepseek", async (req, res) => {
+  const { url } = req.body;
+  if (!url)
+    return res.status(400).json({ success: false, error: "Missing URL" });
+
+  try {
+    /* 1️⃣  pull title + text ------------------------------------------------ */
+    const resp = await axios.get(url, { timeout: 15000 });
+    const $    = cheerio.load(resp.data);
+
+    const title = $("title").text().trim() || "Untitled";
+    let body    = "";
+    $("p").each((_, el) => { body += $(el).text() + "\n"; });
+
+    if (!body.trim())
+      throw new Error("No article text found on page");
+
+    /* cut a little to stay well under token limits */
+    const textForModel = body.slice(0, 3500);
+
+    /* 2️⃣  build DeepSeek prompt ------------------------------------------ */
+    const prompt = `
+आप एक पेशेवर हिंदी अनुवादक हैं। कृपया नीचे दिये गए अंग्रेज़ी क्रिकेट लेख का शुद्ध, सहज और प्राकृतिक हिंदी में अनुवाद करें।
+क्रिकेट के तकनीकी शब्द (Powerplay, DLS, Yorker वग़ैरह) यथावत रखें।
+
+--- मूल लेख ---
+Title: ${title}
+Content:
+${textForModel}
+
+--- हिंदी अनुवाद शुरू करें ---
+`;
+
+    /* 3️⃣  call DeepSeek --------------------------------------------------- */
+    const dsRes = await axios.post(
+      "https://api.deepseek.com/v1/chat/completions",
+      {
+        model    : "deepseek-chat",
+        messages : [{ role: "user", content: prompt }],
+        temperature : 0.3,
+        max_tokens  : 1800,
+      },
+      {
+        headers: {
+          Authorization : `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const hindiArticle = dsRes.data.choices[0].message.content.trim();
+
+    /* 4️⃣  return ---------------------------------------------------------- */
+    return res.json({
+      success : true,
+      title   : title,
+      hindi   : hindiArticle,
+    });
+
+  } catch (err) {
+    console.error("❌ [DeepSeek Hindi] Error:", err.message);
+    res.status(500).json({
+      success: false,
+      error  : "Translation failed",
+      message: err.message,
+    });
+  }
+});
+
+
 
 
 
@@ -198,52 +271,7 @@ cron.schedule(
   }
 );
 
-// cron.schedule("*/5 * * * *", async () => {
-//   const now = moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-//   console.log(`🕒 [${now} IST] Running DeepSeek Summary Automation...`);
-//   try {
-//     await runDeepSeekSummaryAutomation();
-//     console.log("✅ DeepSeek summary task complete.");
-//   } catch (err) {
-//     console.error("❌ DeepSeek summary task failed:", err.message);
-//   }
-// }, {
-//   timezone: "Asia/Kolkata"
-// })
 
-// 1. Looks at your site’s performance for the last 14 days
-// It compares:
-
-// 🔹 This week (last 7 days)
-
-// 🔹 Last week (7–14 days ago)
-
-// 2. Finds pages that are doing worse
-// If a page's ranking got worse (e.g., from position #5 to #10),
-
-// Then it adds that page to a list for analysis
-
-// 3. Checks what keyword that page is ranking for
-// It finds the main search keyword (e.g., "India vs Australia Preview")
-
-// 4. Asks DeepSeek AI: "How do I fix this page?"
-// It sends the AI:
-
-// What page is dropping
-
-// How its ranking, clicks, and impressions changed
-
-// The keyword it's targeting
-
-// And asks the AI:
-
-// 🔧 What to improve in title/meta
-
-// 🧱 What section to rewrite
-
-// 📝 What new headings to add
-
-// 🔗 What internal links to add
 
 // ----------------------- news summary
 app.get("/api/article_summaries", async (req, res) => {
@@ -1302,52 +1330,7 @@ async function extractFullArticleData(url) {
   }
 }
 
-// 2. Generate rewrite with cricket journalist prompt
-// async function sendSmartJournalistPrompt(articleData, keyword = "cricket") {
-//   const prompt = `
-// You're a seasoned cricket journalist writing for Cricket Addictor. Rewrite the following article with natural tone, personal commentary, and subtle analysis, as if you're reporting after watching the game live.
 
-// Instructions:
-// - Do NOT write like a machine or use robotic formatting.
-// - Avoid predictable patterns — vary sentence structure, flow, and pacing naturally.
-// - Add your own observations, interpretation of events, and logical assumptions where appropriate.
-// - Feel free to reference past matches or similar controversies if it adds perspective.
-// - Use mild idiomatic language and natural transitions like any human sportswriter would.
-// - Maintain keyword presence organically:
-//   - Keywords: ${keyword}, ICC Code of Conduct, ball-change, Headingley Test
-//   - English Standard: 10th or 12th Max.
-//   - Use simple, direct language for Indian readers
-//   - If there is any rule of Cricket mentioned, use the exact way as written in ICC’s Rule Book.
-
-// Tone to follow: Similar to journalists like Jarrod Kimber or Harsha Bhogle — observational, human, and sometimes slightly opinionated.
-
-// Avoid any phrases like “as an AI” or overuse of filler phrases.
-
-// ---
-
-// Now rewrite the following article accordingly:
-
-// ${articleData.body}
-// `;
-
-//   const response = await axios.post(
-//     "https://api.deepseek.com/v1/chat/completions",
-//     {
-//       model: "deepseek-chat",
-//       messages: [{ role: "user", content: prompt }],
-//       temperature: 0.7,
-//       max_tokens: 2000,
-//     },
-//     {
-//       headers: {
-//         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-//         "Content-Type": "application/json",
-//       },
-//     }
-//   );
-
-//   return response.data.choices[0].message.content;
-// }
 
 async function sendSmartJournalistPrompt(
   articleData,
@@ -1402,30 +1385,7 @@ ${articleData.body}
   return response.data.choices[0].message.content;
 }
 
-
-// 3. API Route
-// app.post("/api/smart-journalist-rewrite", async (req, res) => {
-//   const { url, keyword = "cricket" } = req.body;
-//   console.log("HITTT")
-//   if (!url) {
-//     return res.status(400).json({ success: false, error: "URL required" });
-//   }
-
-//   try {
-//     const articleData = await extractFullArticleData(url);
-//     const rewritten = await sendSmartJournalistPrompt(articleData, keyword);
-//     console.log(rewritten,"dkfhkhdfkdhkfhk")
-//     return res.json({
-//       success: true,
-//       originalTitle: articleData.title,
-//       metaDescription: articleData.description,
-//       rewrittenArticle: rewritten,
-//     });
-//   } catch (err) {
-//     console.error("❌ Rewrite failed:", err.message);
-//     return res.status(500).json({ success: false, error: "Rewrite failed" });
-//   }
-// });
+;
 
 
 
