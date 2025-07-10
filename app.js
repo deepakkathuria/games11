@@ -170,43 +170,66 @@ app.post("/api/translate-url-deepseek", async (req, res) => {
   try {
     /* 1️⃣  pull title + text ------------------------------------------------ */
     const resp = await axios.get(url, { timeout: 15000 });
-    const $    = cheerio.load(resp.data);
+    const $ = cheerio.load(resp.data);
 
     const title = $("title").text().trim() || "Untitled";
-    let body    = "";
-    $("p").each((_, el) => { body += $(el).text() + "\n"; });
+    let body = "";
+    $("p").each((_, el) => {
+      body += $(el).text() + "\n";
+    });
 
     if (!body.trim())
       throw new Error("No article text found on page");
 
-    /* cut a little to stay well under token limits */
+    // Cut down to avoid hitting token limits
     const textForModel = body.slice(0, 3500);
 
-    /* 2️⃣  build DeepSeek prompt ------------------------------------------ */
+    /* 2️⃣  updated DeepSeek prompt ------------------------------------------ */
     const prompt = `
-आप एक पेशेवर हिंदी अनुवादक हैं। कृपया नीचे दिये गए अंग्रेज़ी क्रिकेट लेख का शुद्ध, सहज और प्राकृतिक हिंदी में अनुवाद करें।
-क्रिकेट के तकनीकी शब्द (Powerplay, DLS, Yorker वग़ैरह) यथावत रखें।
+You are a senior Hindi content writer working for a popular cricket news website.
+I will provide you with an English cricket article. Your task is to translate it into easy-to-read, engaging, and contextually accurate Hindi, suitable for Indian readers of all age groups.
 
---- मूल लेख ---
+Guidelines:
+• Use natural Hindi, not word-for-word literal translation.
+• Maintain a professional yet fan-friendly tone, like that of websites such as Cricket Addictor, Cricbuzz Hindi, or Navbharat Times.
+• Keep cricket terminology and player names intact (don’t translate names or score numbers).
+• Translate headlines and subheadings in a click-worthy, SEO-friendly style.
+• If any English phrases or cricket-specific terms are more commonly used in English (e.g., “T20,” “No-Ball,” “Man of the Match”), retain them.
+• Ensure the grammar is clean, and the article flows naturally like it was originally written in Hindi.
+• Use simple Hindi like people reading and writing nowadays.
+• Use tables if there is any table in the article – use the table with the same values.
+• Use bullet points if required.
+• Make minor improvements to ensure the content is helpful and aligns with Google’s helpful content policies.
+• Format the article with clearly defined:
+  - SEO Title
+  - Meta Description
+  - Headline
+  - Article Body
+  - Subheadings
+  - FAQs (if relevant)
+
+Do not change the context of the article.
+
+--- English Article ---
 Title: ${title}
 Content:
 ${textForModel}
 
---- हिंदी अनुवाद शुरू करें ---
+--- Now write the Hindi article as per the above instructions ---
 `;
 
     /* 3️⃣  call DeepSeek --------------------------------------------------- */
     const dsRes = await axios.post(
       "https://api.deepseek.com/v1/chat/completions",
       {
-        model    : "deepseek-chat",
-        messages : [{ role: "user", content: prompt }],
-        temperature : 0.3,
-        max_tokens  : 1800,
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1800,
       },
       {
         headers: {
-          Authorization : `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
           "Content-Type": "application/json",
         },
       }
@@ -216,20 +239,21 @@ ${textForModel}
 
     /* 4️⃣  return ---------------------------------------------------------- */
     return res.json({
-      success : true,
-      title   : title,
-      hindi   : hindiArticle,
+      success: true,
+      title: title,
+      hindi: hindiArticle,
     });
 
   } catch (err) {
     console.error("❌ [DeepSeek Hindi] Error:", err.message);
     res.status(500).json({
       success: false,
-      error  : "Translation failed",
+      error: "Translation failed",
       message: err.message,
     });
   }
 });
+
 
 
 
