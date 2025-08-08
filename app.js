@@ -67,6 +67,63 @@ const { runGscLowCtrFixAutomation } = require("./runGscLowCtrFixAutomation");
 const { runGscRankingWatchdog } = require("./runGscRankingWatchdog");
 const runDeepSeekSummaryAutomation = require("./summarizeArticle");
 
+
+// Add this import at the top
+const { runHindiGscDeepSeekAutomation } = require('./hindiGscAutomation');
+
+// Hindi GSC AI Reports API
+app.get("/api/gsc/hi/ai-reports", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 80;
+  const offset = (page - 1) * limit;
+
+  try {
+    const [rows] = await pollDBPool.query(
+      `
+      SELECT 
+        id, 
+        url, 
+        impressions, 
+        clicks, 
+        ctr, 
+        position, 
+        gsc_queries,
+        deepseek_output, 
+        created_at, 
+        article_published_at
+      FROM gsc_hindi_ai_recommendations 
+      ORDER BY 
+        article_published_at IS NULL,
+        article_published_at DESC,
+        created_at DESC
+      LIMIT ? OFFSET ?
+    `,
+      [limit, offset]
+    );
+
+    const [countResult] = await pollDBPool.query(`
+      SELECT COUNT(*) AS total FROM gsc_hindi_ai_recommendations
+    `);
+
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ success: true, data: rows, page, totalPages });
+  } catch (err) {
+    console.error("❌ Hindi GSC AI Report Fetch Error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to load Hindi reports" });
+  }
+});
+
+// Test Hindi GSC automation
+app.post("/api/test-hindi-gsc", async (req, res) => {
+  try {
+    await runHindiGscDeepSeekAutomation();
+    res.json({ success: true, message: "Hindi GSC automation completed" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 // It connects to your Google Search Console and fetches up to 5000 pages that appeared in search results over the past week.
 
 // It filters pages that have high impressions but low clicks and CTR (i.e., underperforming pages).
@@ -82,7 +139,88 @@ const runDeepSeekSummaryAutomation = require("./summarizeArticle");
 //automation gec ai report
 
 
+// Add this to your main backend file
+app.get("/api/debug-gsc", async (req, res) => {
+  try {
+    const { google } = require('googleapis');
+    const fs = require('fs');
+    const path = require('path');
+    
+    const TEMP_KEY_PATH = path.join(__dirname, 'gsc_key_temp.json');
+    
+    // Check if key file exists and its content
+    const keyFileExists = fs.existsSync(TEMP_KEY_PATH);
+    let keyFileContent = null;
+    let decodedCredentials = null;
+    
+    if (keyFileExists) {
+      keyFileContent = fs.readFileSync(TEMP_KEY_PATH, 'utf8');
+      try {
+        decodedCredentials = JSON.parse(keyFileContent);
+      } catch (e) {
+        decodedCredentials = { error: "Invalid JSON" };
+      }
+    }
+    
+    // Check environment variable
+    const envCredentials = process.env.GSC_CREDENTIALS_BASE64;
+    
+    res.json({
+      keyFileExists,
+      keyFileSize: keyFileExists ? fs.statSync(TEMP_KEY_PATH).size : 0,
+      envCredentialsExists: !!envCredentials,
+      envCredentialsLength: envCredentials ? envCredentials.length : 0,
+      decodedCredentials: decodedCredentials ? {
+        type: decodedCredentials.type,
+        project_id: decodedCredentials.project_id,
+        client_email: decodedCredentials.client_email,
+        private_key_id: decodedCredentials.private_key_id
+      } : null
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
+
+// Add this endpoint
+app.get("/api/gsc-sites", async (req, res) => {
+  try {
+    const { google } = require('googleapis');
+    const fs = require('fs');
+    const path = require('path');
+    
+    const TEMP_KEY_PATH = path.join(__dirname, 'gsc_key_temp.json');
+    const SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly'];
+    
+    if (!fs.existsSync(TEMP_KEY_PATH)) {
+      return res.json({ error: "GSC key file not found" });
+    }
+    
+    const auth = new google.auth.GoogleAuth({
+      keyFile: TEMP_KEY_PATH,
+      scopes: SCOPES,
+    });
+
+    const authClient = await auth.getClient();
+    const webmasters = google.webmasters({ version: 'v3', auth: authClient });
+
+    // List all sites
+    const sites = await webmasters.sites.list();
+    
+    res.json({
+      success: true,
+      sites: sites.data.siteEntry || [],
+      serviceAccountEmail: authClient.email
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: error.response?.data || 'No additional details'
+    });
+  }
+});
 
 
 const vectorstore = require("./embeddings/vectorstore.json");
@@ -278,6 +416,9 @@ cron.schedule(
     try {
       await runGscDeepSeekAutomation();
       console.log("✅ GSC AI analysis complete.");
+
+        await runHindiGscDeepSeekAutomation();
+      console.log("✅ Hindi GSC AI analysis complete.");
       await runGscContentRefreshAutomation();
       console.log("✅ GSC refresh complete.");
       await runGscTrendingKeywords();
