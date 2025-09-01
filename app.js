@@ -82,6 +82,44 @@ const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
 // HINDI GSC BACKEND APIs - ADD TO MAIN FILE
 // ===========================================
 
+
+// Test APIs for Hindi automations
+app.post("/api/test-hindi-content-refresh", async (req, res) => {
+  try {
+    await runHindiGscContentRefreshAutomation();
+    res.json({ success: true, message: "Hindi content refresh automation completed" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/test-hindi-low-ctr", async (req, res) => {
+  try {
+    await runHindiGscLowCtrFixAutomation();
+    res.json({ success: true, message: "Hindi low CTR fix automation completed" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/test-hindi-ranking-watchdog", async (req, res) => {
+  try {
+    await runHindiGscRankingWatchdog();
+    res.json({ success: true, message: "Hindi ranking watchdog automation completed" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/test-hindi-content-query-match", async (req, res) => {
+  try {
+    await runHindiGscContentQueryMatch();
+    res.json({ success: true, message: "Hindi content query match automation completed" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 1. Hindi GSC Content Refresh API
 app.get("/api/gsc/hi/content-refresh", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
