@@ -77,6 +77,134 @@ const { runHindiGscRankingWatchdog } = require('./hindiGscRankingWatchdog');
 const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
 
 
+// Add these imports at the top of your server file
+const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./src/lib/newsFetcher');
+
+// Add these endpoints to your existing server
+// Fetch cricket news from GNews API
+app.get("/api/fetch-cricket-news", async (req, res) => {
+  try {
+    const { 
+      query = "cricket", 
+      lang = "en", 
+      country = "in", 
+      max = 25,
+      filters = "{}"
+    } = req.query;
+
+    console.log(`📰 Fetching cricket news: ${query}`);
+
+    const newsResult = await fetchCricketNews({
+      query,
+      lang,
+      country,
+      max: parseInt(max)
+    });
+
+    if (!newsResult.success) {
+      return res.status(500).json({
+        success: false,
+        error: newsResult.error
+      });
+    }
+
+    // Apply filters if provided
+    let filteredArticles = newsResult.articles;
+    try {
+      const filterOptions = JSON.parse(filters);
+      filteredArticles = filterArticles(newsResult.articles, filterOptions);
+    } catch (e) {
+      // Use default filters if parsing fails
+      filteredArticles = filterArticles(newsResult.articles);
+    }
+
+    // Add summary and validation to each article
+    const processedArticles = filteredArticles.map(article => ({
+      ...article,
+      summary: getArticleSummary(article),
+      validation: validateArticleForProcessing(article),
+      wordCount: article.content ? article.content.split(' ').length : 0
+    }));
+
+    res.json({
+      success: true,
+      totalArticles: newsResult.totalArticles,
+      filteredArticles: processedArticles.length,
+      articles: processedArticles,
+      fetchedAt: newsResult.fetchedAt
+    });
+
+  } catch (error) {
+    console.error("Fetch cricket news error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to fetch cricket news"
+    });
+  }
+});
+
+// Process selected article from GNews
+app.post("/api/process-selected-article", async (req, res) => {
+  try {
+    const { article, options = {} } = req.body;
+
+    if (!article || !article.title || !article.description || !article.content) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid article data"
+      });
+    }
+
+    const validation = validateArticleForProcessing(article);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: "Article validation failed",
+        details: validation.errors
+      });
+    }
+
+    console.log(`�� Processing selected article: ${article.title}`);
+
+    // Use your existing processManualInput function
+    const result = await processManualInput(
+      { 
+        title: article.title, 
+        description: article.description, 
+        content: article.content 
+      },
+      {
+        language: options.language || "en",
+        includePrePublishingChecks: options.includePrePublishingChecks !== false,
+        includeHumanLikeRewriting: options.includeHumanLikeRewriting !== false,
+        includeGoogleOptimization: options.includeGoogleOptimization !== false,
+        avoidAIDetection: options.avoidAIDetection !== false
+      }
+    );
+
+    res.json({
+      success: true,
+      readyToPublishArticle: result.readyToPublishArticle,
+      originalArticle: {
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        source: article.source?.name,
+        publishedAt: article.publishedAt
+      },
+      processingTime: result.processingTime
+    });
+
+  } catch (error) {
+    console.error("Process selected article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process selected article"
+    });
+  }
+});
+
+
 
 // ===========================================
 // HINDI GSC BACKEND APIs - ADD TO MAIN FILE

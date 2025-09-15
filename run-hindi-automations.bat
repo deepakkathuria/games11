@@ -1,8 +1,7 @@
 @echo off
 echo Starting Hindi GSC Automations...
 
-echo 1. Running Hindi GSC AI Reports...
-curl -X POST http://localhost:5000/api/test-hindi-gsc
+
 
 echo 2. Running Hindi Content Refresh...
 curl -X POST http://localhost:5000/api/test-hindi-content-refresh
