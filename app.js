@@ -77,11 +77,11 @@ const { runHindiGscRankingWatchdog } = require('./hindiGscRankingWatchdog');
 const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
 
 
-// Add these imports at the top of your server file
+// Top of the file mein ye imports add karo
 const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./src/lib/newsFetcher');
+const { processManualInput } = require('./src/lib/manualInputProcessor');
 
-// Add these endpoints to your existing server
-// Fetch cricket news from GNews API
+// Ye endpoints add karo
 app.get("/api/fetch-cricket-news", async (req, res) => {
   try {
     const { 
@@ -108,17 +108,14 @@ app.get("/api/fetch-cricket-news", async (req, res) => {
       });
     }
 
-    // Apply filters if provided
     let filteredArticles = newsResult.articles;
     try {
       const filterOptions = JSON.parse(filters);
       filteredArticles = filterArticles(newsResult.articles, filterOptions);
     } catch (e) {
-      // Use default filters if parsing fails
       filteredArticles = filterArticles(newsResult.articles);
     }
 
-    // Add summary and validation to each article
     const processedArticles = filteredArticles.map(article => ({
       ...article,
       summary: getArticleSummary(article),
@@ -143,7 +140,6 @@ app.get("/api/fetch-cricket-news", async (req, res) => {
   }
 });
 
-// Process selected article from GNews
 app.post("/api/process-selected-article", async (req, res) => {
   try {
     const { article, options = {} } = req.body;
@@ -166,7 +162,6 @@ app.post("/api/process-selected-article", async (req, res) => {
 
     console.log(`🚀 Processing selected article: ${article.title}`);
 
-    // Use your existing processManualInput function
     const result = await processManualInput(
       { 
         title: article.title, 
@@ -203,7 +198,6 @@ app.post("/api/process-selected-article", async (req, res) => {
     });
   }
 });
-
 
 // ===========================================
 // HINDI GSC BACKEND APIs - ADD TO MAIN FILE
