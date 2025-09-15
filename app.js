@@ -164,7 +164,7 @@ app.post("/api/process-selected-article", async (req, res) => {
       });
     }
 
-    console.log(`�� Processing selected article: ${article.title}`);
+    console.log(`🚀 Processing selected article: ${article.title}`);
 
     // Use your existing processManualInput function
     const result = await processManualInput(
@@ -203,7 +203,6 @@ app.post("/api/process-selected-article", async (req, res) => {
     });
   }
 });
-
 
 
 // ===========================================

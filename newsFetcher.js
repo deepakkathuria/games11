@@ -1,4 +1,3 @@
-// src/lib/newsFetcher.js
 const axios = require('axios');
 
 const GNEWS_API_KEY = "10221c352c3324d296732745fffffe4c";
@@ -29,10 +28,7 @@ async function fetchCricketNews(options = {}) {
     
     const response = await axios.get(url.toString());
     
-    if (!response.ok) {
-      throw new Error(`GNews API error: ${response.status} ${response.statusText}`);
-    }
-
+    // For axios, we don't need to check response.ok - axios throws errors for non-2xx status codes
     const data = response.data;
     
     console.log(`✅ Fetched ${data.articles?.length || 0} articles from GNews`);
