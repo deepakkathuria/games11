@@ -75,13 +75,64 @@ const { runHindiGscContentRefreshAutomation } = require('./hindiGscContentRefres
 const { runHindiGscLowCtrFixAutomation } = require('./hindiGscLowCtrFixAutomation');
 const { runHindiGscRankingWatchdog } = require('./hindiGscRankingWatchdog');
 const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
+// Add these imports after your existing imports
+const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./newsFetcher');
+const { processManualInput } = require('./manualInputProcessor');
 
 
-// Top of the file mein ye imports add karo
-const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./src/lib/newsFetcher');
-const { processManualInput } = require('./src/lib/manualInputProcessor');
+// ===========================================
+// CRICKET NEWS AUTOMATION APIs
+// ===========================================
 
-// Ye endpoints add karo
+// Add this endpoint to your app.js
+app.post("/api/get-ready-article", async (req, res) => {
+  try {
+    const { title, description, content } = req.body;
+
+    if (!title || !description || !content) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: title, description, content"
+      });
+    }
+
+    console.log(`🚀 Processing get-ready-article: ${title}`);
+
+    // Use your existing processManualInput function
+    const result = await processManualInput(
+      { title, description, content },
+      {
+        language: "en",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        readyToPublishArticle: result.readyToPublishArticle,
+        processingTime: result.processingTime
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Get ready article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process article"
+    });
+  }
+});
+
+// Fetch cricket news from GNews API
 app.get("/api/fetch-cricket-news", async (req, res) => {
   try {
     const { 
@@ -108,14 +159,17 @@ app.get("/api/fetch-cricket-news", async (req, res) => {
       });
     }
 
+    // Apply filters if provided
     let filteredArticles = newsResult.articles;
     try {
       const filterOptions = JSON.parse(filters);
       filteredArticles = filterArticles(newsResult.articles, filterOptions);
     } catch (e) {
+      // Use default filters if parsing fails
       filteredArticles = filterArticles(newsResult.articles);
     }
 
+    // Add summary and validation to each article
     const processedArticles = filteredArticles.map(article => ({
       ...article,
       summary: getArticleSummary(article),
@@ -140,6 +194,7 @@ app.get("/api/fetch-cricket-news", async (req, res) => {
   }
 });
 
+// Process selected article from GNews
 app.post("/api/process-selected-article", async (req, res) => {
   try {
     const { article, options = {} } = req.body;
@@ -160,8 +215,9 @@ app.post("/api/process-selected-article", async (req, res) => {
       });
     }
 
-    console.log(`🚀 Processing selected article: ${article.title}`);
+    console.log(`�� Processing selected article: ${article.title}`);
 
+    // Use your existing processManualInput function
     const result = await processManualInput(
       { 
         title: article.title, 
@@ -198,6 +254,10 @@ app.post("/api/process-selected-article", async (req, res) => {
     });
   }
 });
+
+
+// Top of the file mein ye imports add karo
+
 
 // ===========================================
 // HINDI GSC BACKEND APIs - ADD TO MAIN FILE

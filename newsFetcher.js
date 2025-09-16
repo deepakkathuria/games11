@@ -27,8 +27,6 @@ async function fetchCricketNews(options = {}) {
     console.log(`🔍 Fetching cricket news from GNews API...`);
     
     const response = await axios.get(url.toString());
-    
-    // For axios, we don't need to check response.ok - axios throws errors for non-2xx status codes
     const data = response.data;
     
     console.log(`✅ Fetched ${data.articles?.length || 0} articles from GNews`);
@@ -55,10 +53,10 @@ async function fetchCricketNews(options = {}) {
  * Filter articles based on criteria
  */
 function filterArticles(articles, filters = {}) {
-  const {
-    minContentLength = 500,
-    excludeKeywords = ["betting", "gambling", "casino"],
-    includeKeywords = [],
+  const { 
+    minContentLength = 500, 
+    excludeKeywords = ["betting", "gambling", "casino"], 
+    includeKeywords = [], 
     maxAge = 7 // days
   } = filters;
 
@@ -100,11 +98,9 @@ function filterArticles(articles, filters = {}) {
 function getArticleSummary(article) {
   const content = article.content || article.description || "";
   const maxLength = 200;
-  
   if (content.length <= maxLength) {
     return content;
   }
-  
   return content.substring(0, maxLength) + "...";
 }
 
@@ -117,19 +113,16 @@ function validateArticleForProcessing(article) {
   if (!article.title || article.title.length < 10) {
     errors.push("Title too short");
   }
-  
   if (!article.description || article.description.length < 20) {
     errors.push("Description too short");
   }
-  
   if (!article.content || article.content.length < 300) {
     errors.push("Content too short for processing");
   }
-  
   if (!article.url) {
     errors.push("Missing article URL");
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors
