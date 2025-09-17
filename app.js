@@ -77,7 +77,144 @@ const { runHindiGscRankingWatchdog } = require('./hindiGscRankingWatchdog');
 const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
 // Add these imports after your existing imports
 const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./newsFetcher');
+const NewsScheduler = require('./newsSheduler');
 const { processManualInput } = require('./manualInputProcessor');
+
+// Initialize news scheduler
+const newsScheduler = new NewsScheduler();
+newsScheduler.startScheduler(1); // Fetch every 30 minutes
+
+
+// ===========================================
+// CONTINUOUS CRICKET NEWS APIs
+// ===========================================
+
+// Get stored news from database
+app.get('/api/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    // Get total count
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+    
+    // Get paginated news
+    const news = await newsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+    
+    res.json({ 
+      success: true, 
+      news,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error getting stored news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process single article
+app.post('/api/process-article/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get article from database using your existing pollDBPool
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM cricket_news WHERE id = ? AND processed = false',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Article not found or already processed' });
+    }
+
+    const article = rows[0];
+    
+    // Process with your existing logic
+    const result = await processManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Mark as processed using your existing pollDBPool
+      await pollDBPool.query(
+        'UPDATE cricket_news SET processed = true, processed_at = NOW(), ready_article = ? WHERE id = ?',
+        [result.readyToPublishArticle, id]
+      );
+      res.json({ success: true, readyToPublishArticle: result.readyToPublishArticle });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error('Error processing article:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed articles
+app.get('/api/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    // Get total count
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+    
+    // Get paginated news
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news 
+       WHERE processed = true 
+       ORDER BY processed_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+    
+    res.json({ 
+      success: true, 
+      news: rows,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error getting processed news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manual fetch news (for testing)
+app.post('/api/manual-fetch-news', async (req, res) => {
+  try {
+    await newsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'News fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get scheduler status
+app.get('/api/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: newsScheduler.isRunning,
+      message: 'Scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
 
 
 // ===========================================

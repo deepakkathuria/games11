@@ -24,12 +24,11 @@ async function fetchCricketNews(options = {}) {
     url.searchParams.append("expand", expand);
     url.searchParams.append("apikey", GNEWS_API_KEY);
 
-    console.log(`🔍 Fetching cricket news from GNews API...`);
+    
     
     const response = await axios.get(url.toString());
     const data = response.data;
     
-    console.log(`✅ Fetched ${data.articles?.length || 0} articles from GNews`);
     
     return {
       success: true,
