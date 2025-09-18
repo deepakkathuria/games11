@@ -49,7 +49,7 @@ class NewsScheduler {
       const url = new URL(GNEWS_BASE_URL);
       url.searchParams.append("q", "cricket");
       url.searchParams.append("lang", "en");
-      url.searchParams.append("country", "in");
+      // url.searchParams.append("country", "in");
       url.searchParams.append("max", "50");
       url.searchParams.append("expand", "content");
       url.searchParams.append("apikey", GNEWS_API_KEY);

@@ -11,7 +11,7 @@ async function fetchCricketNews(options = {}) {
     const {
       query = "cricket",
       lang = "en",
-      country = "in",
+      // country = "in",
       max = 25,
       expand = "content"
     } = options;
@@ -19,7 +19,7 @@ async function fetchCricketNews(options = {}) {
     const url = new URL(GNEWS_BASE_URL);
     url.searchParams.append("q", query);
     url.searchParams.append("lang", lang);
-    url.searchParams.append("country", country);
+    // url.searchParams.append("country", country);
     url.searchParams.append("max", max.toString());
     url.searchParams.append("expand", expand);
     url.searchParams.append("apikey", GNEWS_API_KEY);
