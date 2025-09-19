@@ -45,7 +45,7 @@ cloudinary.config({
 const sendInvoiceEmail = require("./utils/sendInvoiceEmail");
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(cors());
 app.set("trust proxy", 1); // even for cross-origin frontend/backend
 
@@ -79,10 +79,101 @@ const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
 const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./newsFetcher');
 const NewsScheduler = require('./newsSheduler');
 const { processManualInput } = require('./manualInputProcessor');
-
+// ⬇️ ADD THESE
+const {
+  generateWithDeepSeek,
+  buildPrePublishPrompt,
+  buildRewriteBodyHtmlPrompt,
+  parsePrePublishTextToJSON,
+  buildHtmlDocument,
+} = require("./prepublish");
 // Initialize news scheduler
 const newsScheduler = new NewsScheduler();
 newsScheduler.startScheduler(1); // Fetch every 30 minutes
+
+
+
+// -------------- NEW: Pre-Publish Recs + Rewrite --------------
+
+// ONE-CLICK GENERATE: make recs (if missing) -> write FULL HTML -> save
+app.post("/api/articles/:id/generate", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // 1) ensure recommendations exist
+    let recs = null;
+    if (article.prepublish_recs) {
+      try { recs = JSON.parse(article.prepublish_recs); } catch {}
+    }
+    if (!recs || !recs.recommendedTitle) {
+      const prePrompt = buildPrePublishPrompt({
+        title: article.title || "",
+        description: article.description || "",
+        body: article.content || "",
+      });
+      const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
+      recs = parsePrePublishTextToJSON(recText);
+
+      await pollDBPool.query(
+        "UPDATE cricket_news SET prepublish_recs = ? WHERE id = ?",
+        [JSON.stringify(recs), id]
+      );
+    }
+
+    // 2) generate BODY HTML with outline
+    const bodyPrompt = buildRewriteBodyHtmlPrompt({
+      rawTitle: article.title || "",
+      rawDescription: article.description || "",
+      rawBody: article.content || "",
+      recTitle: recs.recommendedTitle,
+      recMeta: recs.recommendedMeta,
+      recOutline: recs.outline,
+      recPrimary: recs.keywords?.primary || "",
+      recSecondary: recs.keywords?.secondary || "",
+    });
+    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.6, max_tokens: 2500 });
+
+    // 3) wrap to full HTML doc and save
+    const finalHtml = buildHtmlDocument({
+      title: recs.recommendedTitle,
+      metaDescription: recs.recommendedMeta,
+      bodyHtml,
+    });
+
+    await pollDBPool.query(
+      `UPDATE cricket_news
+         SET processed = 1,
+             processed_at = NOW(),
+             ready_article = ?,
+             final_title = ?,
+             final_meta  = ?,
+             final_slug  = ?
+       WHERE id = ?`,
+      [finalHtml, recs.recommendedTitle, recs.recommendedMeta, recs.recommendedSlug, id]
+    );
+
+    return res.json({
+      success: true,
+      final: {
+        title: recs.recommendedTitle,
+        meta: recs.recommendedMeta,
+        slug: recs.recommendedSlug,
+        html: finalHtml
+      }
+    });
+  } catch (err) {
+    console.error("generate error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
 
 
 // ===========================================
