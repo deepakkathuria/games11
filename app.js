@@ -116,6 +116,91 @@ app.get('/api/debug-gnews', async (req, res) => {
 
 
 
+// helper to force ISO Z
+function toIsoZ(v) {
+  if (!v) return null;
+  // already a Date?
+  if (v instanceof Date) return v.toISOString();
+  const s = String(v).trim();
+  // 'YYYY-MM-DD HH:MM:SS' -> treat as UTC, make ISO
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+    return s.replace(' ', 'T') + 'Z';
+  }
+  // already ISO-like, ensure Z
+  if (s.includes('T')) return s.endsWith('Z') ? s : s + 'Z';
+  return s;
+}
+
+// --------- STORED ----------
+app.get('/api/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await newsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// --------- PROCESSED ----------
+app.get('/api/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
 
 // -------------- NEW: Pre-Publish Recs + Rewrite --------------
 
@@ -204,48 +289,48 @@ app.post("/api/articles/:id/generate", async (req, res) => {
 // CONTINUOUS CRICKET NEWS APIs
 // ===========================================
 
-app.get('/api/stored-news', async (req, res) => {
-  try {
-    const limit  = Number(req.query.limit ?? 25);
-    const offset = Number(req.query.offset ?? 0);
+// app.get('/api/stored-news', async (req, res) => {
+//   try {
+//     const limit  = Number(req.query.limit ?? 25);
+//     const offset = Number(req.query.offset ?? 0);
 
-    // total count
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) AS total FROM cricket_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
+//     // total count
+//     const [countResult] = await pollDBPool.query(
+//       'SELECT COUNT(*) AS total FROM cricket_news WHERE is_valid = true'
+//     );
+//     const totalCount = countResult[0].total;
 
-    // page rows
-    const raw = await newsScheduler.getStoredNews(limit, offset);
+//     // page rows
+//     const raw = await newsScheduler.getStoredNews(limit, offset);
 
-    // helper: normalize any MySQL DATETIME (string or Date) to ISO UTC with Z
-    const toIsoUtc = (val) => {
-      if (!val) return null;
-      if (val instanceof Date) return val.toISOString();     // already UTC ISO
-      const s = String(val);                                  // e.g. "2025-09-20 05:29:00"
-      if (s.includes('T')) return s.endsWith('Z') ? s : (s + 'Z');
-      return s.replace(' ', 'T') + 'Z';
-    };
+//     // helper: normalize any MySQL DATETIME (string or Date) to ISO UTC with Z
+//     const toIsoUtc = (val) => {
+//       if (!val) return null;
+//       if (val instanceof Date) return val.toISOString();     // already UTC ISO
+//       const s = String(val);                                  // e.g. "2025-09-20 05:29:00"
+//       if (s.includes('T')) return s.endsWith('Z') ? s : (s + 'Z');
+//       return s.replace(' ', 'T') + 'Z';
+//     };
 
-    const news = raw.map(n => ({
-      ...n,
-      published_at_iso: toIsoUtc(n.published_at),
-      fetched_at_iso:   toIsoUtc(n.fetched_at),
-      processed_at_iso: toIsoUtc(n.processed_at),
-    }));
+//     const news = raw.map(n => ({
+//       ...n,
+//       published_at_iso: toIsoUtc(n.published_at),
+//       fetched_at_iso:   toIsoUtc(n.fetched_at),
+//       processed_at_iso: toIsoUtc(n.processed_at),
+//     }));
 
-    res.json({
-      success: true,
-      news,
-      totalCount,
-      currentPage: Math.floor(offset / limit) + 1,
-      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+//     res.json({
+//       success: true,
+//       news,
+//       totalCount,
+//       currentPage: Math.floor(offset / limit) + 1,
+//       totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+//     });
+//   } catch (error) {
+//     console.error('Error getting stored news:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 
 // Process single article
@@ -289,37 +374,37 @@ app.post('/api/process-article/:id', async (req, res) => {
 });
 
 // Get processed articles
-app.get('/api/processed-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
+// app.get('/api/processed-news', async (req, res) => {
+//   try {
+//     const { limit = 25, offset = 0 } = req.query;
     
-    // Get total count
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM cricket_news WHERE processed = true'
-    );
-    const totalCount = countResult[0].total;
+//     // Get total count
+//     const [countResult] = await pollDBPool.query(
+//       'SELECT COUNT(*) as total FROM cricket_news WHERE processed = true'
+//     );
+//     const totalCount = countResult[0].total;
     
-    // Get paginated news
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM cricket_news 
-       WHERE processed = true 
-       ORDER BY processed_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
+//     // Get paginated news
+//     const [rows] = await pollDBPool.query(
+//       `SELECT * FROM cricket_news 
+//        WHERE processed = true 
+//        ORDER BY processed_at DESC 
+//        LIMIT ? OFFSET ?`,
+//       [parseInt(limit), parseInt(offset)]
+//     );
     
-    res.json({ 
-      success: true, 
-      news: rows,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit))
-    });
-  } catch (error) {
-    console.error('Error getting processed news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+//     res.json({ 
+//       success: true, 
+//       news: rows,
+//       totalCount,
+//       currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+//       totalPages: Math.ceil(totalCount / parseInt(limit))
+//     });
+//   } catch (error) {
+//     console.error('Error getting processed news:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 // Manual fetch news (for testing)
 app.post('/api/manual-fetch-news', async (req, res) => {
