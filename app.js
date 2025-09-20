@@ -91,6 +91,30 @@ const {
 const newsScheduler = new NewsScheduler();
 newsScheduler.startScheduler(1); // Fetch every 30 minutes
 
+// DEBUG: test GNews from server (GET only; HEAD 404 deta hai)
+app.get('/api/debug-gnews', async (req, res) => {
+  try {
+    const key = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
+    const url = `https://gnews.io/api/v4/search?q=cricket&lang=en&max=3&expand=content&apikey=${key}`;
+
+    const https = require('https');
+    const dns = require('dns');
+    try { dns.setDefaultResultOrder('ipv4first'); } catch {}
+    const agent = new https.Agent({ family: 4, keepAlive: true });
+
+    const r = await axios.get(url, { timeout: 45000, httpsAgent: agent, headers: { Accept: 'application/json' } });
+    res.json({
+      ok: true,
+      status: r.status,
+      total: r.data?.totalArticles,
+      sample: (r.data?.articles || []).map(a => a.title)
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message, code: e.code, status: e.response?.status });
+  }
+});
+
+
 
 
 // -------------- NEW: Pre-Publish Recs + Rewrite --------------
@@ -180,32 +204,49 @@ app.post("/api/articles/:id/generate", async (req, res) => {
 // CONTINUOUS CRICKET NEWS APIs
 // ===========================================
 
-// Get stored news from database
 app.get('/api/stored-news', async (req, res) => {
   try {
-    const { limit = 25, offset = 0 } = req.query;
-    
-    // Get total count
+    const limit  = Number(req.query.limit ?? 25);
+    const offset = Number(req.query.offset ?? 0);
+
+    // total count
     const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+      'SELECT COUNT(*) AS total FROM cricket_news WHERE is_valid = true'
     );
     const totalCount = countResult[0].total;
-    
-    // Get paginated news
-    const news = await newsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
-    
-    res.json({ 
-      success: true, 
+
+    // page rows
+    const raw = await newsScheduler.getStoredNews(limit, offset);
+
+    // helper: normalize any MySQL DATETIME (string or Date) to ISO UTC with Z
+    const toIsoUtc = (val) => {
+      if (!val) return null;
+      if (val instanceof Date) return val.toISOString();     // already UTC ISO
+      const s = String(val);                                  // e.g. "2025-09-20 05:29:00"
+      if (s.includes('T')) return s.endsWith('Z') ? s : (s + 'Z');
+      return s.replace(' ', 'T') + 'Z';
+    };
+
+    const news = raw.map(n => ({
+      ...n,
+      published_at_iso: toIsoUtc(n.published_at),
+      fetched_at_iso:   toIsoUtc(n.fetched_at),
+      processed_at_iso: toIsoUtc(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
       news,
       totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit))
+      currentPage: Math.floor(offset / limit) + 1,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
     });
   } catch (error) {
     console.error('Error getting stored news:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 // Process single article
 app.post('/api/process-article/:id', async (req, res) => {
