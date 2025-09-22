@@ -100,6 +100,196 @@ const { processHindiManualInput } = require('./hindiManualInputProcessor');
 const hindiNewsScheduler = new HindiNewsScheduler();
 hindiNewsScheduler.startScheduler(1); // Fetch every 30 minutes
 
+
+
+// Add this import at the top
+const { generateViralContent } = require('./viralContentGenerator');
+
+// ===========================================
+// VIRAL CONTENT GENERATOR APIs
+// ===========================================
+
+// Get stored news for viral content generation
+app.get("/api/viral/stored-news", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC, fetched_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored news for viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate viral content from stored article
+app.post("/api/viral/generate-from-stored", async (req, res) => {
+  try {
+    const { articleId } = req.body;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: "Article ID is required"
+      });
+    }
+
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM cricket_news WHERE id = ? AND is_valid = true',
+      [articleId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found"
+      });
+    }
+
+    const article = rows[0];
+    
+    // Convert database article to GNews format
+    const gnewsArticle = {
+      title: article.title,
+      description: article.description,
+      content: article.content,
+      url: article.source_url,
+      publishedAt: article.published_at,
+      source: {
+        name: article.source_name,
+        url: article.source_url
+      }
+    };
+
+    console.log(`�� Generating viral content for stored article: ${article.title}`);
+
+    // Generate viral content
+    const result = await generateViralContent(gnewsArticle);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        analysis: result.analysis,
+        content: result.content,
+        processingTime: result.processingTime,
+        originalArticle: gnewsArticle
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Generate viral content from stored article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate viral content"
+    });
+  }
+});
+
+// Get viral content templates
+app.get("/api/viral/templates", async (req, res) => {
+  try {
+    const templates = {
+      instagram: {
+        reel: {
+          structure: "Hook (3s) → Story → CTA",
+          elements: ["Visual hook", "Story progression", "Strong CTA", "Trending hashtags"]
+        },
+        carousel: {
+          structure: "Title slide → 3-5 content slides → CTA slide",
+          elements: ["Eye-catching title", "Fact-based content", "Visual consistency", "Clear CTA"]
+        },
+        story: {
+          structure: "Multiple slides with polls/quizzes",
+          elements: ["Interactive polls", "Swipe-up actions", "Behind-the-scenes", "Quick facts"]
+        }
+      },
+      facebook: {
+        video: {
+          structure: "Hook → Narrative → CTA",
+          elements: ["Emotional hook", "Story progression", "Visual elements", "Share-worthy CTA"]
+        },
+        debate: {
+          structure: "Question → Image → Caption → CTA",
+          elements: ["Controversial question", "Supporting image", "Opinion-driven caption", "Discussion CTA"]
+        },
+        awareness: {
+          structure: "Story → Images → Emotional CTA",
+          elements: ["Personal story", "Supporting images", "Emotional connection", "Action CTA"]
+        }
+      },
+      twitter: {
+        thread: {
+          structure: "Hook tweet → 3-4 fact tweets → CTA tweet",
+          elements: ["Strong opening", "Fact progression", "Visual elements", "Engagement CTA"]
+        },
+        poll: {
+          structure: "Question → Poll options → Follow-up",
+          elements: ["Opinion question", "Multiple options", "Follow-up discussion", "Hashtags"]
+        },
+        opinion: {
+          structure: "Bold take → Supporting image → CTA",
+          elements: ["Controversial opinion", "Supporting visual", "Engagement CTA", "Relevant hashtags"]
+        }
+      },
+      youtube: {
+        shorts: {
+          structure: "Hook (3s) → Content → CTA",
+          elements: ["Visual hook", "Quick content", "Strong CTA", "Trending music"]
+        },
+        longform: {
+          structure: "Hook → Story → Analysis → CTA",
+          elements: ["Strong opening", "Story progression", "Deep analysis", "Subscription CTA"]
+        },
+        reaction: {
+          structure: "Reaction → Analysis → Opinion → CTA",
+          elements: ["Genuine reaction", "Fact analysis", "Personal opinion", "Engagement CTA"]
+        }
+      }
+    };
+
+    res.json({
+      success: true,
+      templates
+    });
+
+  } catch (error) {
+    console.error("Get viral content templates error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to get templates"
+    });
+  }
+});
 // ===========================================
 // HINDI CRICKET NEWS APIs
 // ===========================================
