@@ -91,6 +91,322 @@ const {
 const newsScheduler = new NewsScheduler();
 newsScheduler.startScheduler(1); // Fetch every 30 minutes
 
+// Add these imports at the top
+const HindiNewsScheduler = require('./hindiNewsScheduler');
+const { fetchHindiCricketNews, filterHindiArticles, getHindiArticleSummary, validateHindiArticleForProcessing } = require('./hindiNewsFetcher');
+const { processHindiManualInput } = require('./hindiManualInputProcessor');
+
+// Initialize Hindi news scheduler
+const hindiNewsScheduler = new HindiNewsScheduler();
+hindiNewsScheduler.startScheduler(1); // Fetch every 30 minutes
+
+// ===========================================
+// HINDI CRICKET NEWS APIs
+// ===========================================
+
+// Get stored Hindi news
+app.get('/api/hindi/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await hindiNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi news
+app.get('/api/hindi/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi article
+app.post('/api/hindi/process-article/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM hindi_cricket_news WHERE id = ? AND processed = false',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Hindi article not found or already processed' });
+    }
+
+    const article = rows[0];
+    
+    // Process with Hindi logic
+    const result = await processHindiManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Mark as processed
+      await pollDBPool.query(
+        'UPDATE hindi_cricket_news SET processed = true, processed_at = NOW(), ready_article = ? WHERE id = ?',
+        [result.readyToPublishArticle, id]
+      );
+      res.json({ success: true, readyToPublishArticle: result.readyToPublishArticle });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error('Error processing Hindi article:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manual fetch Hindi news
+app.post('/api/hindi/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi scheduler status
+app.get('/api/hindi/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: hindiNewsScheduler.isRunning,
+      message: 'Hindi scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Fetch Hindi cricket news from GNews API
+app.get("/api/hindi/fetch-cricket-news", async (req, res) => {
+  try {
+    const { 
+      query = "cricket", 
+      lang = "hi", 
+      country = "in", 
+      max = 25,
+      filters = "{}"
+    } = req.query;
+
+    console.log(`📰 Fetching Hindi cricket news: ${query}`);
+
+    const newsResult = await fetchHindiCricketNews({
+      query,
+      lang,
+      country,
+      max: parseInt(max)
+    });
+
+    if (!newsResult.success) {
+      return res.status(500).json({
+        success: false,
+        error: newsResult.error
+      });
+    }
+
+    // Apply filters if provided
+    let filteredArticles = newsResult.articles;
+    try {
+      const filterOptions = JSON.parse(filters);
+      filteredArticles = filterHindiArticles(newsResult.articles, filterOptions);
+    } catch (e) {
+      // Use default filters if parsing fails
+      filteredArticles = filterHindiArticles(newsResult.articles);
+    }
+
+    // Add summary and validation to each article
+    const processedArticles = filteredArticles.map(article => ({
+      ...article,
+      summary: getHindiArticleSummary(article),
+      validation: validateHindiArticleForProcessing(article),
+      wordCount: article.content ? article.content.split(' ').length : 0
+    }));
+
+    res.json({
+      success: true,
+      totalArticles: newsResult.totalArticles,
+      filteredArticles: processedArticles.length,
+      articles: processedArticles,
+      fetchedAt: newsResult.fetchedAt
+    });
+
+  } catch (error) {
+    console.error("Fetch Hindi cricket news error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to fetch Hindi cricket news"
+    });
+  }
+});
+
+// Process selected Hindi article from GNews
+app.post("/api/hindi/process-selected-article", async (req, res) => {
+  try {
+    const { article, options = {} } = req.body;
+
+    if (!article || !article.title || !article.description || !article.content) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid Hindi article data"
+      });
+    }
+
+    const validation = validateHindiArticleForProcessing(article);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: "Hindi article validation failed",
+        details: validation.errors
+      });
+    }
+
+    console.log(`🚀 Processing selected Hindi article: ${article.title}`);
+
+    // Use Hindi processing function
+    const result = await processHindiManualInput(
+      { 
+        title: article.title, 
+        description: article.description, 
+        content: article.content 
+      },
+      {
+        language: options.language || "hi",
+        includePrePublishingChecks: options.includePrePublishingChecks !== false,
+        includeHumanLikeRewriting: options.includeHumanLikeRewriting !== false,
+        includeGoogleOptimization: options.includeGoogleOptimization !== false,
+        avoidAIDetection: options.avoidAIDetection !== false
+      }
+    );
+
+    res.json({
+      success: true,
+      readyToPublishArticle: result.readyToPublishArticle,
+      originalArticle: {
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        source: article.source?.name,
+        publishedAt: article.publishedAt
+      },
+      processingTime: result.processingTime
+    });
+
+  } catch (error) {
+    console.error("Process selected Hindi article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process selected Hindi article"
+    });
+  }
+});
+
+// Quick endpoint to get ready-to-publish Hindi article directly
+app.post("/api/hindi/get-ready-article", async (req, res) => {
+  try {
+    const { title, description, content, options = {} } = req.body;
+
+    if (!title || !description || !content) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: title, description, content"
+      });
+    }
+
+    console.log(`🚀 Processing Hindi get-ready-article: ${title}`);
+
+    // Use Hindi processing function
+    const result = await processHindiManualInput(
+      { title, description, content },
+      {
+        language: "hi",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        readyToPublishArticle: result.readyToPublishArticle,
+        processingTime: result.processingTime
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Get ready Hindi article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process Hindi article"
+    });
+  }
+});
+
 // DEBUG: test GNews from server (GET only; HEAD 404 deta hai)
 app.get('/api/debug-gnews', async (req, res) => {
   try {
