@@ -171,7 +171,6 @@
 //   createHindiReadyToPublishArticle
 // };
 
-
 const axios = require('axios');
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -271,24 +270,47 @@ async function processHindiManualInput(input, options = {}) {
  * Rewrite Hindi content in human-like style
  */
 async function rewriteHindiInHumanStyle(content, title) {
-  const prompt = `Act like a professional Hindi cricket journalist working for a top sports publication. Your task is to rewrite the following Hindi cricket news article in a natural, engaging, and factual way – as if written by a passionate human journalist, not AI. Follow these important instructions:
+  const prompt = `Rewrite the following cricket news article in Hindi with these exact rules:
 
-1. ✅ Do NOT change or add any statistics, scores, dates, or names unless it is clearly present in the original content.
-2. ✅ Preserve all factual accuracy – no hallucination, no assumption, no guessing.
-3. ✅ Use everyday, simple Hindi that people actually speak in India — not literary or overly dramatic Hindi.
-4. ✅ Avoid robotic or repetitive expressions like "वाह", "मैं यकीन नहीं कर सकता" unless it naturally fits.
-5. ✅ Write in flowing, emotional paragraphs like a cricket fan telling a story to other fans.
-6. ✅ Use light, conversational tone — e.g., "देखिए क्या हुआ", "अब सुनिए", "तो हुआ ये".
-7. ✅ Mix short and long sentences to make the article feel real.
-8. ✅ Do NOT use AI phrases like "This article talks about" or "Here is a summary".
-9. ✅ Do NOT use headings like "The Incident", "The Reaction" — just write the article directly.
-10. ✅ Use actual facts and numbers from the input text. If anything is missing, skip it. Do not fill gaps.
-11. ✅ Use attributed quotes if available in input — like "रोहित शर्मा ने कहा, 'हमने शानदार खेल दिखाया।'"
+Tone & Style:
+- Write like a seasoned cricket journalist.
+- Tone should be natural, simple, and conversational, similar to a Hindi newspaper or sports magazine.
+- Avoid heavy or uncommon Hindi words; keep it reader-friendly.
 
-Title: ${title}  
-Content: ${content}  
+Structure:
+- Start with a clear headline (no clickbait, but sharp and engaging).
+- First paragraph should give a short summary of the incident in 3–4 lines.
+- Use sub-headings (###) for sections like घटना क्या थी, टीम/खिलाड़ी की प्रतिक्रिया, अधिकारियों का रुख, पिछला विवाद आदि।
+- Keep paragraphs short (2–3 lines max).
 
-Now rewrite the article in natural Hindi. Write like a real Hindi journalist who loves cricket and is reporting to fellow fans.`;
+Rules for Uniqueness:
+- Keep the essence and facts intact (players' names, scores, match details, quotes must stay accurate).
+- Change sentence structure, choice of words, and flow so that it does not look copied or AI-written.
+- Add human touches like reactions, comparisons, or observations (e.g., "यह फैसला पाकिस्तानी खेमे को रास नहीं आया", "मैदान पर माहौल कुछ देर के लिए तनावपूर्ण हो गया").
+
+Language Guidance:
+- Use short, crisp Hindi sentences.
+- Avoid literal English translations; use natural Hindi equivalents.
+- Insert journalistic phrases:
+  "सूत्रों के मुताबिक…"
+  "मैच के दौरान माहौल…"
+  "इस फैसले पर कई सवाल उठे…"
+
+AI Detection Safety:
+- Vary sentence length (mix short & medium sentences).
+- Avoid repetitive patterns like "इस बीच", "इसके अलावा" too many times.
+- Add small natural connectors like "दरअसल", "खास बात यह रही", "यानी साफ है कि…"
+
+Output Requirements:
+- Must read like a human journalist's article.
+- Must pass AI content detectors (under 10% AI).
+- Should be unique, plagiarism-free.
+- Keep word count between 350–500 words for news reports.
+
+Title: ${title}
+Content: ${content}
+
+Now rewrite this cricket news article following all the above rules exactly.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
@@ -306,24 +328,47 @@ Now rewrite the article in natural Hindi. Write like a real Hindi journalist who
  * Create final ready-to-publish Hindi article
  */
 async function createHindiReadyToPublishArticle(input, options) {
-  const prompt = `Act like a professional Hindi cricket journalist working for a top sports publication. Your task is to rewrite the following Hindi cricket news article in a natural, engaging, and factual way – as if written by a passionate human journalist, not AI. Follow these important instructions:
+  const prompt = `Rewrite the following cricket news article in Hindi with these exact rules:
 
-1. ✅ Do NOT change or add any statistics, scores, dates, or names unless it is clearly present in the original content.
-2. ✅ Preserve all factual accuracy – no hallucination, no assumption, no guessing.
-3. ✅ Use everyday, simple Hindi that people actually speak in India — not literary or overly dramatic Hindi.
-4. ✅ Avoid robotic or repetitive expressions like "वाह", "मैं यकीन नहीं कर सकता" unless it naturally fits.
-5. ✅ Write in flowing, emotional paragraphs like a cricket fan telling a story to other fans.
-6. ✅ Use light, conversational tone — e.g., "देखिए क्या हुआ", "अब सुनिए", "तो हुआ ये".
-7. ✅ Mix short and long sentences to make the article feel real.
-8. ✅ Do NOT use AI phrases like "This article talks about" or "Here is a summary".
-9. ✅ Do NOT use headings like "The Incident", "The Reaction" — just write the article directly.
-10. ✅ Use actual facts and numbers from the input text. If anything is missing, skip it. Do not fill gaps.
-11. ✅ Use attributed quotes if available in input — like "रोहित शर्मा ने कहा, 'हमने शानदार खेल दिखाया।'"
+Tone & Style:
+- Write like a seasoned cricket journalist.
+- Tone should be natural, simple, and conversational, similar to a Hindi newspaper or sports magazine.
+- Avoid heavy or uncommon Hindi words; keep it reader-friendly.
 
-Title: ${input.title}  
-Content: ${input.content}  
+Structure:
+- Start with a clear headline (no clickbait, but sharp and engaging).
+- First paragraph should give a short summary of the incident in 3–4 lines.
+- Use sub-headings (###) for sections like घटना क्या थी, टीम/खिलाड़ी की प्रतिक्रिया, अधिकारियों का रुख, पिछला विवाद आदि।
+- Keep paragraphs short (2–3 lines max).
 
-Now rewrite the article in natural Hindi. Write like a real Hindi journalist who loves cricket and is reporting to fellow fans.`;
+Rules for Uniqueness:
+- Keep the essence and facts intact (players' names, scores, match details, quotes must stay accurate).
+- Change sentence structure, choice of words, and flow so that it does not look copied or AI-written.
+- Add human touches like reactions, comparisons, or observations (e.g., "यह फैसला पाकिस्तानी खेमे को रास नहीं आया", "मैदान पर माहौल कुछ देर के लिए तनावपूर्ण हो गया").
+
+Language Guidance:
+- Use short, crisp Hindi sentences.
+- Avoid literal English translations; use natural Hindi equivalents.
+- Insert journalistic phrases:
+  "सूत्रों के मुताबिक…"
+  "मैच के दौरान माहौल…"
+  "इस फैसले पर कई सवाल उठे…"
+
+AI Detection Safety:
+- Vary sentence length (mix short & medium sentences).
+- Avoid repetitive patterns like "इस बीच", "इसके अलावा" too many times.
+- Add small natural connectors like "दरअसल", "खास बात यह रही", "यानी साफ है कि…"
+
+Output Requirements:
+- Must read like a human journalist's article.
+- Must pass AI content detectors (under 10% AI).
+- Should be unique, plagiarism-free.
+- Keep word count between 350–500 words for news reports.
+
+Title: ${input.title}
+Content: ${input.content}
+
+Now rewrite this cricket news article following all the above rules exactly.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
