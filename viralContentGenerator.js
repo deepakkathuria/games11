@@ -698,8 +698,6 @@
 //   generateTwitterContent,
 //   generateYouTubeContent
 // };
-
-
 const axios = require('axios');
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -933,7 +931,7 @@ Call-to-Action: [Specific CTA for this post]
 Hashtags: [Relevant hashtags - NO STAR SYMBOLS]
 Best time to post: [Specific timing]
 
-IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags. NO extra formatting like asterisks or dashes.`;
+IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags. NO extra formatting like asterisks or dashes. NO asterisks anywhere in the output.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
