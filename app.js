@@ -147,6 +147,7 @@ app.get("/api/viral/stored-news", async (req, res) => {
 });
 
 // Generate viral content from stored article
+// Updated endpoint in src/server.js
 app.post("/api/viral/generate-from-stored", async (req, res) => {
   try {
     const { articleId } = req.body;
@@ -192,12 +193,28 @@ app.post("/api/viral/generate-from-stored", async (req, res) => {
     const result = await generateViralContent(gnewsArticle);
 
     if (result.success) {
+      // ✅ STORE IN DATABASE - NEW ADDITION!
+      const [insertResult] = await pollDBPool.query(
+        `INSERT INTO viral_content 
+         (article_id, analysis, content, processing_time, generated_at) 
+         VALUES (?, ?, ?, ?, NOW())`,
+        [
+          articleId,
+          JSON.stringify(result.analysis),
+          JSON.stringify(result.content),
+          result.processingTime
+        ]
+      );
+
+      console.log(`💾 Viral content stored with ID: ${insertResult.insertId}`);
+
       res.json({
         success: true,
         analysis: result.analysis,
         content: result.content,
         processingTime: result.processingTime,
-        originalArticle: gnewsArticle
+        originalArticle: gnewsArticle,
+        viralContentId: insertResult.insertId // Return the stored ID
       });
     } else {
       res.status(500).json({
@@ -212,6 +229,85 @@ app.post("/api/viral/generate-from-stored", async (req, res) => {
       success: false,
       error: error.message || "Failed to generate viral content"
     });
+  }
+});
+
+// Get stored viral content history
+app.get("/api/viral/history", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM viral_content'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at
+       FROM viral_content vc
+       JOIN cricket_news cn ON vc.article_id = cn.id
+       ORDER BY vc.generated_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(row => ({
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    }));
+
+    res.json({
+      success: true,
+      viralContent: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting viral content history:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get specific viral content by ID
+app.get("/api/viral/content/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at, cn.description
+       FROM viral_content vc
+       JOIN cricket_news cn ON vc.article_id = cn.id
+       WHERE vc.id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Viral content not found"
+      });
+    }
+
+    const row = rows[0];
+    const result = {
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    };
+
+    res.json({
+      success: true,
+      viralContent: result
+    });
+  } catch (error) {
+    console.error('Error getting viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

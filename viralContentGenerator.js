@@ -1,710 +1,10 @@
-// // const axios = require('axios');
-
-// // const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-// // const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
-
-// // /**
-// //  * Generate content using DeepSeek API
-// //  */
-// // async function generateWithDeepSeek(prompt, options = {}) {
-// //   try {
-// //     const response = await axios.post(DEEPSEEK_BASE_URL, {
-// //       model: "deepseek-chat",
-// //       messages: [
-// //         {
-// //           role: "user",
-// //           content: prompt
-// //         }
-// //       ],
-// //       temperature: options.temperature || 0.7,
-// //       max_tokens: options.max_tokens || 2000
-// //     }, {
-// //       headers: {
-// //         'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-// //         'Content-Type': 'application/json'
-// //       },
-// //       timeout: 60000
-// //     });
-
-// //     return response.data.choices[0].message.content;
-// //   } catch (error) {
-// //     console.error('DeepSeek API error:', error);
-// //     throw error;
-// //   }
-// // }
-
-// // /**
-// //  * Analyze news article for viral potential
-// //  */
-// // async function analyzeNewsForViralContent(newsArticle) {
-// //   const prompt = `Analyze this cricket news article and extract key elements for viral social media content:
-
-// // Title: ${newsArticle.title}
-// // Description: ${newsArticle.description}
-// // Content: ${newsArticle.content}
-
-// // Extract and return in JSON format:
-// // {
-// //   "keyFacts": ["fact1", "fact2", "fact3"],
-// //   "emotionalTriggers": ["pride", "controversy", "inspiration", "curiosity"],
-// //   "viralAngles": ["angle1", "angle2", "angle3"],
-// //   "targetAudience": ["cricket fans", "women's rights", "health awareness"],
-// //   "controversyPotential": "high/medium/low",
-// //   "inspirationLevel": "high/medium/low",
-// //   "curiosityHooks": ["hook1", "hook2", "hook3"],
-// //   "statistics": ["stat1", "stat2", "stat3"],
-// //   "quotes": ["quote1", "quote2"],
-// //   "visualElements": ["element1", "element2", "element3"]
-// // }
-
-// // Focus on elements that can trigger strong emotional reactions, debates, shares, and engagement.`;
-
-// //   try {
-// //     const response = await generateWithDeepSeek(prompt, {
-// //       temperature: 0.3,
-// //       max_tokens: 1500
-// //     });
-    
-// //     // Try to parse JSON response
-// //     try {
-// //       return JSON.parse(response);
-// //     } catch (e) {
-// //       // If not valid JSON, return structured data
-// //       return {
-// //         keyFacts: [newsArticle.title],
-// //         emotionalTriggers: ["pride", "inspiration"],
-// //         viralAngles: ["historic moment", "women's cricket"],
-// //         targetAudience: ["cricket fans", "women's rights"],
-// //         controversyPotential: "medium",
-// //         inspirationLevel: "high",
-// //         curiosityHooks: ["Why pink jerseys?", "What's the significance?"],
-// //         statistics: ["First time in history"],
-// //         quotes: [newsArticle.description],
-// //         visualElements: ["pink jerseys", "cricket field", "team celebration"]
-// //       };
-// //     }
-// //   } catch (error) {
-// //     console.error('News analysis error:', error);
-// //     return {
-// //       keyFacts: [newsArticle.title],
-// //       emotionalTriggers: ["pride", "inspiration"],
-// //       viralAngles: ["historic moment"],
-// //       targetAudience: ["cricket fans"],
-// //       controversyPotential: "medium",
-// //       inspirationLevel: "high",
-// //       curiosityHooks: ["Why this change?"],
-// //       statistics: ["Historic moment"],
-// //       quotes: [newsArticle.description],
-// //       visualElements: ["cricket", "team"]
-// //     };
-// //   }
-// // }
-
-// // /**
-// //  * Generate Instagram viral content ideas
-// //  */
-// // async function generateInstagramContent(analysis, newsArticle) {
-// //   const prompt = `Create 3 viral Instagram content ideas based on this cricket news analysis:
-
-// // News: ${newsArticle.title}
-// // Analysis: ${JSON.stringify(analysis)}
-
-// // Create 3 different Instagram content ideas:
-
-// // 1. REEL IDEA:
-// // - Hook (first 3 seconds)
-// // - Storyline/Structure
-// // - Call-to-Action
-// // - Hashtags (10-15 relevant)
-// // - Best time to post
-// // - Visual elements needed
-
-// // 2. CAROUSEL IDEA:
-// // - Slide 1 title
-// // - Slide 2-5 content
-// // - Caption structure
-// // - Hashtags
-// // - Best time to post
-
-// // 3. STORY IDEA:
-// // - Story slides structure
-// // - Polls/Quizzes to include
-// // - Swipe-up action
-// // - Hashtags
-// // - Best time to post
-
-// // Format each idea clearly with sections. Make them emotionally engaging and designed to go viral.`;
-
-// //   try {
-// //     const response = await generateWithDeepSeek(prompt, {
-// //       temperature: 0.8,
-// //       max_tokens: 2000
-// //     });
-// //     return response;
-// //   } catch (error) {
-// //     console.error('Instagram content generation error:', error);
-// //     return "Error generating Instagram content";
-// //   }
-// // }
-
-// // /**
-// //  * Generate Facebook viral content ideas
-// //  */
-// // async function generateFacebookContent(analysis, newsArticle) {
-// //   const prompt = `Create 3 viral Facebook content ideas based on this cricket news analysis:
-
-// // News: ${newsArticle.title}
-// // Analysis: ${JSON.stringify(analysis)}
-
-// // Create 3 different Facebook content ideas:
-
-// // 1. VIDEO POST:
-// // - Hook/Narrative
-// // - Visual elements
-// // - Caption structure
-// // - Call-to-Action
-// // - Best time to post
-// // - Engagement tactics
-
-// // 2. TEXT + IMAGE DEBATE POST:
-// // - Question-style hook
-// // - Emotional angle
-// // - Image suggestions
-// // - Caption
-// // - Call-to-Action
-// // - Best time to post
-
-// // 3. AWARENESS CAMPAIGN POST:
-// // - Story structure
-// // - Images needed
-// // - Emotional story caption
-// // - Call-to-Action
-// // - Best time to post
-// // - Sharing incentives
-
-// // Format each idea clearly. Make them designed to spark discussions and shares.`;
-
-// //   try {
-// //     const response = await generateWithDeepSeek(prompt, {
-// //       temperature: 0.8,
-// //       max_tokens: 2000
-// //     });
-// //     return response;
-// //   } catch (error) {
-// //     console.error('Facebook content generation error:', error);
-// //     return "Error generating Facebook content";
-// //   }
-// // }
-
-// // /**
-// //  * Generate X/Twitter viral content ideas
-// //  */
-// // async function generateTwitterContent(analysis, newsArticle) {
-// //   const prompt = `Create 3 viral X/Twitter content ideas based on this cricket news analysis:
-
-// // News: ${newsArticle.title}
-// // Analysis: ${JSON.stringify(analysis)}
-
-// // Create 3 different X/Twitter content ideas:
-
-// // 1. THREAD (5 tweets):
-// // - Tweet 1: Hook
-// // - Tweet 2-4: Facts/Story
-// // - Tweet 5: Call-to-Action
-// // - Hashtags for each tweet
-// // - Best time to post
-
-// // 2. POLL/OPINION POST:
-// // - Opinion-driven question
-// // - Poll options
-// // - Follow-up tweet
-// // - Hashtags
-// // - Best time to post
-
-// // 3. VISUAL + OPINION:
-// // - Bold take/opinion
-// // - Image suggestions
-// // - Caption
-// // - Call-to-Action
-// // - Hashtags
-// // - Best time to post
-
-// // Format each idea clearly. Make them controversial and engaging.`;
-
-// //   try {
-// //     const response = await generateWithDeepSeek(prompt, {
-// //       temperature: 0.8,
-// //       max_tokens: 2000
-// //     });
-// //     return response;
-// //   } catch (error) {
-// //     console.error('Twitter content generation error:', error);
-// //     return "Error generating Twitter content";
-// //   }
-// // }
-
-// // /**
-// //  * Generate YouTube viral content ideas
-// //  */
-// // async function generateYouTubeContent(analysis, newsArticle) {
-// //   const prompt = `Create 3 viral YouTube content ideas based on this cricket news analysis:
-
-// // News: ${newsArticle.title}
-// // Analysis: ${JSON.stringify(analysis)}
-
-// // Create 3 different YouTube content ideas:
-
-// // 1. SHORTS IDEA:
-// // - Hook (first 3 seconds)
-// // - Structure/Flow
-// // - Visual elements
-// // - Call-to-Action
-// // - Thumbnail suggestions
-// // - Best time to post
-
-// // 2. LONG-FORM IDEA:
-// // - Title
-// // - Script structure
-// // - Retention tactics
-// // - Visual elements
-// // - Call-to-Action
-// // - Thumbnail strategy
-// // - Best time to post
-
-// // 3. REACTION/OPINION IDEA:
-// // - Debate/Story format
-// // - Engagement tactics
-// // - Visual elements
-// // - Call-to-Action
-// // - Thumbnail strategy
-// // - Best time to post
-
-// // Format each idea clearly. Make them designed for high retention and engagement.`;
-
-// //   try {
-// //     const response = await generateWithDeepSeek(prompt, {
-// //       temperature: 0.8,
-// //       max_tokens: 2000
-// //     });
-// //     return response;
-// //   } catch (error) {
-// //     console.error('YouTube content generation error:', error);
-// //     return "Error generating YouTube content";
-// //   }
-// // }
-
-// // /**
-// //  * Main function to generate all viral content
-// //  */
-// // async function generateViralContent(newsArticle) {
-// //   const startTime = Date.now();
-  
-// //   try {
-// //     console.log(`🚀 Generating viral content for: ${newsArticle.title}`);
-    
-// //     // Step 1: Analyze news for viral potential
-// //     const analysis = await analyzeNewsForViralContent(newsArticle);
-// //     console.log('✅ News analysis completed');
-    
-// //     // Step 2: Generate content for all platforms
-// //     const [instagramContent, facebookContent, twitterContent, youtubeContent] = await Promise.all([
-// //       generateInstagramContent(analysis, newsArticle),
-// //       generateFacebookContent(analysis, newsArticle),
-// //       generateTwitterContent(analysis, newsArticle),
-// //       generateYouTubeContent(analysis, newsArticle)
-// //     ]);
-    
-// //     console.log('✅ All platform content generated');
-    
-// //     return {
-// //       success: true,
-// //       analysis,
-// //       content: {
-// //         instagram: instagramContent,
-// //         facebook: facebookContent,
-// //         twitter: twitterContent,
-// //         youtube: youtubeContent
-// //       },
-// //       processingTime: Date.now() - startTime
-// //     };
-    
-// //   } catch (error) {
-// //     console.error('Viral content generation error:', error);
-// //     return {
-// //       success: false,
-// //       error: error.message,
-// //       processingTime: Date.now() - startTime
-// //     };
-// //   }
-// // }
-
-// // module.exports = {
-// //   generateViralContent,
-// //   analyzeNewsForViralContent,
-// //   generateInstagramContent,
-// //   generateFacebookContent,
-// //   generateTwitterContent,
-// //   generateYouTubeContent
-// // };
-
-
-// const axios = require('axios');
-
-// const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-// const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
-
-// /**
-//  * Generate content using DeepSeek API
-//  */
-// async function generateWithDeepSeek(prompt, options = {}) {
-//   try {
-//     const response = await axios.post(DEEPSEEK_BASE_URL, {
-//       model: "deepseek-chat",
-//       messages: [
-//         {
-//           role: "user",
-//           content: prompt
-//         }
-//       ],
-//       temperature: options.temperature || 0.7,
-//       max_tokens: options.max_tokens || 2000
-//     }, {
-//       headers: {
-//         'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-//         'Content-Type': 'application/json'
-//       },
-//       timeout: 60000
-//     });
-
-//     return response.data.choices[0].message.content;
-//   } catch (error) {
-//     console.error('DeepSeek API error:', error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Analyze news article for viral potential
-//  */
-// async function analyzeNewsForViralContent(newsArticle) {
-//   const prompt = `Analyze this cricket news article and extract key elements for viral social media content:
-
-// Title: ${newsArticle.title}
-// Description: ${newsArticle.description}
-// Content: ${newsArticle.content}
-
-// Extract and return in JSON format:
-// {
-//   "keyFacts": ["fact1", "fact2", "fact3"],
-//   "emotionalTriggers": ["pride", "controversy", "inspiration", "curiosity"],
-//   "viralAngles": ["angle1", "angle2", "angle3"],
-//   "targetAudience": ["cricket fans", "women's rights", "health awareness"],
-//   "controversyPotential": "high/medium/low",
-//   "inspirationLevel": "high/medium/low",
-//   "curiosityHooks": ["hook1", "hook2", "hook3"],
-//   "statistics": ["stat1", "stat2", "stat3"],
-//   "quotes": ["quote1", "quote2"],
-//   "visualElements": ["element1", "element2", "element3"]
-// }
-
-// Focus on elements that can trigger strong emotional reactions, debates, shares, and engagement.`;
-
-//   try {
-//     const response = await generateWithDeepSeek(prompt, {
-//       temperature: 0.3,
-//       max_tokens: 1500
-//     });
-    
-//     // Try to parse JSON response
-//     try {
-//       return JSON.parse(response);
-//     } catch (e) {
-//       // If not valid JSON, return structured data
-//       return {
-//         keyFacts: [newsArticle.title],
-//         emotionalTriggers: ["pride", "inspiration"],
-//         viralAngles: ["historic moment", "women's cricket"],
-//         targetAudience: ["cricket fans", "women's rights"],
-//         controversyPotential: "medium",
-//         inspirationLevel: "high",
-//         curiosityHooks: ["Why pink jerseys?", "What's the significance?"],
-//         statistics: ["First time in history"],
-//         quotes: [newsArticle.description],
-//         visualElements: ["pink jerseys", "cricket field", "team celebration"]
-//       };
-//     }
-//   } catch (error) {
-//     console.error('News analysis error:', error);
-//     return {
-//       keyFacts: [newsArticle.title],
-//       emotionalTriggers: ["pride", "inspiration"],
-//       viralAngles: ["historic moment"],
-//       targetAudience: ["cricket fans"],
-//       controversyPotential: "medium",
-//       inspirationLevel: "high",
-//       curiosityHooks: ["Why this change?"],
-//       statistics: ["Historic moment"],
-//       quotes: [newsArticle.description],
-//       visualElements: ["cricket", "team"]
-//     };
-//   }
-// }
-
-// /**
-//  * Generate Instagram viral content ideas
-//  */
-// async function generateInstagramContent(analysis, newsArticle) {
-//   const prompt = `Create 3 DIFFERENT viral Instagram content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
-
-// News: ${newsArticle.title}
-// Analysis: ${JSON.stringify(analysis)}
-
-// Create 3 SEPARATE Instagram content ideas:
-
-// **POST 1 - REEL IDEA:**
-// - Hook (first 3 seconds): [Unique hook for this post]
-// - Storyline/Structure: [Specific structure for this post]
-// - Call-to-Action: [Specific CTA for this post]
-// - Hashtags: [10-15 relevant hashtags - NO STAR SYMBOLS]
-// - Best time to post: [Specific timing]
-// - Visual elements needed: [Specific visuals for this post]
-
-// **POST 2 - CAROUSEL IDEA:**
-// - Slide 1 title: [Unique title for this post]
-// - Slide 2-5 content: [Specific content for each slide]
-// - Caption structure: [Specific caption approach]
-// - Hashtags: [10-15 relevant hashtags - NO STAR SYMBOLS]
-// - Best time to post: [Specific timing]
-// - Visual elements needed: [Specific visuals for this post]
-
-// **POST 3 - STORY IDEA:**
-// - Story slides structure: [Specific structure for this post]
-// - Polls/Quizzes to include: [Specific interactive elements]
-// - Swipe-up action: [Specific action for this post]
-// - Hashtags: [10-15 relevant hashtags - NO STAR SYMBOLS]
-// - Best time to post: [Specific timing]
-// - Visual elements needed: [Specific visuals for this post]
-
-// IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags.`;
-
-//   try {
-//     const response = await generateWithDeepSeek(prompt, {
-//       temperature: 0.8,
-//       max_tokens: 2000
-//     });
-//     return response;
-//   } catch (error) {
-//     console.error('Instagram content generation error:', error);
-//     return "Error generating Instagram content";
-//   }
-// }
-
-// /**
-//  * Generate Facebook viral content ideas
-//  */
-// async function generateFacebookContent(analysis, newsArticle) {
-//   const prompt = `Create 3 DIFFERENT viral Facebook content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
-
-// News: ${newsArticle.title}
-// Analysis: ${JSON.stringify(analysis)}
-
-// Create 3 SEPARATE Facebook content ideas:
-
-// **POST 1 - VIDEO POST:**
-// - Hook/Narrative: [Unique hook for this post]
-// - Visual elements: [Specific visuals for this post]
-// - Caption structure: [Specific caption approach]
-// - Call-to-Action: [Specific CTA for this post]
-// - Best time to post: [Specific timing]
-// - Engagement tactics: [Specific tactics for this post]
-
-// **POST 2 - TEXT + IMAGE DEBATE POST:**
-// - Question-style hook: [Unique question for this post]
-// - Emotional angle: [Specific emotional approach]
-// - Image suggestions: [Specific images for this post]
-// - Caption: [Specific caption content]
-// - Call-to-Action: [Specific CTA for this post]
-// - Best time to post: [Specific timing]
-
-// **POST 3 - AWARENESS CAMPAIGN POST:**
-// - Story structure: [Specific story approach for this post]
-// - Images needed: [Specific images for this post]
-// - Emotional story caption: [Specific emotional content]
-// - Call-to-Action: [Specific CTA for this post]
-// - Best time to post: [Specific timing]
-// - Sharing incentives: [Specific incentives for this post]
-
-// IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags.`;
-
-//   try {
-//     const response = await generateWithDeepSeek(prompt, {
-//       temperature: 0.8,
-//       max_tokens: 2000
-//     });
-//     return response;
-//   } catch (error) {
-//     console.error('Facebook content generation error:', error);
-//     return "Error generating Facebook content";
-//   }
-// }
-
-// /**
-//  * Generate X/Twitter viral content ideas
-//  */
-// async function generateTwitterContent(analysis, newsArticle) {
-//   const prompt = `Create 3 DIFFERENT viral X/Twitter content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
-
-// News: ${newsArticle.title}
-// Analysis: ${JSON.stringify(analysis)}
-
-// Create 3 SEPARATE X/Twitter content ideas:
-
-// **POST 1 - THREAD (5 tweets):**
-// - Tweet 1: Hook: [Unique hook for this post]
-// - Tweet 2-4: Facts/Story: [Specific facts for this post]
-// - Tweet 5: Call-to-Action: [Specific CTA for this post]
-// - Hashtags: [Relevant hashtags for each tweet - NO STAR SYMBOLS]
-// - Best time to post: [Specific timing]
-
-// **POST 2 - POLL/OPINION POST:**
-// - Opinion-driven question: [Unique question for this post]
-// - Poll options: [Specific poll options for this post]
-// - Follow-up tweet: [Specific follow-up content]
-// - Hashtags: [Relevant hashtags - NO STAR SYMBOLS]
-// - Best time to post: [Specific timing]
-
-// **POST 3 - VISUAL + OPINION:**
-// - Bold take/opinion: [Unique opinion for this post]
-// - Image suggestions: [Specific images for this post]
-// - Caption: [Specific caption content]
-// - Call-to-Action: [Specific CTA for this post]
-// - Hashtags: [Relevant hashtags - NO STAR SYMBOLS]
-// - Best time to post: [Specific timing]
-
-// IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags.`;
-
-//   try {
-//     const response = await generateWithDeepSeek(prompt, {
-//       temperature: 0.8,
-//       max_tokens: 2000
-//     });
-//     return response;
-//   } catch (error) {
-//     console.error('Twitter content generation error:', error);
-//     return "Error generating Twitter content";
-//   }
-// }
-
-// /**
-//  * Generate YouTube viral content ideas
-//  */
-// async function generateYouTubeContent(analysis, newsArticle) {
-//   const prompt = `Create 3 DIFFERENT viral YouTube content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
-
-// News: ${newsArticle.title}
-// Analysis: ${JSON.stringify(analysis)}
-
-// Create 3 SEPARATE YouTube content ideas:
-
-// **POST 1 - SHORTS IDEA:**
-// - Hook (first 3 seconds): [Unique hook for this post]
-// - Structure/Flow: [Specific structure for this post]
-// - Visual elements: [Specific visuals for this post]
-// - Call-to-Action: [Specific CTA for this post]
-// - Thumbnail suggestions: [Specific thumbnails for this post]
-// - Best time to post: [Specific timing]
-
-// **POST 2 - LONG-FORM IDEA:**
-// - Title: [Unique title for this post]
-// - Script structure: [Specific script approach for this post]
-// - Retention tactics: [Specific tactics for this post]
-// - Visual elements: [Specific visuals for this post]
-// - Call-to-Action: [Specific CTA for this post]
-// - Thumbnail strategy: [Specific strategy for this post]
-// - Best time to post: [Specific timing]
-
-// **POST 3 - REACTION/OPINION IDEA:**
-// - Debate/Story format: [Specific format for this post]
-// - Engagement tactics: [Specific tactics for this post]
-// - Visual elements: [Specific visuals for this post]
-// - Call-to-Action: [Specific CTA for this post]
-// - Thumbnail strategy: [Specific strategy for this post]
-// - Best time to post: [Specific timing]
-
-// IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags.`;
-
-//   try {
-//     const response = await generateWithDeepSeek(prompt, {
-//       temperature: 0.8,
-//       max_tokens: 2000
-//     });
-//     return response;
-//   } catch (error) {
-//     console.error('YouTube content generation error:', error);
-//     return "Error generating YouTube content";
-//   }
-// }
-
-// /**
-//  * Main function to generate all viral content
-//  */
-// async function generateViralContent(newsArticle) {
-//   const startTime = Date.now();
-  
-//   try {
-//     console.log(`🚀 Generating viral content for: ${newsArticle.title}`);
-    
-//     // Step 1: Analyze news for viral potential
-//     const analysis = await analyzeNewsForViralContent(newsArticle);
-//     console.log('✅ News analysis completed');
-    
-//     // Step 2: Generate content for all platforms
-//     const [instagramContent, facebookContent, twitterContent, youtubeContent] = await Promise.all([
-//       generateInstagramContent(analysis, newsArticle),
-//       generateFacebookContent(analysis, newsArticle),
-//       generateTwitterContent(analysis, newsArticle),
-//       generateYouTubeContent(analysis, newsArticle)
-//     ]);
-    
-//     console.log('✅ All platform content generated');
-    
-//     return {
-//       success: true,
-//       analysis,
-//       content: {
-//         instagram: instagramContent,
-//         facebook: facebookContent,
-//         twitter: twitterContent,
-//         youtube: youtubeContent
-//       },
-//       processingTime: Date.now() - startTime
-//     };
-    
-//   } catch (error) {
-//     console.error('Viral content generation error:', error);
-//     return {
-//       success: false,
-//       error: error.message,
-//       processingTime: Date.now() - startTime
-//     };
-//   }
-// }
-
-// module.exports = {
-//   generateViralContent,
-//   analyzeNewsForViralContent,
-//   generateInstagramContent,
-//   generateFacebookContent,
-//   generateTwitterContent,
-//   generateYouTubeContent
-// };
 const axios = require('axios');
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
 
 /**
- * Generate content using DeepSeek API
+ * Generate content using DeepSeek API with improved error handling
  */
 async function generateWithDeepSeek(prompt, options = {}) {
   try {
@@ -716,8 +16,8 @@ async function generateWithDeepSeek(prompt, options = {}) {
           content: prompt
         }
       ],
-      temperature: options.temperature || 0.7,
-      max_tokens: options.max_tokens || 2000
+      temperature: options.temperature || 0.8,
+      max_tokens: options.max_tokens || 2500
     }, {
       headers: {
         'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
@@ -734,286 +34,351 @@ async function generateWithDeepSeek(prompt, options = {}) {
 }
 
 /**
- * Analyze news article for viral potential
+ * Analyze news article for viral potential - IMPROVED VERSION
  */
 async function analyzeNewsForViralContent(newsArticle) {
-  const prompt = `Analyze this cricket news article and extract key elements for viral social media content:
+  const prompt = `You are a viral content strategist specializing in cricket and sports content. Analyze this news article and extract key viral elements:
 
-Title: ${newsArticle.title}
-Description: ${newsArticle.description}
-Content: ${newsArticle.content}
+TITLE: ${newsArticle.title}
+DESCRIPTION: ${newsArticle.description}
+CONTENT: ${newsArticle.content.substring(0, 2000)}...
 
-Extract and return in JSON format:
+Extract the following elements and return ONLY a valid JSON object:
+
 {
   "keyFacts": ["fact1", "fact2", "fact3"],
-  "emotionalTriggers": ["pride", "controversy", "inspiration", "curiosity"],
+  "emotionalTriggers": ["emotion1", "emotion2", "emotion3"],
   "viralAngles": ["angle1", "angle2", "angle3"],
-  "targetAudience": ["cricket fans", "women's rights", "health awareness"],
+  "targetAudience": ["audience1", "audience2", "audience3"],
   "controversyPotential": "high/medium/low",
   "inspirationLevel": "high/medium/low",
   "curiosityHooks": ["hook1", "hook2", "hook3"],
   "statistics": ["stat1", "stat2", "stat3"],
   "quotes": ["quote1", "quote2"],
-  "visualElements": ["element1", "element2", "element3"]
+  "visualElements": ["visual1", "visual2", "visual3"],
+  "debatePoints": ["debate1", "debate2", "debate3"],
+  "trendingKeywords": ["keyword1", "keyword2", "keyword3"]
 }
 
-Focus on elements that can trigger strong emotional reactions, debates, shares, and engagement.`;
+Focus on elements from THIS SPECIFIC ARTICLE that can trigger strong emotional reactions, debates, shares, and engagement. Base everything on the actual content provided.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
-      temperature: 0.3,
+      temperature: 0.4,
       max_tokens: 1500
     });
     
-    // Try to parse JSON response
+    // Clean the response and try to parse JSON
+    const cleanedResponse = response.trim().replace(/```json\n?|\n?```/g, '');
+    
     try {
-      return JSON.parse(response);
-    } catch (e) {
-      // If not valid JSON, return structured data
-      return {
-        keyFacts: [newsArticle.title],
-        emotionalTriggers: ["pride", "inspiration"],
-        viralAngles: ["historic moment", "women's cricket"],
-        targetAudience: ["cricket fans", "women's rights"],
-        controversyPotential: "medium",
-        inspirationLevel: "high",
-        curiosityHooks: ["Why pink jerseys?", "What's the significance?"],
-        statistics: ["First time in history"],
-        quotes: [newsArticle.description],
-        visualElements: ["pink jerseys", "cricket field", "team celebration"]
-      };
+      const parsed = JSON.parse(cleanedResponse);
+      console.log('✅ Successfully parsed analysis JSON');
+      return parsed;
+    } catch (parseError) {
+      console.error('JSON parse error, generating fresh analysis...');
+      // Generate a fresh analysis based on the actual article content
+      return await generateFreshAnalysis(newsArticle);
     }
   } catch (error) {
     console.error('News analysis error:', error);
+    return await generateFreshAnalysis(newsArticle);
+  }
+}
+
+/**
+ * Generate fresh analysis when JSON parsing fails
+ */
+async function generateFreshAnalysis(newsArticle) {
+  const prompt = `Generate a fresh viral content analysis for this cricket news:
+
+TITLE: ${newsArticle.title}
+DESCRIPTION: ${newsArticle.description}
+CONTENT: ${newsArticle.content.substring(0, 1000)}
+
+Extract key facts, emotional triggers, and viral angles from THIS SPECIFIC ARTICLE. Return as JSON:
+
+{
+  "keyFacts": ["fact1", "fact2", "fact3"],
+  "emotionalTriggers": ["emotion1", "emotion2"],
+  "viralAngles": ["angle1", "angle2"],
+  "targetAudience": ["cricket fans", "sports lovers"],
+  "controversyPotential": "medium",
+  "inspirationLevel": "high",
+  "curiosityHooks": ["hook1", "hook2"],
+  "statistics": ["stat1", "stat2"],
+  "quotes": ["quote1"],
+  "visualElements": ["visual1", "visual2"],
+  "debatePoints": ["debate1", "debate2"],
+  "trendingKeywords": ["keyword1", "keyword2"]
+}`;
+
+  try {
+    const response = await generateWithDeepSeek(prompt, {
+      temperature: 0.6,
+      max_tokens: 1000
+    });
+    
+    const cleanedResponse = response.trim().replace(/```json\n?|\n?```/g, '');
+    return JSON.parse(cleanedResponse);
+  } catch (error) {
+    console.error('Fresh analysis generation failed:', error);
+    // Return minimal analysis based on actual article content
     return {
       keyFacts: [newsArticle.title],
-      emotionalTriggers: ["pride", "inspiration"],
-      viralAngles: ["historic moment"],
+      emotionalTriggers: ["excitement", "pride"],
+      viralAngles: ["breaking news", "cricket update"],
       targetAudience: ["cricket fans"],
       controversyPotential: "medium",
-      inspirationLevel: "high",
-      curiosityHooks: ["Why this change?"],
-      statistics: ["Historic moment"],
+      inspirationLevel: "medium",
+      curiosityHooks: ["What's the latest?"],
+      statistics: ["Latest update"],
       quotes: [newsArticle.description],
-      visualElements: ["cricket", "team"]
+      visualElements: ["cricket", "news"],
+      debatePoints: ["Latest development"],
+      trendingKeywords: ["cricket", "news"]
     };
   }
 }
 
 /**
- * Generate Instagram viral content ideas
+ * Generate Instagram viral content ideas - IMPROVED VERSION
  */
 async function generateInstagramContent(analysis, newsArticle) {
-  const prompt = `Create 3 DIFFERENT viral Instagram content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
+  const prompt = `Create 3 UNIQUE viral Instagram content ideas based on this cricket news analysis. Make each idea COMPLETELY DIFFERENT and specific to THIS ARTICLE.
 
-News: ${newsArticle.title}
-Analysis: ${JSON.stringify(analysis)}
+NEWS: ${newsArticle.title}
+DESCRIPTION: ${newsArticle.description}
+
+ANALYSIS: ${JSON.stringify(analysis, null, 2)}
 
 Create 3 SEPARATE Instagram content ideas:
 
 POST 1 - REEL IDEA:
-Hook (first 3 seconds): [Unique hook for this post]
-Storyline/Structure: [Specific structure for this post]
-Call-to-Action: [Specific CTA for this post]
-Hashtags: [10-15 relevant hashtags - NO STAR SYMBOLS]
-Best time to post: [Specific timing]
-Visual elements needed: [Specific visuals for this post]
+Hook (first 3 seconds): [Specific hook for THIS news]
+Storyline/Structure: [Specific structure for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Hashtags: [10-15 relevant hashtags for THIS news]
+Best time to post: [Optimal timing]
+Visual elements needed: [Specific visuals for THIS news]
 
 POST 2 - CAROUSEL IDEA:
-Slide 1 title: [Unique title for this post]
-Slide 2-5 content: [Specific content for each slide]
-Caption structure: [Specific caption approach]
-Hashtags: [10-15 relevant hashtags - NO STAR SYMBOLS]
-Best time to post: [Specific timing]
-Visual elements needed: [Specific visuals for this post]
+Slide 1 title: [Specific title for THIS news]
+Slide 2-5 content: [Specific content for each slide about THIS news]
+Caption structure: [Specific caption for THIS news]
+Hashtags: [10-15 relevant hashtags for THIS news]
+Best time to post: [Optimal timing]
+Visual elements needed: [Specific visuals for THIS news]
 
 POST 3 - STORY IDEA:
-Story slides structure: [Specific structure for this post]
-Polls/Quizzes to include: [Specific interactive elements]
-Swipe-up action: [Specific action for this post]
-Hashtags: [10-15 relevant hashtags - NO STAR SYMBOLS]
-Best time to post: [Specific timing]
-Visual elements needed: [Specific visuals for this post]
+Story slides structure: [Specific structure for THIS news]
+Polls/Quizzes to include: [Specific interactive elements for THIS news]
+Swipe-up action: [Specific action for THIS news]
+Hashtags: [10-15 relevant hashtags for THIS news]
+Best time to post: [Optimal timing]
+Visual elements needed: [Specific visuals for THIS news]
 
-IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags. NO extra formatting like asterisks or dashes.`;
+IMPORTANT: Base everything on THIS SPECIFIC NEWS ARTICLE. NO generic content. NO repetitive themes. Make each post unique and relevant to the actual news content.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
-      temperature: 0.8,
-      max_tokens: 2000
+      temperature: 0.9,
+      max_tokens: 2500
     });
     return response;
   } catch (error) {
     console.error('Instagram content generation error:', error);
-    return "Error generating Instagram content";
+    return `Error generating Instagram content for: ${newsArticle.title}`;
   }
 }
 
 /**
- * Generate Facebook viral content ideas
+ * Generate Facebook viral content ideas - IMPROVED VERSION
  */
 async function generateFacebookContent(analysis, newsArticle) {
-  const prompt = `Create 3 DIFFERENT viral Facebook content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
+  const prompt = `Create 3 UNIQUE viral Facebook content ideas based on this cricket news analysis. Make each idea COMPLETELY DIFFERENT and specific to THIS ARTICLE.
 
-News: ${newsArticle.title}
-Analysis: ${JSON.stringify(analysis)}
+NEWS: ${newsArticle.title}
+DESCRIPTION: ${newsArticle.description}
+
+ANALYSIS: ${JSON.stringify(analysis, null, 2)}
 
 Create 3 SEPARATE Facebook content ideas:
 
 POST 1 - VIDEO POST:
-Hook/Narrative: [Unique hook for this post]
-Visual elements: [Specific visuals for this post]
-Caption structure: [Specific caption approach]
-Call-to-Action: [Specific CTA for this post]
-Best time to post: [Specific timing]
-Engagement tactics: [Specific tactics for this post]
+Hook/Narrative: [Specific hook for THIS news]
+Visual elements: [Specific visuals for THIS news]
+Caption structure: [Specific caption for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Best time to post: [Optimal timing]
+Engagement tactics: [Specific tactics for THIS news]
 
 POST 2 - TEXT + IMAGE DEBATE POST:
-Question-style hook: [Unique question for this post]
-Emotional angle: [Specific emotional approach]
-Image suggestions: [Specific images for this post]
-Caption: [Specific caption content]
-Call-to-Action: [Specific CTA for this post]
-Best time to post: [Specific timing]
+Question-style hook: [Specific question for THIS news]
+Emotional angle: [Specific emotional approach for THIS news]
+Image suggestions: [Specific images for THIS news]
+Caption: [Specific caption for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Best time to post: [Optimal timing]
 
 POST 3 - AWARENESS CAMPAIGN POST:
-Story structure: [Specific story approach for this post]
-Images needed: [Specific images for this post]
-Emotional story caption: [Specific emotional content]
-Call-to-Action: [Specific CTA for this post]
-Best time to post: [Specific timing]
-Sharing incentives: [Specific incentives for this post]
+Story structure: [Specific story for THIS news]
+Images needed: [Specific images for THIS news]
+Emotional story caption: [Specific emotional content for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Best time to post: [Optimal timing]
+Sharing incentives: [Specific incentives for THIS news]
 
-IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags. NO extra formatting like asterisks or dashes.`;
+IMPORTANT: Base everything on THIS SPECIFIC NEWS ARTICLE. NO generic content. Make each post unique and relevant to the actual news content.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
-      temperature: 0.8,
-      max_tokens: 2000
+      temperature: 0.9,
+      max_tokens: 2500
     });
     return response;
   } catch (error) {
     console.error('Facebook content generation error:', error);
-    return "Error generating Facebook content";
+    return `Error generating Facebook content for: ${newsArticle.title}`;
   }
 }
 
 /**
- * Generate X/Twitter viral content ideas
+ * Generate X/Twitter viral content ideas - IMPROVED VERSION
  */
 async function generateTwitterContent(analysis, newsArticle) {
-  const prompt = `Create 3 DIFFERENT viral X/Twitter content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
+  const prompt = `Create 3 UNIQUE viral X/Twitter content ideas based on this cricket news analysis. Make each idea COMPLETELY DIFFERENT and specific to THIS ARTICLE.
 
-News: ${newsArticle.title}
-Analysis: ${JSON.stringify(analysis)}
+NEWS: ${newsArticle.title}
+DESCRIPTION: ${newsArticle.description}
+
+ANALYSIS: ${JSON.stringify(analysis, null, 2)}
 
 Create 3 SEPARATE X/Twitter content ideas:
 
 POST 1 - THREAD (5 tweets):
-Tweet 1: Hook: [Unique hook for this post]
-Tweet 2-4: Facts/Story: [Specific facts for this post]
-Tweet 5: Call-to-Action: [Specific CTA for this post]
-Hashtags: [Relevant hashtags for each tweet - NO STAR SYMBOLS]
-Best time to post: [Specific timing]
+Tweet 1: Hook: [Specific hook for THIS news]
+Tweet 2-4: Facts/Story: [Specific facts about THIS news]
+Tweet 5: Call-to-Action: [Specific CTA for THIS news]
+Hashtags: [Relevant hashtags for THIS news]
+Best time to post: [Optimal timing]
 
 POST 2 - POLL/OPINION POST:
-Opinion-driven question: [Unique question for this post]
-Poll options: [Specific poll options for this post]
-Follow-up tweet: [Specific follow-up content]
-Hashtags: [Relevant hashtags - NO STAR SYMBOLS]
-Best time to post: [Specific timing]
+Opinion-driven question: [Specific question about THIS news]
+Poll options: [Specific poll options for THIS news]
+Follow-up tweet: [Specific follow-up about THIS news]
+Hashtags: [Relevant hashtags for THIS news]
+Best time to post: [Optimal timing]
 
 POST 3 - VISUAL + OPINION:
-Bold take/opinion: [Unique opinion for this post]
-Image suggestions: [Specific images for this post]
-Caption: [Specific caption content]
-Call-to-Action: [Specific CTA for this post]
-Hashtags: [Relevant hashtags - NO STAR SYMBOLS]
-Best time to post: [Specific timing]
+Bold take/opinion: [Specific opinion about THIS news]
+Image suggestions: [Specific images for THIS news]
+Caption: [Specific caption for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Hashtags: [Relevant hashtags for THIS news]
+Best time to post: [Optimal timing]
 
-IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags. NO extra formatting like asterisks or dashes. NO asterisks anywhere in the output.`;
+IMPORTANT: Base everything on THIS SPECIFIC NEWS ARTICLE. NO generic content. Make each post unique and relevant to the actual news content.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
-      temperature: 0.8,
-      max_tokens: 2000
+      temperature: 0.9,
+      max_tokens: 2500
     });
     return response;
   } catch (error) {
     console.error('Twitter content generation error:', error);
-    return "Error generating Twitter content";
+    return `Error generating Twitter content for: ${newsArticle.title}`;
   }
 }
 
 /**
- * Generate YouTube viral content ideas
+ * Generate YouTube viral content ideas - IMPROVED VERSION
  */
 async function generateYouTubeContent(analysis, newsArticle) {
-  const prompt = `Create 3 DIFFERENT viral YouTube content ideas based on this cricket news analysis. Each idea should be COMPLETELY UNIQUE with different angles, hooks, and approaches.
+  const prompt = `Create 3 UNIQUE viral YouTube content ideas based on this cricket news analysis. Make each idea COMPLETELY DIFFERENT and specific to THIS ARTICLE.
 
-News: ${newsArticle.title}
-Analysis: ${JSON.stringify(analysis)}
+NEWS: ${newsArticle.title}
+DESCRIPTION: ${newsArticle.description}
+
+ANALYSIS: ${JSON.stringify(analysis, null, 2)}
 
 Create 3 SEPARATE YouTube content ideas:
 
 POST 1 - SHORTS IDEA:
-Hook (first 3 seconds): [Unique hook for this post]
-Structure/Flow: [Specific structure for this post]
-Visual elements: [Specific visuals for this post]
-Call-to-Action: [Specific CTA for this post]
-Thumbnail suggestions: [Specific thumbnails for this post]
-Best time to post: [Specific timing]
+Hook (first 3 seconds): [Specific hook for THIS news]
+Structure/Flow: [Specific structure for THIS news]
+Visual elements: [Specific visuals for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Thumbnail suggestions: [Specific thumbnails for THIS news]
+Best time to post: [Optimal timing]
 
 POST 2 - LONG-FORM IDEA:
-Title: [Unique title for this post]
-Script structure: [Specific script approach for this post]
-Retention tactics: [Specific tactics for this post]
-Visual elements: [Specific visuals for this post]
-Call-to-Action: [Specific CTA for this post]
-Thumbnail strategy: [Specific strategy for this post]
-Best time to post: [Specific timing]
+Title: [Specific title for THIS news]
+Script structure: [Specific script for THIS news]
+Retention tactics: [Specific tactics for THIS news]
+Visual elements: [Specific visuals for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Thumbnail strategy: [Specific strategy for THIS news]
+Best time to post: [Optimal timing]
 
 POST 3 - REACTION/OPINION IDEA:
-Debate/Story format: [Specific format for this post]
-Engagement tactics: [Specific tactics for this post]
-Visual elements: [Specific visuals for this post]
-Call-to-Action: [Specific CTA for this post]
-Thumbnail strategy: [Specific strategy for this post]
-Best time to post: [Specific timing]
+Debate/Story format: [Specific format for THIS news]
+Engagement tactics: [Specific tactics for THIS news]
+Visual elements: [Specific visuals for THIS news]
+Call-to-Action: [Specific CTA for THIS news]
+Thumbnail strategy: [Specific strategy for THIS news]
+Best time to post: [Optimal timing]
 
-IMPORTANT: Each post must have DIFFERENT angles, hooks, and approaches. NO repetitive content. NO star symbols in hashtags. NO extra formatting like asterisks or dashes.`;
+IMPORTANT: Base everything on THIS SPECIFIC NEWS ARTICLE. NO generic content. Make each post unique and relevant to the actual news content.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
-      temperature: 0.8,
-      max_tokens: 2000
+      temperature: 0.9,
+      max_tokens: 2500
     });
     return response;
   } catch (error) {
     console.error('YouTube content generation error:', error);
-    return "Error generating YouTube content";
+    return `Error generating YouTube content for: ${newsArticle.title}`;
   }
 }
 
 /**
- * Main function to generate all viral content
+ * Main function to generate all viral content - IMPROVED VERSION
  */
 async function generateViralContent(newsArticle) {
   const startTime = Date.now();
   
   try {
     console.log(`🚀 Generating viral content for: ${newsArticle.title}`);
+    console.log(`�� Article description: ${newsArticle.description.substring(0, 100)}...`);
     
     // Step 1: Analyze news for viral potential
     const analysis = await analyzeNewsForViralContent(newsArticle);
     console.log('✅ News analysis completed');
+    console.log('�� Analysis keys:', Object.keys(analysis));
     
-    // Step 2: Generate content for all platforms
+    // Step 2: Generate content for all platforms with error handling
+    console.log('🎯 Generating platform content...');
+    
     const [instagramContent, facebookContent, twitterContent, youtubeContent] = await Promise.all([
-      generateInstagramContent(analysis, newsArticle),
-      generateFacebookContent(analysis, newsArticle),
-      generateTwitterContent(analysis, newsArticle),
-      generateYouTubeContent(analysis, newsArticle)
+      generateInstagramContent(analysis, newsArticle).catch(err => {
+        console.error('Instagram generation failed:', err);
+        return `Instagram content generation failed for: ${newsArticle.title}`;
+      }),
+      generateFacebookContent(analysis, newsArticle).catch(err => {
+        console.error('Facebook generation failed:', err);
+        return `Facebook content generation failed for: ${newsArticle.title}`;
+      }),
+      generateTwitterContent(analysis, newsArticle).catch(err => {
+        console.error('Twitter generation failed:', err);
+        return `Twitter content generation failed for: ${newsArticle.title}`;
+      }),
+      generateYouTubeContent(analysis, newsArticle).catch(err => {
+        console.error('YouTube generation failed:', err);
+        return `YouTube content generation failed for: ${newsArticle.title}`;
+      })
     ]);
     
     console.log('✅ All platform content generated');
@@ -1027,7 +392,11 @@ async function generateViralContent(newsArticle) {
         twitter: twitterContent,
         youtube: youtubeContent
       },
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
+      originalArticle: {
+        title: newsArticle.title,
+        description: newsArticle.description
+      }
     };
     
   } catch (error) {
@@ -1035,7 +404,11 @@ async function generateViralContent(newsArticle) {
     return {
       success: false,
       error: error.message,
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
+      originalArticle: {
+        title: newsArticle.title,
+        description: newsArticle.description
+      }
     };
   }
 }
