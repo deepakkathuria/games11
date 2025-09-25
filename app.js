@@ -95,15 +95,224 @@ newsScheduler.startScheduler(1); // Fetch every 30 minutes
 const HindiNewsScheduler = require('./hindiNewsScheduler');
 const { fetchHindiCricketNews, filterHindiArticles, getHindiArticleSummary, validateHindiArticleForProcessing } = require('./hindiNewsFetcher');
 const { processHindiManualInput } = require('./hindiManualInputProcessor');
+const { fetchAllNews, filterAllNewsArticles, getAllNewsArticleSummary, validateAllNewsArticleForProcessing } = require('./allNewsFetcher');
+const AllNewsScheduler = require('./allNewsScheduler');
+const { processAllNewsManualInput } = require('./allManualInputProcessor');
 
 // Initialize Hindi news scheduler
 const hindiNewsScheduler = new HindiNewsScheduler();
 hindiNewsScheduler.startScheduler(1); // Fetch every 30 minutes
 
+// Initialize All News scheduler
+const allNewsScheduler = new AllNewsScheduler();
+allNewsScheduler.startScheduler(30); //
+
 
 
 // Add this import at the top
 const { generateViralContent } = require('./viralContentGenerator');
+
+
+
+
+// ===========================================
+// AUTOMATED ALL NEWS APIs
+// ===========================================
+
+// Get stored all news
+app.get('/api/all/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await allNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed all news
+app.get('/api/all/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM general_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process all news article
+app.post('/api/all/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM general_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // 1) ensure recommendations exist
+    let recs = null;
+    if (article.prepublish_recs) {
+      try { recs = JSON.parse(article.prepublish_recs); } catch {}
+    }
+    if (!recs || !recs.recommendedTitle) {
+      const prePrompt = buildPrePublishPrompt({
+        title: article.title || "",
+        description: article.description || "",
+        body: article.content || "",
+      });
+      const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
+      recs = parsePrePublishTextToJSON(recText);
+
+      await pollDBPool.query(
+        "UPDATE general_news SET prepublish_recs = ? WHERE id = ?",
+        [JSON.stringify(recs), id]
+      );
+    }
+
+    // 2) generate BODY HTML with outline
+    const bodyPrompt = buildRewriteBodyHtmlPrompt({
+      rawTitle: article.title || "",
+      rawDescription: article.description || "",
+      rawBody: article.content || "",
+      recTitle: recs.recommendedTitle,
+      recMeta: recs.recommendedMeta,
+      recOutline: recs.outline,
+      recPrimary: recs.keywords?.primary || "",
+      recSecondary: recs.keywords?.secondary || "",
+    });
+    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.6, max_tokens: 2500 });
+
+    // 3) wrap to full HTML doc and save
+    const finalHtml = buildHtmlDocument({
+      title: recs.recommendedTitle,
+      metaDescription: recs.recommendedMeta,
+      bodyHtml,
+    });
+
+    await pollDBPool.query(
+      `UPDATE general_news
+         SET processed = 1,
+             processed_at = NOW(),
+             ready_article = ?,
+             final_title = ?,
+             final_meta  = ?,
+             final_slug  = ?
+       WHERE id = ?`,
+      [finalHtml, recs.recommendedTitle, recs.recommendedMeta, recs.recommendedSlug, id]
+    );
+
+    return res.json({
+      success: true,
+      final: {
+        title: recs.recommendedTitle,
+        meta: recs.recommendedMeta,
+        slug: recs.recommendedSlug,
+        html: finalHtml
+      }
+    });
+  } catch (err) {
+    console.error("generate all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch all news
+app.post('/api/all/manual-fetch-news', async (req, res) => {
+  try {
+    await allNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'All news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get all news scheduler status
+app.get('/api/all/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: allNewsScheduler.isRunning,
+      message: 'All news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ===========================================
 // VIRAL CONTENT GENERATOR APIs
