@@ -83,7 +83,7 @@ async function processAllNewsManualInput(input, options = {}) {
 }
 
 async function rewriteInHumanStyleAllNews(content, title) {
-  const prompt = `Rewrite this news article in a natural, human-like style. Follow these specific guidelines:
+  const prompt = `Rewrite this news article in a natural and in hindi lanuage, human-like style. Follow these specific guidelines:
 
 1. Write like a real journalist who's passionate about the topic
 2. Use conversational tone: "I think", "Honestly", "You know what's interesting"
@@ -113,7 +113,7 @@ Write it as if you're a journalist who's genuinely excited about the news and wa
 }
 
 async function createReadyToPublishArticleAllNews(input, options) {
-  const prompt = `Create a complete, ready-to-publish news article from this content. Make it sound like a real journalist wrote it, not AI. Follow these rules:
+  const prompt = `Create a complete, ready-to-publish news article in hindi from this content. Make it sound like a real journalist wrote it, not AI. Follow these rules:
 
 1. NO markdown formatting (no **, *, #, etc.)
 2. NO AI phrases like "Of course", "Here is a complete", "optimized for"
