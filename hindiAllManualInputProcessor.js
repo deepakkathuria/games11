@@ -1,3 +1,5 @@
+
+
 // const axios = require('axios');
 
 // const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -178,7 +180,7 @@
 //   }
 // }
 
-// async function processHindiAllNewsInput(input, options = {}) {
+// async function processHindiAllNewsManualInput(input, options = {}) {
 //   const startTime = Date.now();
   
 //   try {
@@ -208,7 +210,7 @@
 //       humanLikeContent = await rewriteInHumanStyleHindiAllNews(input.content, input.title);
 //     }
 
-//     const readyToPublishArticle = await createReadyToPublishHindiAllNews({
+//     const readyToPublishArticle = await createReadyToPublishArticleHindiAllNews({
 //       ...input,
 //       content: humanLikeContent
 //     }, options);
@@ -221,7 +223,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error('Process Hindi all news input error:', error);
+//     console.error('Process Hindi all news manual input error:', error);
 //     return {
 //       success: false,
 //       error: error.message,
@@ -231,16 +233,59 @@
 // }
 
 // async function rewriteInHumanStyleHindiAllNews(content, title) {
+//   console.log('🔄 [Hindi All News] Starting human style rewriting...');
+//   console.log('📝 [Hindi All News] Content length:', content?.length);
+//   console.log('📝 [Hindi All News] Title:', title?.substring(0, 50) + '...');
+  
 //   // Use the simple direct translation approach
-//   return await directTranslateToHindi(content, title);
+//   const hindiContent = await directTranslateToHindi(content, title);
+  
+//   console.log('✅ [Hindi All News] Human style rewriting completed, length:', hindiContent?.length);
+//   console.log('📄 [Hindi All News] Hindi content preview:', hindiContent?.substring(0, 200) + '...');
+  
+//   // Convert plain text to HTML paragraphs
+//   if (hindiContent) {
+//     const paragraphs = hindiContent.split('\n').filter(p => p.trim().length > 0);
+//     console.log('📝 [Hindi All News] Paragraphs count:', paragraphs.length);
+    
+//     const htmlContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
+//     console.log('✅ [Hindi All News] HTML conversion completed, length:', htmlContent.length);
+//     console.log('📄 [Hindi All News] HTML preview:', htmlContent.substring(0, 200) + '...');
+    
+//     return htmlContent;
+//   }
+  
+//   console.log('❌ [Hindi All News] No Hindi content, returning original');
+//   return content;
 // }
 
-// async function createReadyToPublishHindiAllNews(input, options = {}) {
+// async function createReadyToPublishArticleHindiAllNews(input, options = {}) {
+//   console.log('🔄 [Hindi All News] Creating ready-to-publish article...');
+//   console.log('📝 [Hindi All News] Input content length:', input.content?.length);
+  
 //   // Use the simple direct translation approach
-//   return await directTranslateToHindi(input.content, input.title);
+//   const hindiContent = await directTranslateToHindi(input.content, input.title);
+  
+//   console.log('✅ [Hindi All News] Hindi translation completed, length:', hindiContent?.length);
+//   console.log('📄 [Hindi All News] Hindi content preview:', hindiContent?.substring(0, 200) + '...');
+  
+//   // Convert plain text to HTML paragraphs
+//   if (hindiContent) {
+//     const paragraphs = hindiContent.split('\n').filter(p => p.trim().length > 0);
+//     console.log('📝 [Hindi All News] Paragraphs count:', paragraphs.length);
+    
+//     const htmlContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
+//     console.log('✅ [Hindi All News] HTML conversion completed, length:', htmlContent.length);
+//     console.log('📄 [Hindi All News] HTML preview:', htmlContent.substring(0, 200) + '...');
+    
+//     return htmlContent;
+//   }
+  
+//   console.log('❌ [Hindi All News] No Hindi content, returning original');
+//   return input.content;
 // }
 
-// async function generateHindiHeadline(title) {
+// async function generateHindiAllNewsHeadline(title) {
 //   const prompt = `Generate a sharp, engaging Hindi headline for this news article. Follow these rules:
 
 // 1. Keep it under 80 characters
@@ -256,7 +301,8 @@
 //   try {
 //     const response = await generateWithDeepSeek(prompt, {
 //       temperature: 0.8,
-//       max_tokens: 100
+//       max_tokens: 100,
+//       forceHindi: true
 //     });
     
 //     return response.trim();
@@ -266,7 +312,7 @@
 //   }
 // }
 
-// async function generateHindiMetaDescription(description) {
+// async function generateHindiAllNewsMetaDescription(description) {
 //   const prompt = `Generate a compelling Hindi meta description for this news article. Follow these rules:
 
 // 1. Keep it under 160 characters
@@ -282,7 +328,8 @@
 //   try {
 //     const response = await generateWithDeepSeek(prompt, {
 //       temperature: 0.8,
-//       max_tokens: 200
+//       max_tokens: 200,
+//       forceHindi: true
 //     });
     
 //     return response.trim();
@@ -293,11 +340,11 @@
 // }
 
 // module.exports = {
-//   processHindiAllNewsInput,
+//   processHindiAllNewsManualInput,
 //   rewriteInHumanStyleHindiAllNews,
-//   createReadyToPublishHindiAllNews,
-//   generateHindiHeadline,
-//   generateHindiMetaDescription
+//   createReadyToPublishArticleHindiAllNews,
+//   generateHindiAllNewsHeadline,
+//   generateHindiAllNewsMetaDescription
 // };
 
 
@@ -534,57 +581,16 @@ async function processHindiAllNewsManualInput(input, options = {}) {
   }
 }
 
+// ❌ ONE LINE ISSUE - NO HTML CONVERSION
 async function rewriteInHumanStyleHindiAllNews(content, title) {
-  console.log('🔄 [Hindi All News] Starting human style rewriting...');
-  console.log('📝 [Hindi All News] Content length:', content?.length);
-  console.log('📝 [Hindi All News] Title:', title?.substring(0, 50) + '...');
-  
   // Use the simple direct translation approach
-  const hindiContent = await directTranslateToHindi(content, title);
-  
-  console.log('✅ [Hindi All News] Human style rewriting completed, length:', hindiContent?.length);
-  console.log('📄 [Hindi All News] Hindi content preview:', hindiContent?.substring(0, 200) + '...');
-  
-  // Convert plain text to HTML paragraphs
-  if (hindiContent) {
-    const paragraphs = hindiContent.split('\n').filter(p => p.trim().length > 0);
-    console.log('📝 [Hindi All News] Paragraphs count:', paragraphs.length);
-    
-    const htmlContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
-    console.log('✅ [Hindi All News] HTML conversion completed, length:', htmlContent.length);
-    console.log('📄 [Hindi All News] HTML preview:', htmlContent.substring(0, 200) + '...');
-    
-    return htmlContent;
-  }
-  
-  console.log('❌ [Hindi All News] No Hindi content, returning original');
-  return content;
+  return await directTranslateToHindi(content, title);
 }
 
+// ❌ ONE LINE ISSUE - NO HTML CONVERSION  
 async function createReadyToPublishArticleHindiAllNews(input, options = {}) {
-  console.log('🔄 [Hindi All News] Creating ready-to-publish article...');
-  console.log('📝 [Hindi All News] Input content length:', input.content?.length);
-  
   // Use the simple direct translation approach
-  const hindiContent = await directTranslateToHindi(input.content, input.title);
-  
-  console.log('✅ [Hindi All News] Hindi translation completed, length:', hindiContent?.length);
-  console.log('📄 [Hindi All News] Hindi content preview:', hindiContent?.substring(0, 200) + '...');
-  
-  // Convert plain text to HTML paragraphs
-  if (hindiContent) {
-    const paragraphs = hindiContent.split('\n').filter(p => p.trim().length > 0);
-    console.log('📝 [Hindi All News] Paragraphs count:', paragraphs.length);
-    
-    const htmlContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
-    console.log('✅ [Hindi All News] HTML conversion completed, length:', htmlContent.length);
-    console.log('📄 [Hindi All News] HTML preview:', htmlContent.substring(0, 200) + '...');
-    
-    return htmlContent;
-  }
-  
-  console.log('❌ [Hindi All News] No Hindi content, returning original');
-  return input.content;
+  return await directTranslateToHindi(input.content, input.title);
 }
 
 async function generateHindiAllNewsHeadline(title) {
