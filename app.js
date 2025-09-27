@@ -97,7 +97,7 @@ const { fetchHindiCricketNews, filterHindiArticles, getHindiArticleSummary, vali
 const { processHindiManualInput } = require('./hindiManualInputProcessor');
 const { fetchAllNews, filterAllNewsArticles, getAllNewsArticleSummary, validateAllNewsArticleForProcessing } = require('./allNewsFetcher');
 const AllNewsScheduler = require('./allNewsScheduler');
-const { processAllNewsManualInput } = require('./allManualInputProcessor');
+const { processAllNewsManualInput, generateHindiHeadline, generateHindiMetaDescription } = require('./allManualInputProcessor');
 
 // Initialize Hindi news scheduler
 const hindiNewsScheduler = new HindiNewsScheduler();
@@ -109,10 +109,179 @@ allNewsScheduler.startScheduler(30); //
 
 
 
+
 // Add this import at the top
 const { generateViralContent } = require('./viralContentGenerator');
+const { fetchHindiAllNews, filterHindiAllNewsArticles, getHindiAllNewsArticleSummary, validateHindiAllNewsArticleForProcessing } = require('./hindiAllNewsFetcher');
+const HindiAllNewsScheduler = require('./hindiAllNewsScheduler');
+const { processHindiAllNewsManualInput, generateHindiAllNewsHeadline, generateHindiAllNewsMetaDescription } = require('./hindiAllManualInputProcessor');
+
+// ✅ Add this initialization (around line 130-140)
+// Initialize Hindi All News scheduler
+const hindiAllNewsScheduler = new HindiAllNewsScheduler();
+hindiAllNewsScheduler.startScheduler(30); // Fetch every 30 minutes
 
 
+
+// ✅ Add these API endpoints (after existing API endpoints, around line 800-1000)
+
+// ===========================================
+// HINDI ALL NEWS APIs
+// ===========================================
+
+// Get stored Hindi all news
+app.get('/api/hindi-all-news/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await hindiAllNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi all news
+app.get('/api/hindi-all-news/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_general_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_general_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi all news article
+app.post('/api/hindi-all-news/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_general_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Use Hindi processing for Hindi all news
+    const result = await processHindiAllNewsManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate Hindi title and meta
+      const hindiTitle = await generateHindiAllNewsHeadline(article.title);
+      const hindiMeta = await generateHindiAllNewsMetaDescription(article.description);
+      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with Hindi content
+      const finalHtml = buildHtmlDocument({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE hindi_general_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate Hindi all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch Hindi all news
+app.post('/api/hindi-all-news/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiAllNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi all news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi all news scheduler status
+app.get('/api/hindi-all-news/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: hindiAllNewsScheduler.isRunning,
+      message: 'Hindi all news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 
 
@@ -408,6 +577,68 @@ app.get('/api/all/processed-news', async (req, res) => {
 });
 
 // Process all news article
+// app.post('/api/all/articles/:id/generate', async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const [rows] = await pollDBPool.query(
+//       "SELECT * FROM general_news WHERE id = ?",
+//       [id]
+//     );
+//     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+//     const article = rows[0];
+
+//     // Convert English article to Hindi
+//     const result = await processAllNewsManualInput({
+//       title: article.title,
+//       description: article.description,
+//       content: article.content
+//     });
+
+//     if (result.success) {
+//       // Generate Hindi title and meta
+//       const hindiTitle = await generateHindiHeadline(article.title);
+//       const hindiMeta = await generateHindiMetaDescription(article.description);
+//       const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+
+//       // Create HTML document with Hindi content
+//       const finalHtml = buildHtmlDocument({
+//         title: hindiTitle,
+//         metaDescription: hindiMeta,
+//         bodyHtml: result.readyToPublishArticle,
+//       });
+
+//       await pollDBPool.query(
+//         `UPDATE general_news
+//            SET processed = 1,
+//                processed_at = NOW(),
+//                ready_article = ?,
+//                final_title = ?,
+//                final_meta  = ?,
+//                final_slug  = ?
+//          WHERE id = ?`,
+//         [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+//       );
+
+//       return res.json({
+//         success: true,
+//         final: {
+//           title: hindiTitle,
+//           meta: hindiMeta,
+//           slug: hindiSlug,
+//           html: finalHtml
+//         }
+//       });
+//     } else {
+//       return res.status(500).json({ success: false, error: result.error });
+//     }
+//   } catch (err) {
+//     console.error("generate all news article error", err);
+//     return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+//   }
+// });
+
+// Process all news article
 app.post('/api/all/articles/:id/generate', async (req, res) => {
   try {
     const { id } = req.params;
@@ -419,67 +650,50 @@ app.post('/api/all/articles/:id/generate', async (req, res) => {
     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
     const article = rows[0];
 
-    // 1) ensure recommendations exist
-    let recs = null;
-    if (article.prepublish_recs) {
-      try { recs = JSON.parse(article.prepublish_recs); } catch {}
-    }
-    if (!recs || !recs.recommendedTitle) {
-      const prePrompt = buildPrePublishPrompt({
-        title: article.title || "",
-        description: article.description || "",
-        body: article.content || "",
+    // Convert English article to Hindi
+    const result = await processAllNewsManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate Hindi title and meta
+      const hindiTitle = await generateHindiHeadline(article.title);
+      const hindiMeta = await generateHindiMetaDescription(article.description);
+      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with Hindi content
+      const finalHtml = buildHtmlDocument({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
       });
-      const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
-      recs = parsePrePublishTextToJSON(recText);
 
       await pollDBPool.query(
-        "UPDATE general_news SET prepublish_recs = ? WHERE id = ?",
-        [JSON.stringify(recs), id]
+        `UPDATE general_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
       );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
     }
-
-    // 2) generate BODY HTML with outline
-    const bodyPrompt = buildRewriteBodyHtmlPrompt({
-      rawTitle: article.title || "",
-      rawDescription: article.description || "",
-      rawBody: article.content || "",
-      recTitle: recs.recommendedTitle,
-      recMeta: recs.recommendedMeta,
-      recOutline: recs.outline,
-      recPrimary: recs.keywords?.primary || "",
-      recSecondary: recs.keywords?.secondary || "",
-    });
-    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.6, max_tokens: 2500 });
-
-    // 3) wrap to full HTML doc and save
-    const finalHtml = buildHtmlDocument({
-      title: recs.recommendedTitle,
-      metaDescription: recs.recommendedMeta,
-      bodyHtml,
-    });
-
-    await pollDBPool.query(
-      `UPDATE general_news
-         SET processed = 1,
-             processed_at = NOW(),
-             ready_article = ?,
-             final_title = ?,
-             final_meta  = ?,
-             final_slug  = ?
-       WHERE id = ?`,
-      [finalHtml, recs.recommendedTitle, recs.recommendedMeta, recs.recommendedSlug, id]
-    );
-
-    return res.json({
-      success: true,
-      final: {
-        title: recs.recommendedTitle,
-        meta: recs.recommendedMeta,
-        slug: recs.recommendedSlug,
-        html: finalHtml
-      }
-    });
   } catch (err) {
     console.error("generate all news article error", err);
     return res.status(500).json({ success:false, error: err.message || "Generate failed" });
@@ -504,6 +718,152 @@ app.get('/api/all/scheduler-status', async (req, res) => {
       success: true, 
       isRunning: allNewsScheduler.isRunning,
       message: 'All news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
+// HINDI ALL NEWS APIs
+// ===========================================
+
+// Get stored Hindi all news
+app.get('/api/hindi-all/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_all_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await hindiAllNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    res.json({
+      success: true,
+      news,
+      totalCount,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(totalCount / limit)
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi all news
+app.get('/api/hindi-all/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_all_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_all_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(totalCount / limit)
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi all news article
+app.post('/api/hindi-all/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_all_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Use Hindi processing for Hindi all news
+    const result = await processHindiAllNewsManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate Hindi title and meta
+      const hindiTitle = await generateHindiAllNewsHeadline(article.title);
+      const hindiMeta = await generateHindiAllNewsMetaDescription(article.description);
+      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with Hindi content
+      const finalHtml = buildHtmlDocument({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE hindi_all_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate Hindi all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch Hindi all news
+app.post('/api/hindi-all/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiAllNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi all news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi all news scheduler status
+app.get('/api/hindi-all/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: hindiAllNewsScheduler.isRunning,
+      message: 'Hindi all news scheduler is running and fetching news every 30 minutes'
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
