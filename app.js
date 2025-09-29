@@ -98,6 +98,7 @@ const { processHindiManualInput } = require('./hindiManualInputProcessor');
 const { fetchAllNews, filterAllNewsArticles, getAllNewsArticleSummary, validateAllNewsArticleForProcessing } = require('./allNewsFetcher');
 const AllNewsScheduler = require('./allNewsScheduler');
 const { processAllNewsManualInput, generateEnglishHeadline, generateEnglishMetaDescription } = require('./allManualInputProcessor');
+const { processAllNewsOpenAI, generateOpenAIHeadline, generateOpenAIMetaDescription } = require('./allOpenAIProcessor');
 
 // Initialize Hindi news scheduler
 const hindiNewsScheduler = new HindiNewsScheduler();
@@ -718,6 +719,164 @@ app.get('/api/all/scheduler-status', async (req, res) => {
       success: true, 
       isRunning: allNewsScheduler.isRunning,
       message: 'All news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
+// OPENAI ALL NEWS APIs (Separate from DeepSeek)
+// ===========================================
+
+// Get stored all news for OpenAI processing (reuses same table)
+app.get('/api/openai-all/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await allNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored all news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed all news for OpenAI (reuses same table)
+app.get('/api/openai-all/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE openai_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM general_news
+       WHERE openai_processed = true
+       ORDER BY openai_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.openai_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed all news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process all news article with OpenAI
+app.post('/api/openai-all/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM general_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with OpenAI
+    const result = await processAllNewsOpenAI({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate English title and meta with OpenAI
+      const openaiTitle = await generateOpenAIHeadline(article.title);
+      const openaiMeta = await generateOpenAIMetaDescription(article.description);
+      const openaiSlug = openaiTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with OpenAI content
+      const finalHtml = buildHtmlDocument({
+        title: openaiTitle,
+        metaDescription: openaiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE general_news
+           SET openai_processed = 1,
+               openai_processed_at = NOW(),
+               openai_ready_article = ?,
+               openai_final_title = ?,
+               openai_final_meta  = ?,
+               openai_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, openaiTitle, openaiMeta, openaiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: openaiTitle,
+          meta: openaiMeta,
+          slug: openaiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate OpenAI all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch all news for OpenAI (reuses existing functionality)
+app.post('/api/openai-all/manual-fetch-news', async (req, res) => {
+  try {
+    await allNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'All news fetched and stored successfully for OpenAI processing' });
+  } catch (error) {
+    console.error('Error manually fetching all news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get OpenAI all news scheduler status
+app.get('/api/openai-all/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: allNewsScheduler.isRunning,
+      message: 'All news scheduler is running and fetching news every 30 minutes (shared with DeepSeek)'
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
