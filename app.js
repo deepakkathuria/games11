@@ -97,7 +97,7 @@ const { fetchHindiCricketNews, filterHindiArticles, getHindiArticleSummary, vali
 const { processHindiManualInput } = require('./hindiManualInputProcessor');
 const { fetchAllNews, filterAllNewsArticles, getAllNewsArticleSummary, validateAllNewsArticleForProcessing } = require('./allNewsFetcher');
 const AllNewsScheduler = require('./allNewsScheduler');
-const { processAllNewsManualInput, generateHindiHeadline, generateHindiMetaDescription } = require('./allManualInputProcessor');
+const { processAllNewsManualInput, generateEnglishHeadline, generateEnglishMetaDescription } = require('./allManualInputProcessor');
 
 // Initialize Hindi news scheduler
 const hindiNewsScheduler = new HindiNewsScheduler();
@@ -658,15 +658,15 @@ app.post('/api/all/articles/:id/generate', async (req, res) => {
     });
 
     if (result.success) {
-      // Generate Hindi title and meta
-      const hindiTitle = await generateHindiHeadline(article.title);
-      const hindiMeta = await generateHindiMetaDescription(article.description);
-      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+      // Generate English title and meta
+      const englishTitle = await generateEnglishHeadline(article.title);
+      const englishMeta = await generateEnglishMetaDescription(article.description);
+      const englishSlug = englishTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-      // Create HTML document with Hindi content
+      // Create HTML document with English content
       const finalHtml = buildHtmlDocument({
-        title: hindiTitle,
-        metaDescription: hindiMeta,
+        title: englishTitle,
+        metaDescription: englishMeta,
         bodyHtml: result.readyToPublishArticle,
       });
 
@@ -679,15 +679,15 @@ app.post('/api/all/articles/:id/generate', async (req, res) => {
                final_meta  = ?,
                final_slug  = ?
          WHERE id = ?`,
-        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+        [finalHtml, englishTitle, englishMeta, englishSlug, id]
       );
 
       return res.json({
         success: true,
         final: {
-          title: hindiTitle,
-          meta: hindiMeta,
-          slug: hindiSlug,
+          title: englishTitle,
+          meta: englishMeta,
+          slug: englishSlug,
           html: finalHtml
         }
       });

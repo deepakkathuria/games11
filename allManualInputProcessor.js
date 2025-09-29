@@ -34,6 +34,10 @@ async function processAllNewsManualInput(input, options = {}) {
   const startTime = Date.now();
   
   try {
+    console.log('🔍 Processing article:', input.title);
+    console.log('📝 Original content length:', input.content?.length || 0);
+    console.log('📄 Original content preview:', input.content?.substring(0, 200) + '...');
+    
     if (!input.title || input.title.length < 10) {
       throw new Error('Title too short');
     }
@@ -83,7 +87,11 @@ async function processAllNewsManualInput(input, options = {}) {
 }
 
 async function rewriteInHumanStyleAllNews(content, title) {
-  const prompt = `Rewrite this news article in a natural and in hindi lanuage, human-like style. Follow these specific guidelines:
+  console.log('🔄 [English All News] Starting human style rewriting...');
+  console.log('📝 [English All News] Content length:', content?.length);
+  console.log('📝 [English All News] Title:', title?.substring(0, 50) + '...');
+  
+  const prompt = `You are an English journalist. Rewrite this news article in a natural, human-like style in English. Follow these specific guidelines:
 
 1. Write like a real journalist who's passionate about the topic
 2. Use conversational tone: "I think", "Honestly", "You know what's interesting"
@@ -95,17 +103,44 @@ async function rewriteInHumanStyleAllNews(content, title) {
 8. Include emotional reactions and commentary naturally
 9. Make it sound like you're telling a story to a friend
 10. Add hard facts: dates, times, names, locations, statistics
+11. Expand on the content - make it comprehensive and detailed
+12. Add background information and context
+13. Include analysis and implications
+14. Make sure the rewritten content is complete and thorough
+15. Write a FULL, COMPLETE article - at least 800-1200 words
+16. If the source content is short, expand it significantly with relevant details
 
-Original content: ${content}
+IMPORTANT: Write ONLY in English. Create a comprehensive, full-length article.
 
-Write it as if you're a journalist who's genuinely excited about the news and wants to share it with fellow readers. Make it engaging, human, and fact-rich.`;
+English article:
+Title: ${title}
+Content: ${content}
+
+Now write the complete English version:`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
       temperature: 0.95,
-      max_tokens: 2500
+      max_tokens: 4000
     });
-    return response || content;
+    
+    console.log('✅ [English All News] Human style rewriting completed, length:', response?.length);
+    console.log('📄 [English All News] English content preview:', response?.substring(0, 200) + '...');
+    
+    // Convert plain text to HTML paragraphs
+    if (response) {
+      const paragraphs = response.split('\n').filter(p => p.trim().length > 0);
+      console.log('📝 [English All News] Paragraphs count:', paragraphs.length);
+      
+      const htmlContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
+      console.log('✅ [English All News] HTML conversion completed, length:', htmlContent.length);
+      console.log('📄 [English All News] HTML preview:', htmlContent.substring(0, 200) + '...');
+      
+      return htmlContent;
+    }
+    
+    console.log('❌ [English All News] No English content, returning original');
+    return content;
   } catch (error) {
     console.error('Human style rewriting for all news error:', error);
     return content;
@@ -113,7 +148,10 @@ Write it as if you're a journalist who's genuinely excited about the news and wa
 }
 
 async function createReadyToPublishArticleAllNews(input, options) {
-  const prompt = `Create a complete, ready-to-publish news article in hindi from this content. Make it sound like a real journalist wrote it, not AI. Follow these rules:
+  console.log('🔄 [English All News] Creating ready-to-publish article...');
+  console.log('📝 [English All News] Input content length:', input.content?.length);
+  
+  const prompt = `You are an English journalist. Create a complete, comprehensive, ready-to-publish news article in English from this content. Make it sound like a real journalist wrote it, not AI. Follow these rules:
 
 1. NO markdown formatting (no **, *, #, etc.)
 2. NO AI phrases like "Of course", "Here is a complete", "optimized for"
@@ -129,29 +167,109 @@ async function createReadyToPublishArticleAllNews(input, options) {
 12. Add attributed quotes if available
 13. Use varied sentence lengths
 14. Include counter-views and context
+15. Write a FULL, COMPLETE article - at least 800-1200 words
+16. Expand on all key points and provide comprehensive coverage
+17. Include background information and context
+18. Add analysis and expert opinions where relevant
+19. Make sure the article is complete and doesn't end abruptly
+20. If the source content is short, expand it significantly with relevant details
+21. Add context about why this news matters
+22. Include potential implications and future developments
+23. Add relevant background information about the topic
+24. Make it a complete, standalone article that readers will find valuable
 
+IMPORTANT: Write ONLY in English. Create a comprehensive, full-length article.
+
+English article:
 Title: ${input.title}
 Description: ${input.description}
 Content: ${input.content}
 
-Write a complete article that sounds like it was written by a real journalist who's passionate about the topic and has access to specific facts and details.`;
+Now write the complete English version:`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
       temperature: 0.9,
-      max_tokens: 3000
+      max_tokens: 5000
     });
-    return response || input.content;
+    
+    console.log('✅ [English All News] English translation completed, length:', response?.length);
+    console.log('📄 [English All News] English content preview:', response?.substring(0, 200) + '...');
+    
+    // Convert plain text to HTML paragraphs
+    if (response) {
+      const paragraphs = response.split('\n').filter(p => p.trim().length > 0);
+      console.log('📝 [English All News] Paragraphs count:', paragraphs.length);
+      
+      const htmlContent = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
+      console.log('✅ [English All News] HTML conversion completed, length:', htmlContent.length);
+      console.log('📄 [English All News] HTML preview:', htmlContent.substring(0, 200) + '...');
+      
+      return htmlContent;
+    }
+    
+    console.log('❌ [English All News] No English content, returning original');
+    return input.content;
   } catch (error) {
     console.error('Create ready article for all news error:', error);
     return input.content;
   }
 }
 
+async function generateEnglishHeadline(title) {
+  const prompt = `Create an engaging, SEO-friendly headline in English for this news title. Make it:
+1. Catchy and attention-grabbing
+2. Under 60 characters if possible
+3. Include key keywords
+4. Sound like a real news headline
+5. Avoid clickbait but make it compelling
+
+Original title: ${title}
+
+Generate a new headline:`;
+
+  try {
+    const response = await generateWithDeepSeek(prompt, {
+      temperature: 0.8,
+      max_tokens: 100
+    });
+    return response || title;
+  } catch (error) {
+    console.error('Generate English headline error:', error);
+    return title;
+  }
+}
+
+async function generateEnglishMetaDescription(description) {
+  const prompt = `Create an engaging meta description in English for this news description. Make it:
+1. 150-160 characters long
+2. Include key information and keywords
+3. Compelling and click-worthy
+4. Summarize the main points
+5. Sound natural and engaging
+
+Original description: ${description}
+
+Generate a meta description:`;
+
+  try {
+    const response = await generateWithDeepSeek(prompt, {
+      temperature: 0.7,
+      max_tokens: 200
+    });
+    return response || description;
+  } catch (error) {
+    console.error('Generate English meta description error:', error);
+    return description;
+  }
+}
+
 module.exports = {
   processAllNewsManualInput,
   rewriteInHumanStyleAllNews,
-  createReadyToPublishArticleAllNews
+  createReadyToPublishArticleAllNews,
+  generateEnglishHeadline,
+  generateEnglishMetaDescription
 };
 
 
