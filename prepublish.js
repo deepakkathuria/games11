@@ -156,23 +156,43 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
 
 async function generateWithDeepSeek(prompt, options = {}) {
-  const resp = await axios.post(
-    DEEPSEEK_BASE_URL,
-    {
-      model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
-      temperature: options.temperature ?? 0.5,
-      max_tokens: options.max_tokens ?? 2000,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-        "Content-Type": "application/json",
+  try {
+    console.log('🤖 DeepSeek API call started...');
+    console.log('📊 Temperature:', options.temperature ?? 0.5);
+    console.log('📝 Max tokens:', options.max_tokens ?? 2000);
+    
+    const resp = await axios.post(
+      DEEPSEEK_BASE_URL,
+      {
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+        temperature: options.temperature ?? 0.5,
+        max_tokens: options.max_tokens ?? 2000,
       },
-      timeout: 60000,
+      {
+        headers: {
+          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 120000, // Increased to 120 seconds (2 minutes) for longer articles
+      }
+    );
+    
+    const content = resp.data?.choices?.[0]?.message?.content || "";
+    console.log('✅ DeepSeek API call completed, content length:', content.length);
+    return content;
+  } catch (error) {
+    console.error('❌ DeepSeek API error:', error.message);
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('Request timeout - article generation took too long. Try again.');
     }
-  );
-  return resp.data?.choices?.[0]?.message?.content || "";
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+      throw new Error(`DeepSeek API error: ${error.response.data?.error?.message || error.message}`);
+    }
+    throw error;
+  }
 }
 
 /* ---------- PROMPTS ---------- */

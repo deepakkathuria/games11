@@ -1758,6 +1758,7 @@ app.get('/api/processed-news', async (req, res) => {
 app.post("/api/articles/:id/generate", async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`\n🚀 Starting article generation for ID: ${id}`);
 
     const [rows] = await pollDBPool.query(
       "SELECT * FROM cricket_news WHERE id = ?",
@@ -1765,6 +1766,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
     const article = rows[0];
+    console.log(`📰 Article found: ${article.title?.substring(0, 50)}...`);
 
     // 1) ensure recommendations exist
     let recs = null;
@@ -1772,6 +1774,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       try { recs = JSON.parse(article.prepublish_recs); } catch {}
     }
     if (!recs || !recs.recommendedTitle) {
+      console.log('📋 Generating SEO recommendations...');
       const prePrompt = buildPrePublishPrompt({
         title: article.title || "",
         description: article.description || "",
@@ -1779,14 +1782,18 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       });
       const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
       recs = parsePrePublishTextToJSON(recText);
+      console.log('✅ SEO recommendations generated');
 
       await pollDBPool.query(
         "UPDATE cricket_news SET prepublish_recs = ? WHERE id = ?",
         [JSON.stringify(recs), id]
       );
+    } else {
+      console.log('✅ Using existing SEO recommendations');
     }
 
     // 2) generate BODY HTML with outline - using higher temperature for human-like cricket journalism
+    console.log('✍️ Generating cricket article body (this may take up to 2 minutes)...');
     const bodyPrompt = buildRewriteBodyHtmlPrompt({
       rawTitle: article.title || "",
       rawDescription: article.description || "",
@@ -1798,8 +1805,10 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       recSecondary: recs.keywords?.secondary || "",
     });
     const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.9, max_tokens: 4000 });
+    console.log('✅ Article body generated');
 
     // 3) wrap to full HTML doc and save
+    console.log('📦 Building final HTML document...');
     const finalHtml = buildHtmlDocument({
       title: recs.recommendedTitle,
       metaDescription: recs.recommendedMeta,
@@ -1818,6 +1827,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       [finalHtml, recs.recommendedTitle, recs.recommendedMeta, recs.recommendedSlug, id]
     );
 
+    console.log(`✅ Article generation complete for ID: ${id}\n`);
     return res.json({
       success: true,
       final: {
@@ -1828,8 +1838,12 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("generate error", err);
-    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+    console.error("❌ Generate error:", err.message);
+    console.error("Full error:", err);
+    return res.status(500).json({ 
+      success: false, 
+      error: err.message || "Article generation failed. Please try again." 
+    });
   }
 });
 
