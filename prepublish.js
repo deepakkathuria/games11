@@ -240,6 +240,13 @@ function buildRewriteBodyHtmlPrompt({
   return `
 You are an English cricket journalist. Rewrite this cricket article in a natural, human-like style that sounds like a passionate cricket reporter wrote it.
 
+LANGUAGE REQUIREMENTS:
+- Use SIMPLE ENGLISH only
+- Write at 10th class (grade 10) English level
+- Avoid complex vocabulary and difficult words
+- Use short, easy-to-understand sentences
+- Write like you're explaining cricket to a 10th standard student
+
 WRITING STYLE:
 1. Write like a real cricket journalist who's passionate about the game
 2. Use conversational tone: "I think", "Honestly", "You know what's interesting"
@@ -261,7 +268,8 @@ STRICT RULES:
 - NO AI phrases like "Of course", "Here is a complete", "optimized for"
 - NO template sections - write naturally
 - Use ONLY facts from the raw material (no invented scores/quotes/dates)
-- Write ONLY in English
+- Write ONLY in SIMPLE ENGLISH (10th class level)
+- NO difficult or complex words
 - Create a comprehensive, full-length cricket article
 
 HTML FORMAT:
