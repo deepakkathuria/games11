@@ -726,7 +726,7 @@ app.get('/api/all/scheduler-status', async (req, res) => {
 });
 
 // ===========================================
-// OPENAI ALL NEWS APIs (Separate from DeepSeek)
+// OPENAI ALL NEWS APIs (Separate from DeepSeek)(for all type of newss)
 // ===========================================
 
 // Get stored all news for OpenAI processing (reuses same table)
@@ -1786,7 +1786,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       );
     }
 
-    // 2) generate BODY HTML with outline
+    // 2) generate BODY HTML with outline - using higher temperature for human-like cricket journalism
     const bodyPrompt = buildRewriteBodyHtmlPrompt({
       rawTitle: article.title || "",
       rawDescription: article.description || "",
@@ -1797,7 +1797,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       recPrimary: recs.keywords?.primary || "",
       recSecondary: recs.keywords?.secondary || "",
     });
-    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.6, max_tokens: 2500 });
+    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.9, max_tokens: 4000 });
 
     // 3) wrap to full HTML doc and save
     const finalHtml = buildHtmlDocument({

@@ -179,7 +179,7 @@ async function generateWithDeepSeek(prompt, options = {}) {
 
 function buildPrePublishPrompt({ title, description, body }) {
   return `
-You are an SEO editor for a cricket news site.
+You are an English cricket journalist and SEO editor. Analyze this cricket news and provide SEO recommendations.
 
 Return ONLY these fields in plain text (no JSON, no markdown). Keep each on a single line except Outline which can be multiple lines.
 
@@ -191,10 +191,13 @@ Return ONLY these fields in plain text (no JSON, no markdown). Keep each on a si
 - Primary: ...
 - Secondary: ...
 
-RULES
-- Use ONLY facts from input (no invented scores/quotes/dates).
+RULES FOR CRICKET NEWS:
+- Use ONLY facts from input (no invented scores/quotes/dates/venues).
+- Make title engaging and cricket-specific (include team names, match type, key result)
+- Meta description should highlight the main cricket story
+- Outline should follow cricket journalism structure (Match Summary, Key Moments, Player Performances, What's Next)
 - English output.
-- Be concise.
+- Be concise but engaging.
 
 INPUT
 Title: ${title || ""}
@@ -215,27 +218,56 @@ function buildRewriteBodyHtmlPrompt({
   recSecondary,
 }) {
   return `
-You are a cricket news copy editor.
+You are an English cricket journalist. Rewrite this cricket article in a natural, human-like style that sounds like a passionate cricket reporter wrote it.
 
-Rewrite the article as **HTML BODY ONLY** (no <html>, no <head>, no <body>).
-Use only: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>.
-Follow the approved outline and keep newsroom tone. Do NOT invent facts.
+WRITING STYLE:
+1. Write like a real cricket journalist who's passionate about the game
+2. Use conversational tone: "I think", "Honestly", "You know what's interesting"
+3. Add personal reactions: "Wow!", "That's shocking", "What a performance!"
+4. Use contractions: "don't", "can't", "won't", "it's", "that's"
+5. Include specific cricket details: scores, overs, strike rates, venues, dates
+6. Add rhetorical questions: "Can you believe this?", "How good was that?"
+7. Use casual transitions: "So here's what happened", "Now get this", "But wait"
+8. Include emotional reactions and cricket commentary naturally
+9. Make it sound like you're telling a cricket story to a friend
+10. Add hard cricket facts: exact scores, player stats, match details, venues
+11. Expand on the content - make it comprehensive and detailed (800-1200 words)
+12. Add background information and cricket context
+13. Include analysis and match implications
+14. Make sure the rewritten content is complete and thorough
 
-Approved:
+STRICT RULES:
+- NO markdown formatting (no **, *, #, etc.)
+- NO AI phrases like "Of course", "Here is a complete", "optimized for"
+- NO template sections - write naturally
+- Use ONLY facts from the raw material (no invented scores/quotes/dates)
+- Write ONLY in English
+- Create a comprehensive, full-length cricket article
+
+HTML FORMAT:
+- Return **HTML BODY ONLY** (no <html>, no <head>, no <body>)
+- Use only: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>
+- Start with <h1> for the title
+- Follow the approved outline for <h2> and <h3> sections
+- Write natural flowing <p> paragraphs (not bullet points unless listing stats)
+- Use <strong> for player names and key stats
+- Use <blockquote> for any quotes from players/coaches
+
+Approved SEO Structure:
 - Title: ${recTitle || ""}
 - Meta: ${recMeta || ""}
 - Outline:
 ${recOutline || ""}
 - Keywords: ${recPrimary || ""}; ${recSecondary || ""}
 
-Raw material:
+Raw Cricket Material:
 Title: ${rawTitle || ""}
 Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
 
 OUTPUT:
-Return VALID HTML for the body only. Start with <h1> and include proper <h2>/<h3> sections and <p> paragraphs. No commentary.
+Return VALID HTML for the body only. Write a complete, engaging cricket article that sounds human-written, not AI-generated. No commentary or meta text - just the HTML article.
 `.trim();
 }
 
