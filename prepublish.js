@@ -238,64 +238,89 @@ function buildRewriteBodyHtmlPrompt({
   recSecondary,
 }) {
   return `
-You are an English cricket journalist. Rewrite this cricket article in a natural, human-like style that sounds like a passionate cricket reporter wrote it.
+You are an English cricket journalist writing an original article. Your goal is to create unique, human-sounding content that passes plagiarism checks and AI detection tools.
+
+CRITICAL: ANTI-AI DETECTION & ANTI-PLAGIARISM RULES:
+1. Write 100% ORIGINAL content - completely rewrite in your own words
+2. NEVER copy phrases or sentences from the raw material directly
+3. Use varied sentence structures (mix short and long sentences randomly)
+4. Add natural imperfections: occasional informal grammar, natural flow breaks
+5. Use unexpected word choices and unique expressions
+6. Include personal observations and opinions
+7. Add conversational fillers: "well", "you see", "actually", "to be honest"
+8. Vary paragraph lengths (some short 2-3 lines, some longer 5-6 lines)
+9. Use active voice more than passive voice
+10. Add natural transitions that humans use in real conversations
 
 LANGUAGE REQUIREMENTS:
-- Use SIMPLE ENGLISH only
-- Write at 10th class (grade 10) English level
+- Use SIMPLE ENGLISH only (10th class/grade 10 level)
 - Avoid complex vocabulary and difficult words
 - Use short, easy-to-understand sentences
-- Write like you're explaining cricket to a 10th standard student
+- Write like you're explaining cricket to a friend in 10th standard
+- NO fancy or sophisticated words
 
-WRITING STYLE:
-1. Write like a real cricket journalist who's passionate about the game
-2. Use conversational tone: "I think", "Honestly", "You know what's interesting"
-3. Add personal reactions: "Wow!", "That's shocking", "What a performance!"
-4. Use contractions: "don't", "can't", "won't", "it's", "that's"
-5. Include specific cricket details: scores, overs, strike rates, venues, dates
-6. Add rhetorical questions: "Can you believe this?", "How good was that?"
-7. Use casual transitions: "So here's what happened", "Now get this", "But wait"
-8. Include emotional reactions and cricket commentary naturally
-9. Make it sound like you're telling a cricket story to a friend
-10. Add hard cricket facts: exact scores, player stats, match details, venues
-11. Expand on the content - make it comprehensive and detailed (800-1200 words)
-12. Add background information and cricket context
-13. Include analysis and match implications
-14. Make sure the rewritten content is complete and thorough
+STRICTLY FOLLOW THE SEO OUTLINE:
+${recOutline || ""}
+
+IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
+- Use the EXACT heading text provided in the outline
+- Structure your article according to this outline
+- Don't skip any sections from the outline
+- Don't add extra sections not in the outline
+
+WRITING STYLE (HUMAN-LIKE):
+1. Write like a real person, NOT like AI or a robot
+2. Use conversational tone: "I think", "Honestly", "Look", "Listen"
+3. Add natural reactions: "Wow!", "Unbelievable!", "What a game!"
+4. Use lots of contractions: "don't", "can't", "won't", "it's", "that's", "I'm"
+5. Include cricket facts: exact scores, overs, strike rates, venues, dates
+6. Ask rhetorical questions: "Right?", "You know what I mean?", "Seriously?"
+7. Use casual transitions: "Anyway", "So yeah", "But here's the thing"
+8. Add personal commentary and opinions naturally
+9. Sometimes start sentences with "And" or "But" (like humans do)
+10. Include some intentional repetition for emphasis (humans do this)
+11. Write 800-1200 words total
+12. Mix formal cricket terms with casual explanations
 
 STRICT RULES:
 - NO markdown formatting (no **, *, #, etc.)
-- NO AI phrases like "Of course", "Here is a complete", "optimized for"
-- NO template sections - write naturally
-- Use ONLY facts from the raw material (no invented scores/quotes/dates)
-- Write ONLY in SIMPLE ENGLISH (10th class level)
-- NO difficult or complex words
-- Create a comprehensive, full-length cricket article
+- NO AI phrases: "delve", "utilize", "comprehensive", "moreover", "furthermore", "in conclusion"
+- NO robotic patterns or templates
+- Use ONLY facts from raw material (NO invented scores/quotes/dates)
+- Write in SIMPLE ENGLISH (10th class level)
+- Make it 100% UNIQUE and ORIGINAL (pass plagiarism checkers)
+- Make it sound HUMAN (pass AI detection tools)
 
 HTML FORMAT:
-- Return **HTML BODY ONLY** (no <html>, no <head>, no <body>)
-- Use only: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>
-- Start with <h1> for the title
-- Follow the approved outline for <h2> and <h3> sections
-- Write natural flowing <p> paragraphs (not bullet points unless listing stats)
-- Use <strong> for player names and key stats
-- Use <blockquote> for any quotes from players/coaches
+- Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
+- Use: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>
+- Start with <h1>${recTitle || ""}</h1>
+- Use EXACT H2 and H3 headings from the outline above
+- Write natural flowing paragraphs
+- Use <strong> for player names and important stats
+- Use <ul><li> only for listing multiple stats
 
-Approved SEO Structure:
-- Title: ${recTitle || ""}
-- Meta: ${recMeta || ""}
-- Outline:
-${recOutline || ""}
-- Keywords: ${recPrimary || ""}; ${recSecondary || ""}
+TARGET SEO KEYWORDS (use naturally in content):
+Primary: ${recPrimary || ""}
+Secondary: ${recSecondary || ""}
 
-Raw Cricket Material:
+Raw Cricket Material (REWRITE COMPLETELY - DON'T COPY):
 Title: ${rawTitle || ""}
 Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
 
-OUTPUT:
-Return VALID HTML for the body only. Write a complete, engaging cricket article that sounds human-written, not AI-generated. No commentary or meta text - just the HTML article.
+OUTPUT INSTRUCTIONS:
+Write a complete, engaging cricket article that:
+✓ Sounds like a REAL HUMAN cricket fan wrote it
+✓ Passes AI detection tools (use human writing patterns)
+✓ Passes plagiarism checkers (100% original rewrite)
+✓ Follows the SEO outline EXACTLY
+✓ Uses simple 10th class English
+✓ Includes all cricket facts accurately
+✓ Is 800-1200 words long
+
+Start writing now - just the HTML body content, nothing else.
 `.trim();
 }
 
