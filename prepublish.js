@@ -272,46 +272,49 @@ IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
 - Don't skip any sections from the outline
 - Don't add extra sections not in the outline
 
-WRITING STYLE (MAXIMUM HUMAN-LIKE):
-1. Write like you're chatting with a friend over tea, NOT writing an article
-2. VARY SENTENCE LENGTH WILDLY: Mix 3-word sentences with 25-word rambling ones randomly
-3. Use STRONG reactions but DON'T REPEAT SAME FILLERS: "NO WAY!", "Wait, what?!", "Insane!"
-4. Use contractions HEAVILY: don't, can't, won't, it's, that's, I'm, gonna, wanna
-5. Include cricket facts but DON'T cover all angles evenly - skip some details, focus heavily on others
-6. Ask questions but VARY THE STYLE: "Right?", "Know what I mean?", "Or maybe not?"
-7. Use MESSY transitions but DON'T REPEAT: Switch between "Anyway", "So", "Oh", "Actually", "Look"
-8. Be OPINIONATED and INCONSISTENT - Sometimes neutral, sometimes super biased
-9. Start sentences with And/But/So BUT mix it up with normal starts too
-10. NEVER repeat same filler phrases - AI loves "kinda", "you know?", "oh man" repetitively
-11. Write 800-1200 words but make it feel RANDOM and WANDERING
-12. Mix cricket terms randomly - sometimes formal, sometimes slang, unpredictably
-13. Add RANDOM personal memories: "I remember when Kohli did this in 2019...", "My friend said..."
-14. Use dashes, parentheses, ellipses randomly... not in pattern
-15. DON'T cover all topics evenly - spend 3 paragraphs on one thing, 2 lines on another
-16. Mix sentence lengths: Short. Very short. Then suddenly a really long rambling sentence that goes on and keeps adding thoughts because that's how humans actually write sometimes.
-17. AVOID repetitive conversational patterns - don't sound like AI mimicking casual speech
-18. Add INCONSISTENT emotions - calm for 2 paragraphs, then suddenly excited, then back to analytical
-19. Include PERSONAL OPINIONS based on memories: "Last year I saw him play in Mumbai, he was..."
-20. DON'T be perfectly balanced - humans have biases and forget to cover things
+WRITING STYLE (NATURAL HUMAN JOURNALISM):
+1. Write like a REAL sports journalist for a news site, NOT a dramatic blogger
+2. VARY SENTENCE LENGTH but naturally - mix 5-word with 20-word sentences organically
+3. DON'T OVERUSE DRAMA - Use reactions sparingly (max 2-3 times in whole article)
+4. Use contractions naturally: don't, can't, it's, that's (but not "gonna", "wanna" - too casual)
+5. Include cricket facts with UNEVEN depth - analyze some deeply, mention others briefly
+6. Ask questions RARELY - max 2-3 questions in entire article, not every paragraph
+7. Use NATURAL transitions - mostly just continue naturally, occasional "However", "Meanwhile"
+8. Be MOSTLY analytical with occasional opinion - not constantly dramatic
+9. Start sentences normally MOSTLY - use And/But/So only 2-3 times max
+10. AVOID REPEATED DRAMATIC WORDS - Don't use "wow", "crazy", "massive", "wild" more than once each
+11. Write 800-1200 words in NEWS REPORTING style with some personality
+12. Use proper cricket terminology - minimize slang, sound professional
+13. Add 1-2 subtle references to past matches - not dramatic "I remember when..."
+14. Use punctuation normally - excessive dashes/parentheses look AI-generated
+15. Cover topics UNEVENLY but make it flow naturally - don't jump randomly
+16. Vary sentence length naturally. Some short. Others a bit longer with analysis and context.
+17. Write like ESPN Cricinfo or Cricbuzz - professional but engaging
+18. Keep tone MOSTLY calm and analytical with subtle emotion - not roller coaster
+19. Include analysis based on cricket logic, not personal stories
+20. Sound like a cricket journalist who knows the game, not an excited fan
 
-STRICT ANTI-AI RULES:
+STRICT ANTI-AI DETECTION RULES:
 - NO markdown formatting (no **, *, #, etc.)
-- BANNED AI FILLER REPETITION: Don't repeat "kinda", "you know?", "oh man", "super", "proper", "massive"
-  more than once in the article. AI loves to loop these fillers!
-- BANNED AI PHRASES: "delve", "utilize", "comprehensive", "moreover", "furthermore", 
-  "in conclusion", "it's just unbelievable", "here we are", "at the end of the day",
-  "demonstrated", "showcased", "remarkable", "exceptional", "pivotal", "crucial moment",
-  "proper conundrum", "massive shoes to fill" (these are AI favorites)
-- NO UNIFORM SENTENCE LENGTH - AI makes sentences similar length. Mix 3-word with 30-word!
-- NO REPETITIVE CONVERSATIONAL PATTERNS - AI mimics casual speech in predictable way
-- DON'T cover all angles evenly - AI tries to be balanced. Be unbalanced like humans!
-- NO STRUCTURED COVERAGE - Don't do: captaincy→coach→batting→bowlers→future. Be random!
-- SENTENCE RHYTHM MUST VARY WILDLY - Not uniform flow that AI creates
-- Add PERSONAL MEMORIES/STORIES from past cricket matches (makes it human)
+- DON'T OVERUSE EMOTIONAL WORDS: "wow", "crazy", "massive", "wild", "insane", "pathetic" 
+  - use each MAX ONCE or not at all. AI overuses these!
+- AVOID OVER-DRAMATIC PHRASING: "coz that was just awesome", "Wait, what?! Yeah.", 
+  "Are you kidding me?" - sounds like AI trying to be casual
+- BANNED AI PHRASES: "delve", "utilize", "comprehensive", "moreover", "furthermore",
+  "demonstrated", "showcased", "remarkable", "exceptional", "proper conundrum"
+- DON'T STRUCTURE EVENLY: AI covers each section equally. Be uneven - some sections 
+  long (200 words), some brief (30 words)
+- AVOID REPETITIVE SENTENCE RHYTHM: AI loves build-up → reaction → commentary pattern.
+  Mix it naturally.
+- DON'T BE CONSISTENTLY DRAMATIC: AI stays emotionally high throughout. Be mostly calm 
+  with occasional subtle emotion
+- WRITE LIKE REAL SPORTS JOURNALIST: Professional, analytical, factual with personality
+- NO CARTOON LANGUAGE: Avoid "felt like a cartoon", "just standing there" type phrases
+- Use SIMPLE ENGLISH (10th class level) but PROFESSIONAL tone
 - Use ONLY facts from raw material (NO invented scores/quotes/dates)
-- Write in SIMPLE ENGLISH (10th class level) but with real personality
 - Make it 100% UNIQUE and ORIGINAL (pass plagiarism checkers)
-- Make it EXTREMELY HUMAN (pass ChatGPT detector, GPTZero, ALL AI detectors)
+- Sound like ESPNcricinfo or Cricbuzz article, NOT a dramatic blog post
+- Pass ALL AI detectors by writing like professional cricket journalist
 
 HTML FORMAT:
 - Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
@@ -333,22 +336,27 @@ Body:
 ${rawBody || ""}
 
 OUTPUT INSTRUCTIONS:
-Write a complete, engaging cricket article that:
-✓ Sounds like a REAL HUMAN cricket fan wrote it (not AI mimicking human)
+Write a complete, professional cricket article that:
+✓ Sounds like a PROFESSIONAL SPORTS JOURNALIST wrote it (like ESPNcricinfo/Cricbuzz)
 ✓ Passes ALL AI detection tools (ChatGPT detector, GPTZero, Originality.ai)
 ✓ Passes plagiarism checkers (100% original rewrite)
-✓ Follows the SEO outline EXACTLY but writes each section in random depth
-✓ Uses simple 10th class English with personality
-✓ Includes all cricket facts accurately
+✓ Follows the SEO outline EXACTLY but varies depth (some sections deep, some brief)
+✓ Uses simple 10th class English but PROFESSIONAL news tone
+✓ Includes all cricket facts accurately with analysis
 ✓ Is 800-1200 words long
-✓ Has WILDLY VARYING sentence lengths (3 words to 30+ words randomly)
-✓ Includes 2-3 personal memories or observations about past cricket matches
-✓ Does NOT repeat same filler words (kinda, super, massive, proper - use each max once)
-✓ Has INCONSISTENT emotional tone (calm → excited → analytical, not uniform)
-✓ Feels UNSTRUCTURED and wandering (like real human writing, not AI essay)
+✓ Varies sentence length NATURALLY (5-20 words, not extreme 1-word or 30-word)
+✓ Includes 1-2 SUBTLE references to past cricket context (not dramatic memories)
+✓ Uses emotional/dramatic words SPARINGLY (max 1-2 times total, not every paragraph)
+✓ Stays MOSTLY analytical and calm with occasional subtle emotion
+✓ Feels PROFESSIONAL and structured but not AI-perfect
 
-CRITICAL: Your goal is to fool AI detectors into thinking a human cricket fan wrote this 
-while discussing the match with friends. Be messy, inconsistent, opinionated, and real.
+CRITICAL STYLE GUIDE:
+- Write like you're a cricket journalist for a major sports website
+- Stay MOSTLY factual and analytical (80% calm, 20% subtle emotion)
+- DON'T overuse: "wow", "crazy", "massive", "wild", "insane" (max once each)
+- DON'T be over-dramatic or cartoon-like
+- Mix short analysis with detailed facts naturally
+- Sound credible and professional, not like excited fan or AI trying to sound casual
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
