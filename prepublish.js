@@ -272,50 +272,50 @@ IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
 - Don't skip any sections from the outline
 - Don't add extra sections not in the outline
 
-WRITING STYLE (REAL JOURNALISM - ChatGPT-Proof):
-1. Write like a cricket reporter on DEADLINE - sharp, factual, some rough edges
-2. DON'T STRUCTURE NEATLY: AI does Topic A→B→C→D. You mix topics, circle back, be messy
-3. USE LOTS OF QUOTES: Real journalism = 40% quotes, 60% narration. Include attributed statements
-4. NEVER REPEAT SIMILAR PHRASES: Used "serious questions"? Don't use "point of serious discussion"
-5. BREAK BALANCED COVERAGE: Spend 200 words on one angle, 30 on another - NOT equal weight
-6. MAKE ABRUPT TOPIC CHANGES: Don't always smoothly transition - sometimes just start new point
-7. AVOID AI TRANSITION CLICHÉS: No "So where does X go?", "The path forward", "At the end of day"
-8. BE OPINIONATED IN PLACES: Balanced tone = AI. Have some edge, take subtle stance
-9. VARY PACING WILDLY: Fast brief paragraph, then slow detailed one, then fast again - NOT even
-10. Use DIRECT LANGUAGE: "Pakistan lost badly" not "Pakistan faced defeat in challenging circumstances"
-11. Include SPECIFIC DETAILS: Scores, names, dates, venues - not vague generalities
-12. DON'T POLISH TOO MUCH: Real deadline writing has minor rough spots - AI is too smooth
-13. QUOTE-HEAVY SECTIONS: Some paragraphs should be mostly quotes with brief context
-14. UNEVEN DEPTH: Detail one incident heavily, mention another in passing - NOT systematic coverage
-15. NO FORMULAIC PATTERNS: AI loves pattern. Break it - some sections long, some tiny
-16. Use SHORT PUNCHY SENTENCES mixed with longer analytical ones - NOT uniform length
-17. Include NUMBERS and STATS: Real sports writing is data-heavy
-18. ATTRIBUTE EVERYTHING: "Sources said", "According to reports", "X told reporters" - be journalistic
-19. DON'T COVER ALL ANGLES: Real reporters miss things, focus on some aspects, brief on others
-20. Sound URGENT and FACTUAL like breaking news, NOT polished essay
+WRITING STYLE (WIRE SERVICE NEWS - Ultra Strict):
+1. Write like PTI/ANI news wire - FACTUAL, TIGHT, ATTRIBUTED, minimal commentary
+2. DON'T USE CONVERSATIONAL TONE: No "you know?", "honestly", "I mean", "kinda", "proper"
+3. AVOID INTERJECTIONS: No "Wow. Just wow.", "Proper goosebumps stuff.", "More of this please."
+4. NEVER REPEAT FILLER WORDS: Each word like "proper", "honestly", "really" used ONCE max
+5. WRITE TIGHT: "The tribute was emotional" NOT "It was a proper emotional moment, you know?"
+6. DON'T STRUCTURE NEATLY: Real news doesn't go Tribute→Song→Moments→Players→Future neatly
+7. USE 50% DIRECT QUOTES: Real journalism is quote-heavy with brief narration
+8. ATTRIBUTE EVERYTHING: "Police said", "According to officials", "Sources confirmed"
+9. NO SMOOTH TRANSITIONS: Jump topics abruptly like real breaking news
+10. BE FACTUAL, NOT CHATTY: Report events, don't chat about feelings
+11. Use SPECIFIC DATA: Names, exact times, dates, numbers - not vague "like... eight minutes?"
+12. SHORT DECLARATIVE SENTENCES: "The choir performed for eight minutes." NOT "Their performance was like... eight minutes long? Yeah, eight minutes."
+13. NO RHETORICAL QUESTIONS: Don't ask "Guwahati was buzzing, you know?" - just state facts
+14. MINIMIZE PERSONAL COMMENTARY: Report what happened, not "Genius move" or "We need more of this"
+15. UNEVEN COVERAGE: 200 words on main story, 40 on side detail - NOT all sections equal
+16. NO PACKAGED CONCLUSIONS: Don't wrap up neatly - real news stops when facts end
+17. QUOTE-DRIVEN: Let sources tell story through quotes, minimal narration
+18. PROFESSIONAL LANGUAGE: Not "proper pros" or "kinda perfect" - use standard English
+19. TIGHT TRANSITIONS: Use "Meanwhile", "Separately", "According to" - not chatty bridges
+20. Sound like Reuters/AP wire copy, NOT feature article or blog post
 
-STRICT ANTI-AI DETECTION RULES (ChatGPT-Proof):
+ULTRA-STRICT ANTI-AI DETECTION RULES (ChatGPT + All Detectors):
 - NO markdown formatting (no **, *, #, etc.)
-- NEVER REPEAT SIMILAR PHRASES: AI loves "serious questions", "point of serious discussion", 
-  "tough request", "critical step" - if you use one phrase, don't use similar ones!
-- BANNED AI TRANSITION FILLERS: "So where does X go from here?", "The path forward is not simple",
-  "At the end of the day", "Moving forward", "Going forward" - these are AI favorites!
-- DON'T OVER-STRUCTURE: AI neatly divides sections (topic A → topic B → topic C). 
-  Be MESSY - jump between topics, mention something, come back to it later
-- AVOID BALANCED TONE: AI gives equal weight to every angle. BE UNBALANCED - spend 
-  250 words on one point, 40 words on another
-- DON'T MAKE SMOOTH TRANSITIONS: AI uses perfect bridges between paragraphs. Sometimes 
-  just START new topic abruptly without transition
-- VARY PACING: Some paragraphs fast/brief, some slow/detailed - NOT even pacing throughout
-- USE DIRECT QUOTES: Real journalism has lots of quotes. Include attributed statements
-- DON'T GIVE EQUAL COVERAGE: AI covers Person A (100w), Person B (100w), Event C (100w) evenly.
-  Be random: Person A (200w), Person B (30w), skip Event C or mention briefly
-- BANNED REPETITIVE WORDS: If you use "serious" once, don't use it again. Same with 
-  "critical", "crucial", "important", "significant" - AI repeats these!
-- Use SIMPLE ENGLISH (10th class level) but with SHARP, OPINIONATED edge
-- Use ONLY facts from raw material (NO invented scores/quotes/dates)
-- Sound like a REAL cricket reporter writing under deadline, NOT polished AI essay
-- Be UNEVEN, SHARP, QUOTE-HEAVY like actual sports journalism
+- BANNED CONVERSATIONAL INTERJECTIONS (AI OVERUSES THESE):
+  × "Wow. Just wow." × "you know?" × "honestly" × "really" × "I mean" × "kinda" × "proper"
+  Rule: Use each MAX ONCE in entire article. AI repeats "you know?" 5+ times!
+- BANNED WORD REPETITION: If you use "proper" once, NEVER use it again. Same for:
+  "actually", "honestly", "really", "massive", "huge", "crazy" - AI loves repeating these
+- BANNED AI TRANSITION PATTERNS:
+  × "Anyway, X was great too. But for once, Y might have stolen the headlines."
+  × "So here's the thing that got everyone talking..."
+  × "Okay so here's the thing..."
+  × "The path forward is not simple"
+  × "More of this please" (ending sentences)
+- DON'T STRUCTURE INTO NEAT SECTIONS: AI does: Tribute→Song→Key Moments→Players→What's Next
+  Real journalism jumps around, circles back, mentions things out of order
+- DON'T MAKE SMOOTH TRANSITIONS: Real news is abrupt. Start new paragraph without perfect bridge
+- WRITE TIGHT, NOT CONVERSATIONAL: "It was emotional" NOT "It was a proper emotional moment"
+- NO FILLER PHRASES: × "something else" × "you could feel" × "I mean everyone" × "It's huge"
+- USE DIRECT QUOTES more than narration (40% quotes minimum)
+- ATTRIBUTE FACTS: "According to police", "Sources said", "As reported by" - journalistic style
+- Use SIMPLE ENGLISH but PROFESSIONAL tone - not chatty blog style
+- Sound like PTI/ANI wire service report, NOT casual blog commentary
 
 HTML FORMAT:
 - Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
@@ -336,36 +336,40 @@ Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
 
-OUTPUT INSTRUCTIONS (ChatGPT-PROOF):
-Write a deadline-style cricket news article that:
-✓ Sounds like a REAL REPORTER wrote it under time pressure (NOT polished AI)
-✓ Passes ChatGPT detector, GPTZero, Originality.ai (all AI detection tools)
-✓ Passes plagiarism checkers (100% original rewrite)
-✓ Follows SEO outline but MESSILY - jump topics, come back to them, uneven depth
-✓ Uses simple 10th class English but SHARP, direct news language
-✓ Is 800-1200 words with UNEVEN pacing (fast→slow→fast, NOT uniform)
-✓ Includes LOTS OF QUOTES (40% quoted content, 60% narration)
-✓ NEVER repeats similar phrases (no "serious questions" + "point of serious discussion")
-✓ NO AI transition clichés ("So where does X go?", "The path forward is not simple")
-✓ Gives UNBALANCED coverage (250 words here, 40 words there - NOT equal)
-✓ Makes ABRUPT topic changes (don't always transition smoothly)
-✓ Includes SPECIFIC data (scores, stats, dates, venues)
-✓ Uses ATTRIBUTION ("sources said", "according to", "X told reporters")
-✓ Has minor ROUGH EDGES (real deadline writing isn't AI-polished)
+OUTPUT INSTRUCTIONS (ULTRA-STRICT - ALL AI DETECTORS):
+Write a wire service style cricket news article that:
+✓ Sounds like PTI/Reuters wire copy (FACTUAL, TIGHT, NOT conversational)
+✓ Passes ChatGPT, GPTZero, Originality.ai, ALL AI detectors
+✓ Passes plagiarism checkers (100% original)
+✓ Uses simple 10th class English but PROFESSIONAL news wire tone
+✓ Is 800-1200 words with UNEVEN depth (200w main story, 50w side detail)
+✓ Is 50% DIRECT QUOTES with attribution, 50% brief narration
+✓ ZERO repetition of filler words (each word like "proper", "honestly" used ONCE max)
+✓ NO conversational tone ("you know?", "I mean", "kinda" - BANNED)
+✓ NO interjections ("Wow. Just wow.", "Proper goosebumps stuff." - BANNED)
+✓ NO smooth chatty transitions ("Anyway, the match was great too..." - BANNED)
+✓ FACTUAL REPORTING only, minimal personal commentary
+✓ ATTRIBUTE everything ("Police said", "According to", "Sources confirmed")
+✓ SHORT TIGHT SENTENCES like wire copy
+✓ ABRUPT topic changes (real news doesn't flow smoothly)
 
-CRITICAL - AVOID THESE AI PATTERNS:
-❌ Neatly structured sections (Topic A→B→C→D evenly covered)
-❌ Balanced tone giving equal weight to everything
-❌ Phrase repetition ("serious", "critical", "important" used multiple times)
-❌ Smooth generic transitions between all paragraphs
-❌ Polished formulaic writing
+CRITICAL - THESE EXACT PATTERNS ChatGPT CATCHES:
+❌ "Wow. Just wow." / "Proper goosebumps stuff." / "More of this please."
+❌ Repeating "proper" 5+ times ("proper emotional", "proper pros", "proper meaning")
+❌ Repeating "you know?" multiple times
+❌ "Anyway, X was great. But for once, Y might have stolen the headlines."
+❌ Neat section structure: Tribute→Song→Key Moments→Players→What's Next
+❌ Conversational narrative throughout
+❌ "Smooth but generic transitions"
+❌ "Too perfectly packaged"
 
-✅ WRITE LIKE THIS INSTEAD:
-✓ Messy structure - jump topics, circle back
-✓ Unbalanced - deep dive one point, brief mention another
-✓ Each phrase used ONCE only
-✓ Abrupt changes, not always smooth
-✓ Rough, urgent, quote-heavy like real breaking news
+✅ WRITE LIKE WIRE SERVICE NEWS INSTEAD:
+✓ Tight factual sentences: "The choir performed for eight minutes."
+✓ NOT chatty: "Their performance was like... eight minutes long? Yeah, eight minutes."
+✓ Quote-heavy: 50% direct quotes with attribution
+✓ No filler word repetition
+✓ Professional tone, not blog commentary
+✓ Abrupt, fact-driven, minimal transitions
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
