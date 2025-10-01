@@ -273,38 +273,45 @@ IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
 - Don't add extra sections not in the outline
 
 WRITING STYLE (MAXIMUM HUMAN-LIKE):
-1. Write like you're chatting with a friend, NOT writing an essay
-2. VARY TONE WILDLY: excited → calm → frustrated → happy (randomly)
-3. Use STRONG reactions: "NO WAY!", "Wait, what?!", "Are you kidding me?!"
+1. Write like you're chatting with a friend over tea, NOT writing an article
+2. VARY SENTENCE LENGTH WILDLY: Mix 3-word sentences with 25-word rambling ones randomly
+3. Use STRONG reactions but DON'T REPEAT SAME FILLERS: "NO WAY!", "Wait, what?!", "Insane!"
 4. Use contractions HEAVILY: don't, can't, won't, it's, that's, I'm, gonna, wanna
-5. Include cricket facts but explain casually, not perfectly structured
-6. Ask LOTS of questions: "Right?", "Know what I mean?", "Am I wrong here?"
-7. Use MESSY transitions: "Anyway...", "So yeah", "Oh and", "Actually wait"
-8. Be OPINIONATED - Don't be neutral! Show clear preferences
-9. Start sentences with And/But/So (break grammar rules like humans do)
-10. DON'T repeat similar phrases - AI loves "It's just...", "Here's the thing"
-11. Write 800-1200 words but make it feel UNSTRUCTURED
-12. Mix cricket terms with slang: "absolutely smashed it", "got rekt"
-13. Add INTERRUPTING thoughts in middle: "Kohli - and man this guy is something - scored 112"
-14. Use dashes and parentheses for side comments (humans do this a lot)
-15. DON'T make every paragraph flow perfectly - sometimes jump topics
-16. Add incomplete sentences. Like this. For emphasis.
-17. Use "like" as filler: "He was like, totally dominating"
-18. Show FRUSTRATION or EXCITEMENT, not always balanced analysis
+5. Include cricket facts but DON'T cover all angles evenly - skip some details, focus heavily on others
+6. Ask questions but VARY THE STYLE: "Right?", "Know what I mean?", "Or maybe not?"
+7. Use MESSY transitions but DON'T REPEAT: Switch between "Anyway", "So", "Oh", "Actually", "Look"
+8. Be OPINIONATED and INCONSISTENT - Sometimes neutral, sometimes super biased
+9. Start sentences with And/But/So BUT mix it up with normal starts too
+10. NEVER repeat same filler phrases - AI loves "kinda", "you know?", "oh man" repetitively
+11. Write 800-1200 words but make it feel RANDOM and WANDERING
+12. Mix cricket terms randomly - sometimes formal, sometimes slang, unpredictably
+13. Add RANDOM personal memories: "I remember when Kohli did this in 2019...", "My friend said..."
+14. Use dashes, parentheses, ellipses randomly... not in pattern
+15. DON'T cover all topics evenly - spend 3 paragraphs on one thing, 2 lines on another
+16. Mix sentence lengths: Short. Very short. Then suddenly a really long rambling sentence that goes on and keeps adding thoughts because that's how humans actually write sometimes.
+17. AVOID repetitive conversational patterns - don't sound like AI mimicking casual speech
+18. Add INCONSISTENT emotions - calm for 2 paragraphs, then suddenly excited, then back to analytical
+19. Include PERSONAL OPINIONS based on memories: "Last year I saw him play in Mumbai, he was..."
+20. DON'T be perfectly balanced - humans have biases and forget to cover things
 
 STRICT ANTI-AI RULES:
 - NO markdown formatting (no **, *, #, etc.)
+- BANNED AI FILLER REPETITION: Don't repeat "kinda", "you know?", "oh man", "super", "proper", "massive"
+  more than once in the article. AI loves to loop these fillers!
 - BANNED AI PHRASES: "delve", "utilize", "comprehensive", "moreover", "furthermore", 
   "in conclusion", "it's just unbelievable", "here we are", "at the end of the day",
-  "demonstrated", "showcased", "remarkable", "exceptional", "pivotal", "crucial moment"
-- NO REPETITIVE PATTERNS - ChatGPT/AI loves to repeat sentence structures
-- NO OVERLY SMOOTH FLOW - Make it rough like human writing
-- NO BALANCED NEUTRAL TONE - Be biased! Pick favorites! Show emotion!
-- DON'T structure everything perfectly - humans are messy
+  "demonstrated", "showcased", "remarkable", "exceptional", "pivotal", "crucial moment",
+  "proper conundrum", "massive shoes to fill" (these are AI favorites)
+- NO UNIFORM SENTENCE LENGTH - AI makes sentences similar length. Mix 3-word with 30-word!
+- NO REPETITIVE CONVERSATIONAL PATTERNS - AI mimics casual speech in predictable way
+- DON'T cover all angles evenly - AI tries to be balanced. Be unbalanced like humans!
+- NO STRUCTURED COVERAGE - Don't do: captaincy→coach→batting→bowlers→future. Be random!
+- SENTENCE RHYTHM MUST VARY WILDLY - Not uniform flow that AI creates
+- Add PERSONAL MEMORIES/STORIES from past cricket matches (makes it human)
 - Use ONLY facts from raw material (NO invented scores/quotes/dates)
-- Write in SIMPLE ENGLISH (10th class level) but with personality
+- Write in SIMPLE ENGLISH (10th class level) but with real personality
 - Make it 100% UNIQUE and ORIGINAL (pass plagiarism checkers)
-- Make it EXTREMELY HUMAN (pass AI detection tools like ChatGPT detector)
+- Make it EXTREMELY HUMAN (pass ChatGPT detector, GPTZero, ALL AI detectors)
 
 HTML FORMAT:
 - Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
@@ -327,13 +334,21 @@ ${rawBody || ""}
 
 OUTPUT INSTRUCTIONS:
 Write a complete, engaging cricket article that:
-✓ Sounds like a REAL HUMAN cricket fan wrote it
-✓ Passes AI detection tools (use human writing patterns)
+✓ Sounds like a REAL HUMAN cricket fan wrote it (not AI mimicking human)
+✓ Passes ALL AI detection tools (ChatGPT detector, GPTZero, Originality.ai)
 ✓ Passes plagiarism checkers (100% original rewrite)
-✓ Follows the SEO outline EXACTLY
-✓ Uses simple 10th class English
+✓ Follows the SEO outline EXACTLY but writes each section in random depth
+✓ Uses simple 10th class English with personality
 ✓ Includes all cricket facts accurately
 ✓ Is 800-1200 words long
+✓ Has WILDLY VARYING sentence lengths (3 words to 30+ words randomly)
+✓ Includes 2-3 personal memories or observations about past cricket matches
+✓ Does NOT repeat same filler words (kinda, super, massive, proper - use each max once)
+✓ Has INCONSISTENT emotional tone (calm → excited → analytical, not uniform)
+✓ Feels UNSTRUCTURED and wandering (like real human writing, not AI essay)
+
+CRITICAL: Your goal is to fool AI detectors into thinking a human cricket fan wrote this 
+while discussing the match with friends. Be messy, inconsistent, opinionated, and real.
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
