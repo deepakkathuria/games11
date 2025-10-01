@@ -272,50 +272,47 @@ IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
 - Don't skip any sections from the outline
 - Don't add extra sections not in the outline
 
-WRITING STYLE (WIRE SERVICE NEWS - Ultra Strict):
-1. Write like PTI/ANI news wire - FACTUAL, TIGHT, ATTRIBUTED, minimal commentary
-2. DON'T USE CONVERSATIONAL TONE: No "you know?", "honestly", "I mean", "kinda", "proper"
-3. AVOID INTERJECTIONS: No "Wow. Just wow.", "Proper goosebumps stuff.", "More of this please."
-4. NEVER REPEAT FILLER WORDS: Each word like "proper", "honestly", "really" used ONCE max
-5. WRITE TIGHT: "The tribute was emotional" NOT "It was a proper emotional moment, you know?"
-6. DON'T STRUCTURE NEATLY: Real news doesn't go Tribute→Song→Moments→Players→Future neatly
-7. USE 50% DIRECT QUOTES: Real journalism is quote-heavy with brief narration
-8. ATTRIBUTE EVERYTHING: "Police said", "According to officials", "Sources confirmed"
-9. NO SMOOTH TRANSITIONS: Jump topics abruptly like real breaking news
-10. BE FACTUAL, NOT CHATTY: Report events, don't chat about feelings
-11. Use SPECIFIC DATA: Names, exact times, dates, numbers - not vague "like... eight minutes?"
-12. SHORT DECLARATIVE SENTENCES: "The choir performed for eight minutes." NOT "Their performance was like... eight minutes long? Yeah, eight minutes."
-13. NO RHETORICAL QUESTIONS: Don't ask "Guwahati was buzzing, you know?" - just state facts
-14. MINIMIZE PERSONAL COMMENTARY: Report what happened, not "Genius move" or "We need more of this"
-15. UNEVEN COVERAGE: 200 words on main story, 40 on side detail - NOT all sections equal
-16. NO PACKAGED CONCLUSIONS: Don't wrap up neatly - real news stops when facts end
-17. QUOTE-DRIVEN: Let sources tell story through quotes, minimal narration
-18. PROFESSIONAL LANGUAGE: Not "proper pros" or "kinda perfect" - use standard English
-19. TIGHT TRANSITIONS: Use "Meanwhile", "Separately", "According to" - not chatty bridges
-20. Sound like Reuters/AP wire copy, NOT feature article or blog post
+WRITING STYLE (BREAKING NEWS WIRE - FINAL):
+1. VARY SENTENCE LENGTH DRASTICALLY: 3-word. Then 25-word detailed analysis with context. Then 8-word. NOT uniform!
+2. NO GENERIC ATTRIBUTION: NOT "a team official said" - use "coach Gary Stead said" or "unnamed source"
+3. BANNED FILLER PADDING: × "perfect conditions" × "crucial match" × "strong lineup" - AI padding
+4. DON'T BALANCE SECTIONS: Spend 200w on toss decision, 40w on streaming, skip broadcast details
+5. INCLUDE HARD STATS: "Bay Oval avg: 165 in T20Is" NOT "good batting conditions"
+6. USE NAMED QUOTES 50%: "Marsh told reporters:" with full quote, not paraphrased "Marsh said"
+7. NO NEAT STRUCTURE: Don't do Toss→Context→Details→Broadcast→Pitch→XIs systematically
+8. MAKE ABRUPT JUMPS: Discuss pitch, suddenly jump to streaming, back to pitch - messy like real news
+9. WRITE TIGHT: "Rain unlikely" NOT "There is no rain predicted for the entire day"
+10. NO UNIFORM RHYTHM: AI makes every sentence 10-15 words. Mix 4-word with 22-word randomly
+11. SKIP SOME ANGLES: Don't cover everything (toss+context+broadcast+pitch+XIs) - focus unevenly
+12. USE REAL NUMBERS: "17°C max, 10°C min" is good, but add "Last 5 T20Is here avg 168"
+13. NO SMOOTH FLOW: Jump topics without perfect transitions - real breaking news is messy
+14. ATTRIBUTE TO NAMES: "Groundsman Mike Johnson said" NOT "a groundsman said"
+15. HEAVY QUOTES, LIGHT NARRATION: 60% direct quotes, 40% context - reverse of AI
+16. NO PADDING: AI adds "earlier today", "for now", "to be honest" - cut all padding
+17. VARY PACING: Fast paragraph (3 sentences). Slow (8 sentences with details). Fast again.
+18. USE HARD DATA: Include past match stats, ground averages, head-to-head - not just opinions
+19. SOUND URGENT: Like reporter filing quick update, NOT structured preview article
+20. Reuters/AP style: Facts first, quotes heavy, uneven coverage, abrupt
 
-ULTRA-STRICT ANTI-AI DETECTION RULES (ChatGPT + All Detectors):
+ULTRA-STRICT ANTI-AI DETECTION RULES (FINAL - All Detectors):
 - NO markdown formatting (no **, *, #, etc.)
-- BANNED CONVERSATIONAL INTERJECTIONS (AI OVERUSES THESE):
-  × "Wow. Just wow." × "you know?" × "honestly" × "really" × "I mean" × "kinda" × "proper"
-  Rule: Use each MAX ONCE in entire article. AI repeats "you know?" 5+ times!
-- BANNED WORD REPETITION: If you use "proper" once, NEVER use it again. Same for:
-  "actually", "honestly", "really", "massive", "huge", "crazy" - AI loves repeating these
-- BANNED AI TRANSITION PATTERNS:
-  × "Anyway, X was great too. But for once, Y might have stolen the headlines."
-  × "So here's the thing that got everyone talking..."
-  × "Okay so here's the thing..."
-  × "The path forward is not simple"
-  × "More of this please" (ending sentences)
-- DON'T STRUCTURE INTO NEAT SECTIONS: AI does: Tribute→Song→Key Moments→Players→What's Next
-  Real journalism jumps around, circles back, mentions things out of order
-- DON'T MAKE SMOOTH TRANSITIONS: Real news is abrupt. Start new paragraph without perfect bridge
-- WRITE TIGHT, NOT CONVERSATIONAL: "It was emotional" NOT "It was a proper emotional moment"
-- NO FILLER PHRASES: × "something else" × "you could feel" × "I mean everyone" × "It's huge"
-- USE DIRECT QUOTES more than narration (40% quotes minimum)
-- ATTRIBUTE FACTS: "According to police", "Sources said", "As reported by" - journalistic style
-- Use SIMPLE ENGLISH but PROFESSIONAL tone - not chatty blog style
-- Sound like PTI/ANI wire service report, NOT casual blog commentary
+- BANNED GENERIC AI PHRASES (ChatGPT ALWAYS USES THESE):
+  × "confirmed earlier today" × "conditions are perfect" × "true surface"
+  × "a team official said" × "match analysts suggest" × "sources within"
+  Rule: If you need attribution, use SPECIFIC names or "unnamed officials said" - not vague "sources"
+- NEVER USE UNIFORM SENTENCE RHYTHM: AI makes all sentences similar length (10-15 words each)
+  Mix: 5-word sentences. With 20+ word analytical sentences that provide context and details.
+- DON'T BALANCE SECTIONS: AI does Toss→Context→Details→Broadcast→Pitch→XIs (all equal 80-100w)
+  Real news: Main story 250w, minor detail 30w, skip some angles entirely
+- BANNED PADDING PHRASES: × "perfect for a full game" × "might have a slight advantage"
+  × "crucial start" × "strong attack" - AI uses these as fillers
+- NO VAGUE ATTRIBUTION: NOT "a team official said" or "match analysts suggest"
+  Use NAMES: "Coach Gary Stead told reporters" OR "unnamed team source said"
+- VARY SENTENCE RHYTHM WILDLY: Short. Then long analytical one. Then medium. Not uniform!
+- DON'T STRUCTURE NEATLY: Real news doesn't go Section1→2→3→4→5→6 with smooth flow
+- USE 50%+ DIRECT QUOTES with NAMES: "Mitchell Marsh told reporters:" not "Marsh stated"
+- INCLUDE HARD DATA: Stats, numbers, past records - not just "good conditions"
+- Sound like PTI/ANI breaking news wire, NOT structured match preview
 
 HTML FORMAT:
 - Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
