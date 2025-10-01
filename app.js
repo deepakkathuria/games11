@@ -1792,8 +1792,8 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       console.log('✅ Using existing SEO recommendations');
     }
 
-    // 2) generate BODY HTML with outline - using higher temperature for human-like, anti-AI detection
-    console.log('✍️ Generating unique, human-like cricket article (this may take up to 2 minutes)...');
+    // 2) generate BODY HTML with outline - maximum temperature for truly human-like, anti-AI detection
+    console.log('✍️ Generating unique, extremely human-like cricket article (this may take up to 2 minutes)...');
     const bodyPrompt = buildRewriteBodyHtmlPrompt({
       rawTitle: article.title || "",
       rawDescription: article.description || "",
@@ -1804,7 +1804,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       recPrimary: recs.keywords?.primary || "",
       recSecondary: recs.keywords?.secondary || "",
     });
-    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 1.0, max_tokens: 4000 });
+    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 1.2, max_tokens: 4000 });
     console.log('✅ Article body generated');
 
     // 3) wrap to full HTML doc and save
