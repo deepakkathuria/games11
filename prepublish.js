@@ -272,49 +272,50 @@ IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
 - Don't skip any sections from the outline
 - Don't add extra sections not in the outline
 
-WRITING STYLE (NATURAL HUMAN JOURNALISM):
-1. Write like a REAL sports journalist for a news site, NOT a dramatic blogger
-2. VARY SENTENCE LENGTH but naturally - mix 5-word with 20-word sentences organically
-3. DON'T OVERUSE DRAMA - Use reactions sparingly (max 2-3 times in whole article)
-4. Use contractions naturally: don't, can't, it's, that's (but not "gonna", "wanna" - too casual)
-5. Include cricket facts with UNEVEN depth - analyze some deeply, mention others briefly
-6. Ask questions RARELY - max 2-3 questions in entire article, not every paragraph
-7. Use NATURAL transitions - mostly just continue naturally, occasional "However", "Meanwhile"
-8. Be MOSTLY analytical with occasional opinion - not constantly dramatic
-9. Start sentences normally MOSTLY - use And/But/So only 2-3 times max
-10. AVOID REPEATED DRAMATIC WORDS - Don't use "wow", "crazy", "massive", "wild" more than once each
-11. Write 800-1200 words in NEWS REPORTING style with some personality
-12. Use proper cricket terminology - minimize slang, sound professional
-13. Add 1-2 subtle references to past matches - not dramatic "I remember when..."
-14. Use punctuation normally - excessive dashes/parentheses look AI-generated
-15. Cover topics UNEVENLY but make it flow naturally - don't jump randomly
-16. Vary sentence length naturally. Some short. Others a bit longer with analysis and context.
-17. Write like ESPN Cricinfo or Cricbuzz - professional but engaging
-18. Keep tone MOSTLY calm and analytical with subtle emotion - not roller coaster
-19. Include analysis based on cricket logic, not personal stories
-20. Sound like a cricket journalist who knows the game, not an excited fan
+WRITING STYLE (REAL JOURNALISM - ChatGPT-Proof):
+1. Write like a cricket reporter on DEADLINE - sharp, factual, some rough edges
+2. DON'T STRUCTURE NEATLY: AI does Topic A→B→C→D. You mix topics, circle back, be messy
+3. USE LOTS OF QUOTES: Real journalism = 40% quotes, 60% narration. Include attributed statements
+4. NEVER REPEAT SIMILAR PHRASES: Used "serious questions"? Don't use "point of serious discussion"
+5. BREAK BALANCED COVERAGE: Spend 200 words on one angle, 30 on another - NOT equal weight
+6. MAKE ABRUPT TOPIC CHANGES: Don't always smoothly transition - sometimes just start new point
+7. AVOID AI TRANSITION CLICHÉS: No "So where does X go?", "The path forward", "At the end of day"
+8. BE OPINIONATED IN PLACES: Balanced tone = AI. Have some edge, take subtle stance
+9. VARY PACING WILDLY: Fast brief paragraph, then slow detailed one, then fast again - NOT even
+10. Use DIRECT LANGUAGE: "Pakistan lost badly" not "Pakistan faced defeat in challenging circumstances"
+11. Include SPECIFIC DETAILS: Scores, names, dates, venues - not vague generalities
+12. DON'T POLISH TOO MUCH: Real deadline writing has minor rough spots - AI is too smooth
+13. QUOTE-HEAVY SECTIONS: Some paragraphs should be mostly quotes with brief context
+14. UNEVEN DEPTH: Detail one incident heavily, mention another in passing - NOT systematic coverage
+15. NO FORMULAIC PATTERNS: AI loves pattern. Break it - some sections long, some tiny
+16. Use SHORT PUNCHY SENTENCES mixed with longer analytical ones - NOT uniform length
+17. Include NUMBERS and STATS: Real sports writing is data-heavy
+18. ATTRIBUTE EVERYTHING: "Sources said", "According to reports", "X told reporters" - be journalistic
+19. DON'T COVER ALL ANGLES: Real reporters miss things, focus on some aspects, brief on others
+20. Sound URGENT and FACTUAL like breaking news, NOT polished essay
 
-STRICT ANTI-AI DETECTION RULES:
+STRICT ANTI-AI DETECTION RULES (ChatGPT-Proof):
 - NO markdown formatting (no **, *, #, etc.)
-- DON'T OVERUSE EMOTIONAL WORDS: "wow", "crazy", "massive", "wild", "insane", "pathetic" 
-  - use each MAX ONCE or not at all. AI overuses these!
-- AVOID OVER-DRAMATIC PHRASING: "coz that was just awesome", "Wait, what?! Yeah.", 
-  "Are you kidding me?" - sounds like AI trying to be casual
-- BANNED AI PHRASES: "delve", "utilize", "comprehensive", "moreover", "furthermore",
-  "demonstrated", "showcased", "remarkable", "exceptional", "proper conundrum"
-- DON'T STRUCTURE EVENLY: AI covers each section equally. Be uneven - some sections 
-  long (200 words), some brief (30 words)
-- AVOID REPETITIVE SENTENCE RHYTHM: AI loves build-up → reaction → commentary pattern.
-  Mix it naturally.
-- DON'T BE CONSISTENTLY DRAMATIC: AI stays emotionally high throughout. Be mostly calm 
-  with occasional subtle emotion
-- WRITE LIKE REAL SPORTS JOURNALIST: Professional, analytical, factual with personality
-- NO CARTOON LANGUAGE: Avoid "felt like a cartoon", "just standing there" type phrases
-- Use SIMPLE ENGLISH (10th class level) but PROFESSIONAL tone
+- NEVER REPEAT SIMILAR PHRASES: AI loves "serious questions", "point of serious discussion", 
+  "tough request", "critical step" - if you use one phrase, don't use similar ones!
+- BANNED AI TRANSITION FILLERS: "So where does X go from here?", "The path forward is not simple",
+  "At the end of the day", "Moving forward", "Going forward" - these are AI favorites!
+- DON'T OVER-STRUCTURE: AI neatly divides sections (topic A → topic B → topic C). 
+  Be MESSY - jump between topics, mention something, come back to it later
+- AVOID BALANCED TONE: AI gives equal weight to every angle. BE UNBALANCED - spend 
+  250 words on one point, 40 words on another
+- DON'T MAKE SMOOTH TRANSITIONS: AI uses perfect bridges between paragraphs. Sometimes 
+  just START new topic abruptly without transition
+- VARY PACING: Some paragraphs fast/brief, some slow/detailed - NOT even pacing throughout
+- USE DIRECT QUOTES: Real journalism has lots of quotes. Include attributed statements
+- DON'T GIVE EQUAL COVERAGE: AI covers Person A (100w), Person B (100w), Event C (100w) evenly.
+  Be random: Person A (200w), Person B (30w), skip Event C or mention briefly
+- BANNED REPETITIVE WORDS: If you use "serious" once, don't use it again. Same with 
+  "critical", "crucial", "important", "significant" - AI repeats these!
+- Use SIMPLE ENGLISH (10th class level) but with SHARP, OPINIONATED edge
 - Use ONLY facts from raw material (NO invented scores/quotes/dates)
-- Make it 100% UNIQUE and ORIGINAL (pass plagiarism checkers)
-- Sound like ESPNcricinfo or Cricbuzz article, NOT a dramatic blog post
-- Pass ALL AI detectors by writing like professional cricket journalist
+- Sound like a REAL cricket reporter writing under deadline, NOT polished AI essay
+- Be UNEVEN, SHARP, QUOTE-HEAVY like actual sports journalism
 
 HTML FORMAT:
 - Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
@@ -335,28 +336,36 @@ Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
 
-OUTPUT INSTRUCTIONS:
-Write a complete, professional cricket article that:
-✓ Sounds like a PROFESSIONAL SPORTS JOURNALIST wrote it (like ESPNcricinfo/Cricbuzz)
-✓ Passes ALL AI detection tools (ChatGPT detector, GPTZero, Originality.ai)
+OUTPUT INSTRUCTIONS (ChatGPT-PROOF):
+Write a deadline-style cricket news article that:
+✓ Sounds like a REAL REPORTER wrote it under time pressure (NOT polished AI)
+✓ Passes ChatGPT detector, GPTZero, Originality.ai (all AI detection tools)
 ✓ Passes plagiarism checkers (100% original rewrite)
-✓ Follows the SEO outline EXACTLY but varies depth (some sections deep, some brief)
-✓ Uses simple 10th class English but PROFESSIONAL news tone
-✓ Includes all cricket facts accurately with analysis
-✓ Is 800-1200 words long
-✓ Varies sentence length NATURALLY (5-20 words, not extreme 1-word or 30-word)
-✓ Includes 1-2 SUBTLE references to past cricket context (not dramatic memories)
-✓ Uses emotional/dramatic words SPARINGLY (max 1-2 times total, not every paragraph)
-✓ Stays MOSTLY analytical and calm with occasional subtle emotion
-✓ Feels PROFESSIONAL and structured but not AI-perfect
+✓ Follows SEO outline but MESSILY - jump topics, come back to them, uneven depth
+✓ Uses simple 10th class English but SHARP, direct news language
+✓ Is 800-1200 words with UNEVEN pacing (fast→slow→fast, NOT uniform)
+✓ Includes LOTS OF QUOTES (40% quoted content, 60% narration)
+✓ NEVER repeats similar phrases (no "serious questions" + "point of serious discussion")
+✓ NO AI transition clichés ("So where does X go?", "The path forward is not simple")
+✓ Gives UNBALANCED coverage (250 words here, 40 words there - NOT equal)
+✓ Makes ABRUPT topic changes (don't always transition smoothly)
+✓ Includes SPECIFIC data (scores, stats, dates, venues)
+✓ Uses ATTRIBUTION ("sources said", "according to", "X told reporters")
+✓ Has minor ROUGH EDGES (real deadline writing isn't AI-polished)
 
-CRITICAL STYLE GUIDE:
-- Write like you're a cricket journalist for a major sports website
-- Stay MOSTLY factual and analytical (80% calm, 20% subtle emotion)
-- DON'T overuse: "wow", "crazy", "massive", "wild", "insane" (max once each)
-- DON'T be over-dramatic or cartoon-like
-- Mix short analysis with detailed facts naturally
-- Sound credible and professional, not like excited fan or AI trying to sound casual
+CRITICAL - AVOID THESE AI PATTERNS:
+❌ Neatly structured sections (Topic A→B→C→D evenly covered)
+❌ Balanced tone giving equal weight to everything
+❌ Phrase repetition ("serious", "critical", "important" used multiple times)
+❌ Smooth generic transitions between all paragraphs
+❌ Polished formulaic writing
+
+✅ WRITE LIKE THIS INSTEAD:
+✓ Messy structure - jump topics, circle back
+✓ Unbalanced - deep dive one point, brief mention another
+✓ Each phrase used ONCE only
+✓ Abrupt changes, not always smooth
+✓ Rough, urgent, quote-heavy like real breaking news
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
