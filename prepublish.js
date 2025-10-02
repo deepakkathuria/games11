@@ -1,155 +1,3 @@
-// // server/prepublish.js
-// const axios = require('axios');
-
-// const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-// const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
-
-// async function generateWithDeepSeek(prompt, options = {}) {
-//   const resp = await axios.post(
-//     DEEPSEEK_BASE_URL,
-//     {
-//       model: "deepseek-chat",
-//       messages: [{ role: "user", content: prompt }],
-//       temperature: options.temperature ?? 0.7,
-//       max_tokens: options.max_tokens ?? 2000,
-//     },
-//     {
-//       headers: {
-//         Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-//         "Content-Type": "application/json",
-//       },
-//       timeout: 60000,
-//     }
-//   );
-//   return resp.data.choices?.[0]?.message?.content || "";
-// }
-
-// // ---------- PROMPTS ----------
-// function buildPrePublishPrompt({ title, description, body }) {
-//   return `
-// You are an SEO editor for a cricket news site. 
-// First produce pre-publish recommendations ONLY (no article body yet).
-
-// HARD RULES
-// - Use ONLY facts from the input. Do NOT invent scores, quotes, dates, venues.
-// - Return clean, concise recommendations.
-// - English output.
-// - No markdown headings like ##; use plain labels.
-
-// INPUT
-// Title: ${title || ""}
-// Description: ${description || ""}
-// Body:
-// ${body || ""}
-
-// TASKS (return in this order, exact labels):
-
-// 1) RECOMMENDED TITLE:
-// 2) RECOMMENDED META DESCRIPTION:
-// 3) RECOMMENDED SLUG:
-// 4) OUTLINE:
-// - H2: ...
-// - H3: ...
-// 5) KEYWORDS:
-// - Primary: ...
-// - Secondary: ...
-// 6) FACTS CHECKLIST:
-// - final score: present/absent
-// - target: present/absent
-// - overs: present/absent
-// - top scorers: present/absent
-// - wickets: present/absent
-// - venue: present/absent
-// - date: present/absent
-// - toss: present/absent
-// - result: present/absent
-// 7) QUALITY FLAGS:
-// - ...
-// 8) VERDICT: OK / REVIEW / BLOCK + one-line reason
-// `.trim();
-// }
-
-// function buildRewriteToSpecPrompt({
-//   rawTitle, rawDescription, rawBody,
-//   recTitle, recMeta, recSlug, recOutline, recPrimary, recSecondary
-// }) {
-//   return `
-// You are a cricket news copy editor. 
-// Rewrite the article EXACTLY following the approved pre-publish recommendations.
-
-// HARD RULES
-// - Do NOT invent facts. Use only what exists in the raw content.
-// - If a fact is missing, omit it naturally (do not guess).
-// - Output format: plain text paragraphs (no markdown lists, no ###).
-// - Keep newsroom tone: clear lede, tight pacing, factual with light color.
-
-// INPUTS
-// A) RAW MATERIAL
-// Title: ${rawTitle || ""}
-// Description: ${rawDescription || ""}
-// Body:
-// ${rawBody || ""}
-
-// B) APPROVED RECOMMENDATIONS
-// - Title: ${recTitle || ""}
-// - Meta: ${recMeta || ""}
-// - Slug: ${recSlug || ""}
-// - Outline:
-// ${recOutline || ""}
-// - Keywords:
-//   Primary: ${recPrimary || ""}
-//   Secondary: ${recSecondary || ""}
-
-// OUTPUT (in this exact order)
-// 1) FINAL TITLE: ${recTitle || ""}
-// 2) FINAL META DESCRIPTION: ${recMeta || ""}
-// 3) FINAL SLUG: ${recSlug || ""}
-// 4) BODY:
-// {Rewrite the article into 5–9 paragraphs. 
-// Insert H2/H3 headings as plain lines preceding paragraphs, e.g.,
-// H2: Match Summary
-// H3: Key Moments
-// Make sure headings match the recommended outline wording.
-// Do not add facts that are not in RAW MATERIAL.}
-// `.trim();
-// }
-
-// // ---------- PARSER ----------
-// function parsePrePublishTextToJSON(text) {
-//   const get = (regex) => (text.match(regex) || [])[1]?.trim() || "";
-
-//   const recommendedTitle = get(/RECOMMENDED TITLE:\s*([\s\S]*?)(?:\n[A-Z0-9\)]|$)/i);
-//   const recommendedMeta  = get(/RECOMMENDED META DESCRIPTION:\s*([\s\S]*?)(?:\n[A-Z0-9\)]|$)/i);
-//   const recommendedSlug  = get(/RECOMMENDED SLUG:\s*([\s\S]*?)(?:\n[A-Z0-9\)]|$)/i);
-//   const outline          = get(/OUTLINE:\s*([\s\S]*?)(?:\n5\)|\nKEYWORDS:|\n[A-Z]|$)/i);
-//   const primary          = get(/Primary:\s*([^\n]+)/i);
-//   const secondary        = get(/Secondary:\s*([^\n]+)/i);
-//   const factsChecklist   = get(/FACTS CHECKLIST:\s*([\s\S]*?)(?:\n7\)|\nQUALITY FLAGS:|\n[A-Z]|$)/i);
-//   const qualityFlags     = get(/QUALITY FLAGS:\s*([\s\S]*?)(?:\n8\)|\nVERDICT:|\n[A-Z]|$)/i);
-//   const verdict          = get(/VERDICT:\s*([^\n]+)/i);
-
-//   return {
-//     recommendedTitle,
-//     recommendedMeta,
-//     recommendedSlug: (recommendedSlug || "").toLowerCase().replace(/\s+/g, '-'),
-//     outline,
-//     keywords: {
-//       primary,
-//       secondary
-//     },
-//     factsChecklist,
-//     qualityFlags,
-//     verdict
-//   };
-// }
-
-// module.exports = {
-//   generateWithDeepSeek,
-//   buildPrePublishPrompt,
-//   buildRewriteToSpecPrompt,
-//   parsePrePublishTextToJSON,
-// };
-// server/prepublish.js
 const axios = require("axios");
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -195,11 +43,115 @@ async function generateWithDeepSeek(prompt, options = {}) {
   }
 }
 
-/* ---------- PROMPTS ---------- */
+/* ---------- ENHANCED DATA & STATS FUNCTIONS ---------- */
+
+async function fetchCricketStats(playerName, teamName, matchType) {
+  // This function simulates fetching cricket statistics
+  // In a real implementation, you would integrate with ESPNcricinfo API or similar
+  const statsPrompts = {
+    "Virat Kohli": {
+      career: "73 centuries in international cricket, 26,000+ runs across formats",
+      recent: "Averaging 45.2 in last 10 ODIs, strike rate of 89.3",
+      records: "Fastest to 8000, 9000, 10000 ODI runs"
+    },
+    "Rohit Sharma": {
+      career: "31 ODI centuries, 3 double centuries in ODIs",
+      recent: "Captain of India since 2021, led team to Asia Cup 2023 victory",
+      records: "Highest individual score in ODIs (264 runs)"
+    },
+    "MS Dhoni": {
+      career: "10,000+ ODI runs, 350+ dismissals as wicketkeeper",
+      recent: "Retired from international cricket in 2020",
+      records: "Only captain to win all three ICC trophies"
+    }
+  };
+
+  const playerStats = statsPrompts[playerName] || {
+    career: "Established player with significant international experience",
+    recent: "Consistent performer in recent matches",
+    records: "Multiple achievements in international cricket"
+  };
+
+  return playerStats;
+}
+
+async function generateExpertOpinion(topic, context) {
+  try {
+    const expertPrompt = `
+You are a cricket expert analyst. Provide a realistic, insightful quote about this cricket topic. Make it sound like something Harsha Bhogle, Ian Bishop, or Ravi Shastri would say.
+
+Topic: ${topic}
+Context: ${context}
+
+Return ONLY a direct quote in quotation marks. Make it:
+- 1-2 sentences max
+- Insightful and analytical
+- Use cricket terminology naturally
+- Sound like a real expert voice
+- No attribution needed (just the quote)
+
+Example: "The way he's playing the short ball now, you can see the confidence is back in his game."
+`;
+
+    const quote = await generateWithDeepSeek(expertPrompt, { 
+      temperature: 0.8, 
+      max_tokens: 100 
+    });
+    
+    return quote.trim().replace(/^["']|["']$/g, '');
+  } catch (error) {
+    console.error('Error generating expert opinion:', error);
+    return "The conditions look challenging but the players have adapted well to the situation.";
+  }
+}
+
+async function generateSocialMediaReactions(articleTitle, keyEvent) {
+  try {
+    const socialPrompt = `
+Generate 5 realistic social media reactions (X/Twitter style) to this cricket news. Make them sound like real cricket fans would write.
+
+Article: ${articleTitle}
+Key Event: ${keyEvent}
+
+Requirements:
+- 5 different reactions
+- Mix of emotions (excitement, criticism, analysis, humor, support)
+- Use casual, social media language
+- Include hashtags naturally
+- 1-2 lines each
+- Sound like real cricket fans from different perspectives
+- Include some abbreviations and emojis
+- Make them trending and realistic
+
+Format each reaction on a new line starting with "• "
+Example: • "Finally! Been waiting for this moment since ages 🏏 #Cricket #Victory"
+
+Return ONLY the 5 reactions, nothing else.
+`;
+
+    const reactions = await generateWithDeepSeek(socialPrompt, { 
+      temperature: 0.9, 
+      max_tokens: 300 
+    });
+    
+    return reactions.split('\n').filter(line => line.trim().startsWith('•')).slice(0, 5);
+  } catch (error) {
+    console.error('Error generating social reactions:', error);
+    return [
+      "• What a match! This is why we love cricket 🏏",
+      "• Finally some good news for the team! #Cricket",
+      "• Been waiting for this moment! Amazing performance 💪",
+      "• Great to see the players stepping up when it matters",
+      "• This changes everything for the series! #GameChanger"
+    ];
+  }
+}
+
+/* ---------- ENHANCED PROMPTS ---------- */
 
 function buildPrePublishPrompt({ title, description, body }) {
   return `
-You are an English cricket journalist and SEO editor. Analyze this cricket news and provide SEO recommendations.
+You are an expert English cricket journalist and SEO editor. Analyze this cricket news and provide comprehensive SEO recommendations.
 
 Return ONLY these fields in plain text (no JSON, no markdown). Keep each on a single line except Outline which can be multiple lines.
 
@@ -210,14 +162,25 @@ Return ONLY these fields in plain text (no JSON, no markdown). Keep each on a si
 5) KEYWORDS:
 - Primary: ...
 - Secondary: ...
+- Tertiary: ...
+- Long-tail: ...
+- Trending: ...
 
-RULES FOR CRICKET NEWS:
-- Use ONLY facts from input (no invented scores/quotes/dates/venues).
+ENHANCED SEO RULES FOR CRICKET NEWS:
+- Use ONLY facts from input (no invented scores/quotes/dates/venues)
 - Make title engaging and cricket-specific (include team names, match type, key result)
-- Meta description should highlight the main cricket story
-- Outline should follow cricket journalism structure (Match Summary, Key Moments, Player Performances, What's Next)
-- English output.
-- Be concise but engaging.
+- Meta description should highlight the main cricket story and create curiosity
+- Outline should follow enhanced cricket journalism structure:
+  * H2: Breaking News Summary (40-60 words)
+  * H2: Match/Event Details
+  * H2: Key Player Performances
+  * H2: Statistical Analysis
+  * H2: Expert Insights
+  * H2: Fan Reactions & Social Media Buzz
+  * H2: What This Means Going Forward
+- Provide 5 diverse keywords: primary (main topic), secondary (related terms), tertiary (specific details), long-tail (detailed phrases), trending (current buzzwords)
+- English output
+- Be engaging and comprehensive
 
 INPUT
 Title: ${title || ""}
@@ -236,32 +199,57 @@ function buildRewriteBodyHtmlPrompt({
   recOutline,
   recPrimary,
   recSecondary,
+  recTertiary,
+  recLongtail,
+  recTrending,
 }) {
   return `
-You are an English cricket journalist writing an original article. Your goal is to create unique, human-sounding content that passes plagiarism checks and AI detection tools.
+You are an elite English cricket journalist writing for a premium sports publication. Your goal is to create a compelling, narrative-rich article that goes beyond simple rewriting.
 
-CRITICAL: ANTI-AI DETECTION & ANTI-PLAGIARISM RULES:
-1. Write 100% ORIGINAL content - completely rewrite in your own words
-2. NEVER copy phrases or sentences from the raw material directly
-3. AVOID REPETITIVE PHRASING - Don't repeat same sentence patterns
-4. VARY YOUR TONE - Mix excited, casual, serious, surprised tones randomly
-5. ADD IMPERFECTIONS: Minor grammar quirks, incomplete thoughts, sudden topic shifts
-6. Use UNEXPECTED word choices - Don't be predictable or smooth
-7. BREAK PERFECT STRUCTURE - Not every paragraph needs smooth transitions
-8. Add REAL HUMAN MESS: "wait what?", "hang on", "you know", "like I said"
-9. DON'T be overly balanced - Take a side, show bias, be opinionated
-10. Include TYPOS or informal spellings occasionally: "gonna", "wanna", "coz"
-11. AVOID smooth AI flow - Make it a bit rough, like natural speech
-12. Mix paragraph lengths WILDLY (some 1 line, some 8 lines)
-13. Don't explain everything perfectly - humans skip details sometimes
-14. Add EMOTIONAL variance - not same calm tone throughout
+ENHANCED WRITING REQUIREMENTS:
+
+1. REPHRASE & ELEVATE THE NARRATIVE:
+- Go beyond synonym swapping - restructure sentences and paragraphs for better flow and impact
+- Inject compelling narrative voice using techniques from journalists like Harsha Bhogle or Jarrod Kimber
+- Use anecdotal leads, rhetorical questions, and personal insight where appropriate
+- Identify and expand on the most newsworthy angle, even if original underplayed it
+- Create a story arc that engages readers from start to finish
+
+2. ENHANCE WITH EXCLUSIVE VALUE:
+- Add relevant statistics and data analysis (player records, team performance, historical context)
+- Include logical, well-inferred quotes from players, coaches, or analysts
+- Provide richer background and historical context that original may have omitted
+- Add comparative analysis with similar past events
+- Include performance metrics and trends
+
+3. OPTIMIZE STRUCTURE & SEO:
+- Craft powerful, keyword-rich headline and crisp opening paragraph (40-60 words)
+- Use clear, descriptive subheadings (H2, H3)
+- Integrate all 5 keywords naturally: ${recPrimary || ""}, ${recSecondary || ""}, ${recTertiary || ""}, ${recLongtail || ""}, ${recTrending || ""}
+- Keep paragraphs short (2-3 lines max) for digital readability
+- Use bullet points for statistics and key facts
+
+4. INCORPORATE NEW SECTIONS:
+- Add realistic social media reactions (3-5 trending reactions from X/Twitter, Instagram)
+- Include expert analysis and quotes
+- Provide statistical context and data insights
+- Add fan perspective and community reactions
+
+ANTI-AI DETECTION RULES (ENHANCED):
+- Write 100% ORIGINAL content - completely rewrite in your own words
+- NEVER copy phrases or sentences from raw material directly
+- VARY sentence length dramatically (3-word punchy statements, then 25-word analytical sentences)
+- Use UNEXPECTED word choices and avoid predictable patterns
+- Add REAL HUMAN ELEMENTS: natural imperfections, varied pacing, emotional variance
+- Include specific details, dates, scores, and hard facts
+- Use NAMED QUOTES with attribution when possible
+- Sound like professional sports journalism, not AI-generated content
 
 LANGUAGE REQUIREMENTS:
-- Use SIMPLE ENGLISH only (10th class/grade 10 level)
-- Avoid complex vocabulary and difficult words
-- Use short, easy-to-understand sentences
-- Write like you're explaining cricket to a friend in 10th standard
-- NO fancy or sophisticated words
+- Use engaging but accessible English (12th grade level)
+- Mix technical cricket terms with everyday language
+- Create compelling, readable content that maintains professional standards
+- Use active voice and dynamic sentence structures
 
 STRICTLY FOLLOW THE SEO OUTLINE:
 ${recOutline || ""}
@@ -272,60 +260,33 @@ IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
 - Don't skip any sections from the outline
 - Don't add extra sections not in the outline
 
-WRITING STYLE (BREAKING NEWS WIRE - FINAL):
-1. VARY SENTENCE LENGTH DRASTICALLY: 3-word. Then 25-word detailed analysis with context. Then 8-word. NOT uniform!
-2. NO GENERIC ATTRIBUTION: NOT "a team official said" - use "coach Gary Stead said" or "unnamed source"
-3. BANNED FILLER PADDING: × "perfect conditions" × "crucial match" × "strong lineup" - AI padding
-4. DON'T BALANCE SECTIONS: Spend 200w on toss decision, 40w on streaming, skip broadcast details
-5. INCLUDE HARD STATS: "Bay Oval avg: 165 in T20Is" NOT "good batting conditions"
-6. USE NAMED QUOTES 50%: "Marsh told reporters:" with full quote, not paraphrased "Marsh said"
-7. NO NEAT STRUCTURE: Don't do Toss→Context→Details→Broadcast→Pitch→XIs systematically
-8. MAKE ABRUPT JUMPS: Discuss pitch, suddenly jump to streaming, back to pitch - messy like real news
-9. WRITE TIGHT: "Rain unlikely" NOT "There is no rain predicted for the entire day"
-10. NO UNIFORM RHYTHM: AI makes every sentence 10-15 words. Mix 4-word with 22-word randomly
-11. SKIP SOME ANGLES: Don't cover everything (toss+context+broadcast+pitch+XIs) - focus unevenly
-12. USE REAL NUMBERS: "17°C max, 10°C min" is good, but add "Last 5 T20Is here avg 168"
-13. NO SMOOTH FLOW: Jump topics without perfect transitions - real breaking news is messy
-14. ATTRIBUTE TO NAMES: "Groundsman Mike Johnson said" NOT "a groundsman said"
-15. HEAVY QUOTES, LIGHT NARRATION: 60% direct quotes, 40% context - reverse of AI
-16. NO PADDING: AI adds "earlier today", "for now", "to be honest" - cut all padding
-17. VARY PACING: Fast paragraph (3 sentences). Slow (8 sentences with details). Fast again.
-18. USE HARD DATA: Include past match stats, ground averages, head-to-head - not just opinions
-19. SOUND URGENT: Like reporter filing quick update, NOT structured preview article
-20. Reuters/AP style: Facts first, quotes heavy, uneven coverage, abrupt
-
-ULTRA-STRICT ANTI-AI DETECTION RULES (FINAL - All Detectors):
-- NO markdown formatting (no **, *, #, etc.)
-- BANNED GENERIC AI PHRASES (ChatGPT ALWAYS USES THESE):
-  × "confirmed earlier today" × "conditions are perfect" × "true surface"
-  × "a team official said" × "match analysts suggest" × "sources within"
-  Rule: If you need attribution, use SPECIFIC names or "unnamed officials said" - not vague "sources"
-- NEVER USE UNIFORM SENTENCE RHYTHM: AI makes all sentences similar length (10-15 words each)
-  Mix: 5-word sentences. With 20+ word analytical sentences that provide context and details.
-- DON'T BALANCE SECTIONS: AI does Toss→Context→Details→Broadcast→Pitch→XIs (all equal 80-100w)
-  Real news: Main story 250w, minor detail 30w, skip some angles entirely
-- BANNED PADDING PHRASES: × "perfect for a full game" × "might have a slight advantage"
-  × "crucial start" × "strong attack" - AI uses these as fillers
-- NO VAGUE ATTRIBUTION: NOT "a team official said" or "match analysts suggest"
-  Use NAMES: "Coach Gary Stead told reporters" OR "unnamed team source said"
-- VARY SENTENCE RHYTHM WILDLY: Short. Then long analytical one. Then medium. Not uniform!
-- DON'T STRUCTURE NEATLY: Real news doesn't go Section1→2→3→4→5→6 with smooth flow
-- USE 50%+ DIRECT QUOTES with NAMES: "Mitchell Marsh told reporters:" not "Marsh stated"
-- INCLUDE HARD DATA: Stats, numbers, past records - not just "good conditions"
-- Sound like PTI/ANI breaking news wire, NOT structured match preview
+ENHANCED WRITING STYLE:
+1. START with a compelling lead that hooks the reader immediately
+2. Use VARIED SENTENCE RHYTHM: Mix short punchy statements with longer analytical sentences
+3. INCLUDE HARD DATA: Specific statistics, records, averages, historical comparisons
+4. ADD EXPERT VOICES: Include realistic quotes from coaches, players, or analysts
+5. CREATE NARRATIVE FLOW: Build tension, excitement, and engagement throughout
+6. USE EMOTIONAL INTELLIGENCE: Capture the drama and significance of the event
+7. PROVIDE CONTEXT: Historical background, implications, and broader significance
+8. INCLUDE FAN PERSPECTIVE: Social media reactions and community sentiment
+9. END with forward-looking analysis: What this means for future matches/events
 
 HTML FORMAT:
 - Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
 - Use: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>
 - Start with <h1>${recTitle || ""}</h1>
 - Use EXACT H2 and H3 headings from the outline above
-- Write natural flowing paragraphs
+- Write natural flowing paragraphs with varied lengths
 - Use <strong> for player names and important stats
-- Use <ul><li> only for listing multiple stats
+- Use <ul><li> for statistics and key points
+- Use <blockquote> for expert quotes and social media reactions
 
-TARGET SEO KEYWORDS (use naturally in content):
+TARGET SEO KEYWORDS (use naturally throughout content):
 Primary: ${recPrimary || ""}
 Secondary: ${recSecondary || ""}
+Tertiary: ${recTertiary || ""}
+Long-tail: ${recLongtail || ""}
+Trending: ${recTrending || ""}
 
 Raw Cricket Material (REWRITE COMPLETELY - DON'T COPY):
 Title: ${rawTitle || ""}
@@ -333,46 +294,24 @@ Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
 
-OUTPUT INSTRUCTIONS (ULTRA-STRICT - ALL AI DETECTORS):
-Write a wire service style cricket news article that:
-✓ Sounds like PTI/Reuters wire copy (FACTUAL, TIGHT, NOT conversational)
-✓ Passes ChatGPT, GPTZero, Originality.ai, ALL AI detectors
-✓ Passes plagiarism checkers (100% original)
-✓ Uses simple 10th class English but PROFESSIONAL news wire tone
-✓ Is 800-1200 words with UNEVEN depth (200w main story, 50w side detail)
-✓ Is 50% DIRECT QUOTES with attribution, 50% brief narration
-✓ ZERO repetition of filler words (each word like "proper", "honestly" used ONCE max)
-✓ NO conversational tone ("you know?", "I mean", "kinda" - BANNED)
-✓ NO interjections ("Wow. Just wow.", "Proper goosebumps stuff." - BANNED)
-✓ NO smooth chatty transitions ("Anyway, the match was great too..." - BANNED)
-✓ FACTUAL REPORTING only, minimal personal commentary
-✓ ATTRIBUTE everything ("Police said", "According to", "Sources confirmed")
-✓ SHORT TIGHT SENTENCES like wire copy
-✓ ABRUPT topic changes (real news doesn't flow smoothly)
-
-CRITICAL - THESE EXACT PATTERNS ChatGPT CATCHES:
-❌ "Wow. Just wow." / "Proper goosebumps stuff." / "More of this please."
-❌ Repeating "proper" 5+ times ("proper emotional", "proper pros", "proper meaning")
-❌ Repeating "you know?" multiple times
-❌ "Anyway, X was great. But for once, Y might have stolen the headlines."
-❌ Neat section structure: Tribute→Song→Key Moments→Players→What's Next
-❌ Conversational narrative throughout
-❌ "Smooth but generic transitions"
-❌ "Too perfectly packaged"
-
-✅ WRITE LIKE WIRE SERVICE NEWS INSTEAD:
-✓ Tight factual sentences: "The choir performed for eight minutes."
-✓ NOT chatty: "Their performance was like... eight minutes long? Yeah, eight minutes."
-✓ Quote-heavy: 50% direct quotes with attribution
-✓ No filler word repetition
-✓ Professional tone, not blog commentary
-✓ Abrupt, fact-driven, minimal transitions
+OUTPUT INSTRUCTIONS:
+Write a comprehensive, engaging cricket news article that:
+✓ Elevates the narrative beyond simple rewriting
+✓ Includes exclusive value (stats, expert opinions, social reactions)
+✓ Passes AI detection tools with natural, human-like writing
+✓ Uses all 5 keywords naturally throughout the content
+✓ Follows the exact outline structure provided
+✓ Is 1000-1500 words with varied section depths
+✓ Includes realistic social media reactions
+✓ Provides expert analysis and statistical context
+✓ Creates compelling storytelling that engages readers
+✓ Maintains professional journalism standards
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
 }
 
-/* ---------- PARSERS & HELPERS ---------- */
+/* ---------- ENHANCED PARSERS & HELPERS ---------- */
 
 function parsePrePublishTextToJSON(text = "") {
   const get = (re) => {
@@ -384,20 +323,37 @@ function parsePrePublishTextToJSON(text = "") {
   let recommendedMeta  = get(/RECOMMENDED META DESCRIPTION:\s*([^\n]+)/i);
   let recommendedSlug  = get(/RECOMMENDED SLUG:\s*([^\n]+)/i);
   let outline          = get(/OUTLINE:\s*([\s\S]*?)(?:\n5\)|\nKEYWORDS:|$)/i);
-  let primary          = get(/Primary:\s*([^\n]+)/i);
-  let secondary        = get(/Secondary:\s*([^\n]+)/i);
+  
+  // Parse all 5 keywords
+  let primary   = get(/Primary:\s*([^\n]+)/i);
+  let secondary = get(/Secondary:\s*([^\n]+)/i);
+  let tertiary  = get(/Tertiary:\s*([^\n]+)/i);
+  let longtail  = get(/Long-tail:\s*([^\n]+)/i);
+  let trending  = get(/Trending:\s*([^\n]+)/i);
 
+  // Fallbacks
   if (!recommendedTitle) recommendedTitle = "Cricket update";
   if (!recommendedMeta)  recommendedMeta  = "Latest cricket update.";
   if (!recommendedSlug)  recommendedSlug  = recommendedTitle;
   if (!outline)          outline          = "H2: Match Summary\nH3: Key Moments";
+  if (!primary)          primary          = "cricket";
+  if (!secondary)        secondary        = "sports";
+  if (!tertiary)         tertiary         = "match";
+  if (!longtail)         longtail         = "cricket news";
+  if (!trending)         trending         = "cricket updates";
 
   return {
     recommendedTitle: recommendedTitle.slice(0, 65),
     recommendedMeta:  recommendedMeta.slice(0, 160),
     recommendedSlug:  recommendedSlug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
     outline,
-    keywords: { primary: primary || "", secondary: secondary || "" },
+    keywords: { 
+      primary: primary || "", 
+      secondary: secondary || "", 
+      tertiary: tertiary || "",
+      longtail: longtail || "",
+      trending: trending || ""
+    },
   };
 }
 
@@ -416,6 +372,11 @@ function buildHtmlDocument({ title, metaDescription, bodyHtml }) {
     '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
     `  <title>${safeTitle}</title>`,
     `  <meta name="description" content="${safeMeta}" />`,
+    '  <meta name="keywords" content="cricket, sports, news, analysis, commentary" />',
+    '  <meta name="author" content="Cricket News Team" />',
+    '  <meta property="og:title" content="' + safeTitle + '" />',
+    '  <meta property="og:description" content="' + safeMeta + '" />',
+    '  <meta property="og:type" content="article" />',
     "</head>",
     "<body>",
     body,
@@ -430,4 +391,7 @@ module.exports = {
   buildRewriteBodyHtmlPrompt,
   parsePrePublishTextToJSON,
   buildHtmlDocument,
+  fetchCricketStats,
+  generateExpertOpinion,
+  generateSocialMediaReactions,
 };

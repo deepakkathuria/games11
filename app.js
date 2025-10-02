@@ -6,7 +6,6 @@ const axios = require("axios");
 const { getSearchConsoleQueries } = require("./gscService");
 const fs = require('fs');
 
-
 // const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cloudinary = require("cloudinary").v2;
 
@@ -18,8 +17,7 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
 const multer = require("multer");
-// const upload = multer({ dest: "uploads/" });
-//
+
 
 const { upload } = require("./config/multer"); // Ensure multer config is set up
 const bcrypt = require("bcrypt");
@@ -86,6 +84,9 @@ const {
   buildRewriteBodyHtmlPrompt,
   parsePrePublishTextToJSON,
   buildHtmlDocument,
+  fetchCricketStats,
+  generateExpertOpinion,
+  generateSocialMediaReactions,
 } = require("./prepublish");
 // Initialize news scheduler
 const newsScheduler = new NewsScheduler();
@@ -109,8 +110,6 @@ const allNewsScheduler = new AllNewsScheduler();
 allNewsScheduler.startScheduler(30); //
 
 
-
-
 // Add this import at the top
 const { generateViralContent } = require('./viralContentGenerator');
 const { fetchHindiAllNews, filterHindiAllNewsArticles, getHindiAllNewsArticleSummary, validateHindiAllNewsArticleForProcessing } = require('./hindiAllNewsFetcher');
@@ -124,1216 +123,10 @@ hindiAllNewsScheduler.startScheduler(30); // Fetch every 30 minutes
 
 
 
-// ✅ Add these API endpoints (after existing API endpoints, around line 800-1000)
 
-// ===========================================
-// HINDI ALL NEWS APIs
-// ===========================================
+// ------------------------------------------------------HINDI ONE-------------------------------------------------
 
-// Get stored Hindi all news
-app.get('/api/hindi-all-news/stored-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
 
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM hindi_general_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const news = await hindiAllNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
-
-    const mapped = news.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored Hindi all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get processed Hindi all news
-app.get('/api/hindi-all-news/processed-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM hindi_general_news WHERE processed = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM hindi_general_news
-       WHERE processed = true
-       ORDER BY processed_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting processed Hindi all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Process Hindi all news article
-app.post('/api/hindi-all-news/articles/:id/generate', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      "SELECT * FROM hindi_general_news WHERE id = ?",
-      [id]
-    );
-    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
-    const article = rows[0];
-
-    // Use Hindi processing for Hindi all news
-    const result = await processHindiAllNewsManualInput({
-      title: article.title,
-      description: article.description,
-      content: article.content
-    });
-
-    if (result.success) {
-      // Generate Hindi title and meta
-      const hindiTitle = await generateHindiAllNewsHeadline(article.title);
-      const hindiMeta = await generateHindiAllNewsMetaDescription(article.description);
-      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
-
-      // Create HTML document with Hindi content
-      const finalHtml = buildHtmlDocument({
-        title: hindiTitle,
-        metaDescription: hindiMeta,
-        bodyHtml: result.readyToPublishArticle,
-      });
-
-      await pollDBPool.query(
-        `UPDATE hindi_general_news
-           SET processed = 1,
-               processed_at = NOW(),
-               ready_article = ?,
-               final_title = ?,
-               final_meta  = ?,
-               final_slug  = ?
-         WHERE id = ?`,
-        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
-      );
-
-      return res.json({
-        success: true,
-        final: {
-          title: hindiTitle,
-          meta: hindiMeta,
-          slug: hindiSlug,
-          html: finalHtml
-        }
-      });
-    } else {
-      return res.status(500).json({ success: false, error: result.error });
-    }
-  } catch (err) {
-    console.error("generate Hindi all news article error", err);
-    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
-  }
-});
-
-// Manual fetch Hindi all news
-app.post('/api/hindi-all-news/manual-fetch-news', async (req, res) => {
-  try {
-    await hindiAllNewsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'Hindi all news fetched and stored successfully' });
-  } catch (error) {
-    console.error('Error manually fetching Hindi all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get Hindi all news scheduler status
-app.get('/api/hindi-all-news/scheduler-status', async (req, res) => {
-  try {
-    res.json({ 
-      success: true, 
-      isRunning: hindiAllNewsScheduler.isRunning,
-      message: 'Hindi all news scheduler is running and fetching news every 30 minutes'
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-
-// ===========================================
-// ALL NEWS VIRAL CONTENT GENERATOR APIs
-// ===========================================
-
-// Get stored all news for viral content generation
-app.get("/api/all-viral/stored-news", async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM general_news 
-       WHERE is_valid = true 
-       ORDER BY published_at DESC, fetched_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored all news for viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Generate viral content from stored all news article
-app.post("/api/all-viral/generate-from-stored", async (req, res) => {
-  try {
-    const { articleId } = req.body;
-
-    if (!articleId) {
-      return res.status(400).json({
-        success: false,
-        error: "Article ID is required"
-      });
-    }
-
-    // Get article from general_news database
-    const [rows] = await pollDBPool.query(
-      'SELECT * FROM general_news WHERE id = ? AND is_valid = true',
-      [articleId]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Article not found"
-      });
-    }
-
-    const article = rows[0];
-    
-    // Convert database article to GNews format
-    const gnewsArticle = {
-      title: article.title,
-      description: article.description,
-      content: article.content,
-      url: article.source_url,
-      publishedAt: article.published_at,
-      source: {
-        name: article.source_name,
-        url: article.source_url
-      }
-    };
-
-    console.log(`🚀 Generating viral content for all news article: ${article.title}`);
-
-    // Generate viral content
-    const result = await generateViralContent(gnewsArticle);
-
-    if (result.success) {
-      // ✅ STORE IN DATABASE - All News Viral Content Table!
-      const [insertResult] = await pollDBPool.query(
-        `INSERT INTO viral_content_all_news 
-         (article_id, analysis, content, processing_time, generated_at) 
-         VALUES (?, ?, ?, ?, NOW())`,
-        [
-          articleId,
-          JSON.stringify(result.analysis),
-          JSON.stringify(result.content),
-          result.processingTime
-        ]
-      );
-
-      console.log(`�� All news viral content stored with ID: ${insertResult.insertId}`);
-
-      res.json({
-        success: true,
-        analysis: result.analysis,
-        content: result.content,
-        processingTime: result.processingTime,
-        originalArticle: gnewsArticle,
-        viralContentId: insertResult.insertId
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: result.error
-      });
-    }
-
-  } catch (error) {
-    console.error("Generate viral content from all news article error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to generate viral content"
-    });
-  }
-});
-
-// Get stored all news viral content history
-app.get("/api/all-viral/history", async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM viral_content_all_news'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT vc.*, gn.title, gn.source_name, gn.source_url, gn.published_at
-       FROM viral_content_all_news vc
-       JOIN general_news gn ON vc.article_id = gn.id
-       ORDER BY vc.generated_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(row => ({
-      ...row,
-      analysis: JSON.parse(row.analysis),
-      content: JSON.parse(row.content),
-      generated_at_iso: toIsoZ(row.generated_at),
-      published_at_iso: toIsoZ(row.published_at)
-    }));
-
-    res.json({
-      success: true,
-      viralContent: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting all news viral content history:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get specific all news viral content by ID
-app.get("/api/all-viral/content/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT vc.*, gn.title, gn.source_name, gn.source_url, gn.published_at, gn.description
-       FROM viral_content_all_news vc
-       JOIN general_news gn ON vc.article_id = gn.id
-       WHERE vc.id = ?`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "All news viral content not found"
-      });
-    }
-
-    const row = rows[0];
-    const result = {
-      ...row,
-      analysis: JSON.parse(row.analysis),
-      content: JSON.parse(row.content),
-      generated_at_iso: toIsoZ(row.generated_at),
-      published_at_iso: toIsoZ(row.published_at)
-    };
-
-    res.json({
-      success: true,
-      viralContent: result
-    });
-  } catch (error) {
-    console.error('Error getting all news viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Manual fetch all news for viral content
-app.post('/api/all-viral/manual-fetch-news', async (req, res) => {
-  try {
-    await allNewsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'All news fetched and stored successfully' });
-  } catch (error) {
-    console.error('Error manually fetching all news for viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-
-
-// ===========================================
-// AUTOMATED ALL NEWS APIs
-// ===========================================
-
-// Get stored all news
-app.get('/api/all/stored-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const news = await allNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
-
-    const mapped = news.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get processed all news
-app.get('/api/all/processed-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM general_news WHERE processed = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM general_news
-       WHERE processed = true
-       ORDER BY processed_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting processed all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Process all news article
-// app.post('/api/all/articles/:id/generate', async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     const [rows] = await pollDBPool.query(
-//       "SELECT * FROM general_news WHERE id = ?",
-//       [id]
-//     );
-//     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
-//     const article = rows[0];
-
-//     // Convert English article to Hindi
-//     const result = await processAllNewsManualInput({
-//       title: article.title,
-//       description: article.description,
-//       content: article.content
-//     });
-
-//     if (result.success) {
-//       // Generate Hindi title and meta
-//       const hindiTitle = await generateHindiHeadline(article.title);
-//       const hindiMeta = await generateHindiMetaDescription(article.description);
-//       const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
-
-//       // Create HTML document with Hindi content
-//       const finalHtml = buildHtmlDocument({
-//         title: hindiTitle,
-//         metaDescription: hindiMeta,
-//         bodyHtml: result.readyToPublishArticle,
-//       });
-
-//       await pollDBPool.query(
-//         `UPDATE general_news
-//            SET processed = 1,
-//                processed_at = NOW(),
-//                ready_article = ?,
-//                final_title = ?,
-//                final_meta  = ?,
-//                final_slug  = ?
-//          WHERE id = ?`,
-//         [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
-//       );
-
-//       return res.json({
-//         success: true,
-//         final: {
-//           title: hindiTitle,
-//           meta: hindiMeta,
-//           slug: hindiSlug,
-//           html: finalHtml
-//         }
-//       });
-//     } else {
-//       return res.status(500).json({ success: false, error: result.error });
-//     }
-//   } catch (err) {
-//     console.error("generate all news article error", err);
-//     return res.status(500).json({ success:false, error: err.message || "Generate failed" });
-//   }
-// });
-
-// Process all news article
-app.post('/api/all/articles/:id/generate', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      "SELECT * FROM general_news WHERE id = ?",
-      [id]
-    );
-    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
-    const article = rows[0];
-
-    // Convert English article to Hindi
-    const result = await processAllNewsManualInput({
-      title: article.title,
-      description: article.description,
-      content: article.content
-    });
-
-    if (result.success) {
-      // Generate English title and meta
-      const englishTitle = await generateEnglishHeadline(article.title);
-      const englishMeta = await generateEnglishMetaDescription(article.description);
-      const englishSlug = englishTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-
-      // Create HTML document with English content
-      const finalHtml = buildHtmlDocument({
-        title: englishTitle,
-        metaDescription: englishMeta,
-        bodyHtml: result.readyToPublishArticle,
-      });
-
-      await pollDBPool.query(
-        `UPDATE general_news
-           SET processed = 1,
-               processed_at = NOW(),
-               ready_article = ?,
-               final_title = ?,
-               final_meta  = ?,
-               final_slug  = ?
-         WHERE id = ?`,
-        [finalHtml, englishTitle, englishMeta, englishSlug, id]
-      );
-
-      return res.json({
-        success: true,
-        final: {
-          title: englishTitle,
-          meta: englishMeta,
-          slug: englishSlug,
-          html: finalHtml
-        }
-      });
-    } else {
-      return res.status(500).json({ success: false, error: result.error });
-    }
-  } catch (err) {
-    console.error("generate all news article error", err);
-    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
-  }
-});
-
-// Manual fetch all news
-app.post('/api/all/manual-fetch-news', async (req, res) => {
-  try {
-    await allNewsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'All news fetched and stored successfully' });
-  } catch (error) {
-    console.error('Error manually fetching all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get all news scheduler status
-app.get('/api/all/scheduler-status', async (req, res) => {
-  try {
-    res.json({ 
-      success: true, 
-      isRunning: allNewsScheduler.isRunning,
-      message: 'All news scheduler is running and fetching news every 30 minutes'
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ===========================================
-// OPENAI ALL NEWS APIs (Separate from DeepSeek)(for all type of newss)
-// ===========================================
-
-// Get stored all news for OpenAI processing (reuses same table)
-app.get('/api/openai-all/stored-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const news = await allNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
-
-    const mapped = news.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored all news for OpenAI:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get processed all news for OpenAI (reuses same table)
-app.get('/api/openai-all/processed-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM general_news WHERE openai_processed = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM general_news
-       WHERE openai_processed = true
-       ORDER BY openai_processed_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.openai_processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting processed all news for OpenAI:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Process all news article with OpenAI
-app.post('/api/openai-all/articles/:id/generate', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      "SELECT * FROM general_news WHERE id = ?",
-      [id]
-    );
-    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
-    const article = rows[0];
-
-    // Process with OpenAI
-    const result = await processAllNewsOpenAI({
-      title: article.title,
-      description: article.description,
-      content: article.content
-    });
-
-    if (result.success) {
-      // Generate English title and meta with OpenAI
-      const openaiTitle = await generateOpenAIHeadline(article.title);
-      const openaiMeta = await generateOpenAIMetaDescription(article.description);
-      const openaiSlug = openaiTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-
-      // Create HTML document with OpenAI content
-      const finalHtml = buildHtmlDocument({
-        title: openaiTitle,
-        metaDescription: openaiMeta,
-        bodyHtml: result.readyToPublishArticle,
-      });
-
-      await pollDBPool.query(
-        `UPDATE general_news
-           SET openai_processed = 1,
-               openai_processed_at = NOW(),
-               openai_ready_article = ?,
-               openai_final_title = ?,
-               openai_final_meta  = ?,
-               openai_final_slug  = ?
-         WHERE id = ?`,
-        [finalHtml, openaiTitle, openaiMeta, openaiSlug, id]
-      );
-
-      return res.json({
-        success: true,
-        final: {
-          title: openaiTitle,
-          meta: openaiMeta,
-          slug: openaiSlug,
-          html: finalHtml
-        }
-      });
-    } else {
-      return res.status(500).json({ success: false, error: result.error });
-    }
-  } catch (err) {
-    console.error("generate OpenAI all news article error", err);
-    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
-  }
-});
-
-// Manual fetch all news for OpenAI (reuses existing functionality)
-app.post('/api/openai-all/manual-fetch-news', async (req, res) => {
-  try {
-    await allNewsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'All news fetched and stored successfully for OpenAI processing' });
-  } catch (error) {
-    console.error('Error manually fetching all news for OpenAI:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get OpenAI all news scheduler status
-app.get('/api/openai-all/scheduler-status', async (req, res) => {
-  try {
-    res.json({ 
-      success: true, 
-      isRunning: allNewsScheduler.isRunning,
-      message: 'All news scheduler is running and fetching news every 30 minutes (shared with DeepSeek)'
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ===========================================
-// HINDI ALL NEWS APIs
-// ===========================================
-
-// Get stored Hindi all news
-app.get('/api/hindi-all/stored-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM hindi_all_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const news = await hindiAllNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
-
-    res.json({
-      success: true,
-      news,
-      totalCount,
-      page: Math.floor(offset / limit) + 1,
-      totalPages: Math.ceil(totalCount / limit)
-    });
-  } catch (error) {
-    console.error('Error getting stored Hindi all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get processed Hindi all news
-app.get('/api/hindi-all/processed-news', async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM hindi_all_news WHERE processed = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM hindi_all_news
-       WHERE processed = true
-       ORDER BY processed_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    res.json({
-      success: true,
-      news: rows,
-      totalCount,
-      page: Math.floor(offset / limit) + 1,
-      totalPages: Math.ceil(totalCount / limit)
-    });
-  } catch (error) {
-    console.error('Error getting processed Hindi all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Process Hindi all news article
-app.post('/api/hindi-all/articles/:id/generate', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      "SELECT * FROM hindi_all_news WHERE id = ?",
-      [id]
-    );
-    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
-    const article = rows[0];
-
-    // Use Hindi processing for Hindi all news
-    const result = await processHindiAllNewsManualInput({
-      title: article.title,
-      description: article.description,
-      content: article.content
-    });
-
-    if (result.success) {
-      // Generate Hindi title and meta
-      const hindiTitle = await generateHindiAllNewsHeadline(article.title);
-      const hindiMeta = await generateHindiAllNewsMetaDescription(article.description);
-      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
-
-      // Create HTML document with Hindi content
-      const finalHtml = buildHtmlDocument({
-        title: hindiTitle,
-        metaDescription: hindiMeta,
-        bodyHtml: result.readyToPublishArticle,
-      });
-
-      await pollDBPool.query(
-        `UPDATE hindi_all_news
-           SET processed = 1,
-               processed_at = NOW(),
-               ready_article = ?,
-               final_title = ?,
-               final_meta  = ?,
-               final_slug  = ?
-         WHERE id = ?`,
-        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
-      );
-
-      return res.json({
-        success: true,
-        final: {
-          title: hindiTitle,
-          meta: hindiMeta,
-          slug: hindiSlug,
-          html: finalHtml
-        }
-      });
-    } else {
-      return res.status(500).json({ success: false, error: result.error });
-    }
-  } catch (err) {
-    console.error("generate Hindi all news article error", err);
-    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
-  }
-});
-
-// Manual fetch Hindi all news
-app.post('/api/hindi-all/manual-fetch-news', async (req, res) => {
-  try {
-    await hindiAllNewsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'Hindi all news fetched and stored successfully' });
-  } catch (error) {
-    console.error('Error manually fetching Hindi all news:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get Hindi all news scheduler status
-app.get('/api/hindi-all/scheduler-status', async (req, res) => {
-  try {
-    res.json({ 
-      success: true, 
-      isRunning: hindiAllNewsScheduler.isRunning,
-      message: 'Hindi all news scheduler is running and fetching news every 30 minutes'
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ===========================================
-// VIRAL CONTENT GENERATOR APIs
-// ===========================================
-
-// Get stored news for viral content generation
-app.get("/api/viral/stored-news", async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM cricket_news 
-       WHERE is_valid = true 
-       ORDER BY published_at DESC, fetched_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored news for viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Generate viral content from stored article
-// Updated endpoint in src/server.js
-app.post("/api/viral/generate-from-stored", async (req, res) => {
-  try {
-    const { articleId } = req.body;
-
-    if (!articleId) {
-      return res.status(400).json({
-        success: false,
-        error: "Article ID is required"
-      });
-    }
-
-    // Get article from database
-    const [rows] = await pollDBPool.query(
-      'SELECT * FROM cricket_news WHERE id = ? AND is_valid = true',
-      [articleId]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Article not found"
-      });
-    }
-
-    const article = rows[0];
-    
-    // Convert database article to GNews format
-    const gnewsArticle = {
-      title: article.title,
-      description: article.description,
-      content: article.content,
-      url: article.source_url,
-      publishedAt: article.published_at,
-      source: {
-        name: article.source_name,
-        url: article.source_url
-      }
-    };
-
-    console.log(`�� Generating viral content for stored article: ${article.title}`);
-
-    // Generate viral content
-    const result = await generateViralContent(gnewsArticle);
-
-    if (result.success) {
-      // ✅ STORE IN DATABASE - NEW ADDITION!
-      const [insertResult] = await pollDBPool.query(
-        `INSERT INTO viral_content 
-         (article_id, analysis, content, processing_time, generated_at) 
-         VALUES (?, ?, ?, ?, NOW())`,
-        [
-          articleId,
-          JSON.stringify(result.analysis),
-          JSON.stringify(result.content),
-          result.processingTime
-        ]
-      );
-
-      console.log(`💾 Viral content stored with ID: ${insertResult.insertId}`);
-
-      res.json({
-        success: true,
-        analysis: result.analysis,
-        content: result.content,
-        processingTime: result.processingTime,
-        originalArticle: gnewsArticle,
-        viralContentId: insertResult.insertId // Return the stored ID
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: result.error
-      });
-    }
-
-  } catch (error) {
-    console.error("Generate viral content from stored article error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to generate viral content"
-    });
-  }
-});
-
-// Get stored viral content history
-app.get("/api/viral/history", async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM viral_content'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at
-       FROM viral_content vc
-       JOIN cricket_news cn ON vc.article_id = cn.id
-       ORDER BY vc.generated_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(row => ({
-      ...row,
-      analysis: JSON.parse(row.analysis),
-      content: JSON.parse(row.content),
-      generated_at_iso: toIsoZ(row.generated_at),
-      published_at_iso: toIsoZ(row.published_at)
-    }));
-
-    res.json({
-      success: true,
-      viralContent: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting viral content history:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get specific viral content by ID
-app.get("/api/viral/content/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at, cn.description
-       FROM viral_content vc
-       JOIN cricket_news cn ON vc.article_id = cn.id
-       WHERE vc.id = ?`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Viral content not found"
-      });
-    }
-
-    const row = rows[0];
-    const result = {
-      ...row,
-      analysis: JSON.parse(row.analysis),
-      content: JSON.parse(row.content),
-      generated_at_iso: toIsoZ(row.generated_at),
-      published_at_iso: toIsoZ(row.published_at)
-    };
-
-    res.json({
-      success: true,
-      viralContent: result
-    });
-  } catch (error) {
-    console.error('Error getting viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get viral content templates
-app.get("/api/viral/templates", async (req, res) => {
-  try {
-    const templates = {
-      instagram: {
-        reel: {
-          structure: "Hook (3s) → Story → CTA",
-          elements: ["Visual hook", "Story progression", "Strong CTA", "Trending hashtags"]
-        },
-        carousel: {
-          structure: "Title slide → 3-5 content slides → CTA slide",
-          elements: ["Eye-catching title", "Fact-based content", "Visual consistency", "Clear CTA"]
-        },
-        story: {
-          structure: "Multiple slides with polls/quizzes",
-          elements: ["Interactive polls", "Swipe-up actions", "Behind-the-scenes", "Quick facts"]
-        }
-      },
-      facebook: {
-        video: {
-          structure: "Hook → Narrative → CTA",
-          elements: ["Emotional hook", "Story progression", "Visual elements", "Share-worthy CTA"]
-        },
-        debate: {
-          structure: "Question → Image → Caption → CTA",
-          elements: ["Controversial question", "Supporting image", "Opinion-driven caption", "Discussion CTA"]
-        },
-        awareness: {
-          structure: "Story → Images → Emotional CTA",
-          elements: ["Personal story", "Supporting images", "Emotional connection", "Action CTA"]
-        }
-      },
-      twitter: {
-        thread: {
-          structure: "Hook tweet → 3-4 fact tweets → CTA tweet",
-          elements: ["Strong opening", "Fact progression", "Visual elements", "Engagement CTA"]
-        },
-        poll: {
-          structure: "Question → Poll options → Follow-up",
-          elements: ["Opinion question", "Multiple options", "Follow-up discussion", "Hashtags"]
-        },
-        opinion: {
-          structure: "Bold take → Supporting image → CTA",
-          elements: ["Controversial opinion", "Supporting visual", "Engagement CTA", "Relevant hashtags"]
-        }
-      },
-      youtube: {
-        shorts: {
-          structure: "Hook (3s) → Content → CTA",
-          elements: ["Visual hook", "Quick content", "Strong CTA", "Trending music"]
-        },
-        longform: {
-          structure: "Hook → Story → Analysis → CTA",
-          elements: ["Strong opening", "Story progression", "Deep analysis", "Subscription CTA"]
-        },
-        reaction: {
-          structure: "Reaction → Analysis → Opinion → CTA",
-          elements: ["Genuine reaction", "Fact analysis", "Personal opinion", "Engagement CTA"]
-        }
-      }
-    };
-
-    res.json({
-      success: true,
-      templates
-    });
-
-  } catch (error) {
-    console.error("Get viral content templates error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to get templates"
-    });
-  }
-});
 // ===========================================
 // HINDI CRICKET NEWS APIs
 // ===========================================
@@ -1666,6 +459,1176 @@ app.get('/api/debug-gnews', async (req, res) => {
 
 
 
+
+// ===========================================
+// HINDI ALL NEWS APIs()
+// ===========================================
+
+// Get stored Hindi all news
+app.get('/api/hindi-all-news/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await hindiAllNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi all news
+app.get('/api/hindi-all-news/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_general_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_general_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi all news article
+app.post('/api/hindi-all-news/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_general_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Use Hindi processing for Hindi all news
+    const result = await processHindiAllNewsManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate Hindi title and meta
+      const hindiTitle = await generateHindiAllNewsHeadline(article.title);
+      const hindiMeta = await generateHindiAllNewsMetaDescription(article.description);
+      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with Hindi content
+      const finalHtml = buildHtmlDocument({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE hindi_general_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate Hindi all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch Hindi all news
+app.post('/api/hindi-all-news/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiAllNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi all news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi all news scheduler status
+app.get('/api/hindi-all-news/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: hindiAllNewsScheduler.isRunning,
+      message: 'Hindi all news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+// ===========================================
+// HINDI ALL NEWS APIs
+// ===========================================
+
+// Get stored Hindi all news
+app.get('/api/hindi-all/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_all_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await hindiAllNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    res.json({
+      success: true,
+      news,
+      totalCount,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(totalCount / limit)
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi all news
+app.get('/api/hindi-all/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_all_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_all_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(totalCount / limit)
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi all news article
+app.post('/api/hindi-all/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_all_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Use Hindi processing for Hindi all news
+    const result = await processHindiAllNewsManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate Hindi title and meta
+      const hindiTitle = await generateHindiAllNewsHeadline(article.title);
+      const hindiMeta = await generateHindiAllNewsMetaDescription(article.description);
+      const hindiSlug = hindiTitle.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with Hindi content
+      const finalHtml = buildHtmlDocument({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE hindi_all_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate Hindi all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch Hindi all news
+app.post('/api/hindi-all/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiAllNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi all news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi all news scheduler status
+app.get('/api/hindi-all/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: hindiAllNewsScheduler.isRunning,
+      message: 'Hindi all news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// ------------------------------------HINDI ONE COMPLETE --------------------------------------
+
+
+
+
+// ===========================================
+// ALL NEWS VIRAL CONTENT GENERATOR APIs
+// ===========================================
+
+// Get stored all news for viral content generation
+app.get("/api/all-viral/stored-news", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM general_news 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC, fetched_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored all news for viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate viral content from stored all news article
+app.post("/api/all-viral/generate-from-stored", async (req, res) => {
+  try {
+    const { articleId } = req.body;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: "Article ID is required"
+      });
+    }
+
+    // Get article from general_news database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM general_news WHERE id = ? AND is_valid = true',
+      [articleId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found"
+      });
+    }
+
+    const article = rows[0];
+    
+    // Convert database article to GNews format
+    const gnewsArticle = {
+      title: article.title,
+      description: article.description,
+      content: article.content,
+      url: article.source_url,
+      publishedAt: article.published_at,
+      source: {
+        name: article.source_name,
+        url: article.source_url
+      }
+    };
+
+    console.log(`🚀 Generating viral content for all news article: ${article.title}`);
+
+    // Generate viral content
+    const result = await generateViralContent(gnewsArticle);
+
+    if (result.success) {
+      // ✅ STORE IN DATABASE - All News Viral Content Table!
+      const [insertResult] = await pollDBPool.query(
+        `INSERT INTO viral_content_all_news 
+         (article_id, analysis, content, processing_time, generated_at) 
+         VALUES (?, ?, ?, ?, NOW())`,
+        [
+          articleId,
+          JSON.stringify(result.analysis),
+          JSON.stringify(result.content),
+          result.processingTime
+        ]
+      );
+
+      console.log(`�� All news viral content stored with ID: ${insertResult.insertId}`);
+
+      res.json({
+        success: true,
+        analysis: result.analysis,
+        content: result.content,
+        processingTime: result.processingTime,
+        originalArticle: gnewsArticle,
+        viralContentId: insertResult.insertId
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Generate viral content from all news article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate viral content"
+    });
+  }
+});
+
+// Get stored all news viral content history
+app.get("/api/all-viral/history", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM viral_content_all_news'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, gn.title, gn.source_name, gn.source_url, gn.published_at
+       FROM viral_content_all_news vc
+       JOIN general_news gn ON vc.article_id = gn.id
+       ORDER BY vc.generated_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(row => ({
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    }));
+
+    res.json({
+      success: true,
+      viralContent: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting all news viral content history:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get specific all news viral content by ID
+app.get("/api/all-viral/content/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, gn.title, gn.source_name, gn.source_url, gn.published_at, gn.description
+       FROM viral_content_all_news vc
+       JOIN general_news gn ON vc.article_id = gn.id
+       WHERE vc.id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "All news viral content not found"
+      });
+    }
+
+    const row = rows[0];
+    const result = {
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    };
+
+    res.json({
+      success: true,
+      viralContent: result
+    });
+  } catch (error) {
+    console.error('Error getting all news viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manual fetch all news for viral content
+app.post('/api/all-viral/manual-fetch-news', async (req, res) => {
+  try {
+    await allNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'All news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching all news for viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+// -------------------------------------------------------ENGLISH ONE --------------------
+// ENGLISH ONE 
+// ===========================================
+// AUTOMATED ALL NEWS APIs  ENGLISH
+// ===========================================
+
+// Get stored all news
+app.get('/api/all/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await allNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed all news
+app.get('/api/all/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM general_news
+       WHERE processed = true
+       ORDER BY processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process all news article
+app.post('/api/all/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM general_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Convert English article to Hindi
+    const result = await processAllNewsManualInput({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate English title and meta
+      const englishTitle = await generateEnglishHeadline(article.title);
+      const englishMeta = await generateEnglishMetaDescription(article.description);
+      const englishSlug = englishTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with English content
+      const finalHtml = buildHtmlDocument({
+        title: englishTitle,
+        metaDescription: englishMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE general_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, englishTitle, englishMeta, englishSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: englishTitle,
+          meta: englishMeta,
+          slug: englishSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch all news
+app.post('/api/all/manual-fetch-news', async (req, res) => {
+  try {
+    await allNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'All news fetched and stored successfully' });
+  } catch (error) {
+    console.error('Error manually fetching all news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get all news scheduler status
+app.get('/api/all/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: allNewsScheduler.isRunning,
+      message: 'All news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+// ===========================================
+// open ai all news english
+// ===========================================
+
+// Get stored all news for OpenAI processing (reuses same table)
+app.get('/api/openai-all/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await allNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored all news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed all news for OpenAI (reuses same table)
+app.get('/api/openai-all/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM general_news WHERE openai_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM general_news
+       WHERE openai_processed = true
+       ORDER BY openai_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.openai_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed all news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process all news article with OpenAI
+app.post('/api/openai-all/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM general_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with OpenAI
+    const result = await processAllNewsOpenAI({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Generate English title and meta with OpenAI
+      const openaiTitle = await generateOpenAIHeadline(article.title);
+      const openaiMeta = await generateOpenAIMetaDescription(article.description);
+      const openaiSlug = openaiTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with OpenAI content
+      const finalHtml = buildHtmlDocument({
+        title: openaiTitle,
+        metaDescription: openaiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE general_news
+           SET openai_processed = 1,
+               openai_processed_at = NOW(),
+               openai_ready_article = ?,
+               openai_final_title = ?,
+               openai_final_meta  = ?,
+               openai_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, openaiTitle, openaiMeta, openaiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: openaiTitle,
+          meta: openaiMeta,
+          slug: openaiSlug,
+          html: finalHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate OpenAI all news article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch all news for OpenAI (reuses existing functionality)
+app.post('/api/openai-all/manual-fetch-news', async (req, res) => {
+  try {
+    await allNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'All news fetched and stored successfully for OpenAI processing' });
+  } catch (error) {
+    console.error('Error manually fetching all news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get OpenAI all news scheduler status
+app.get('/api/openai-all/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: allNewsScheduler.isRunning,
+      message: 'All news scheduler is running and fetching news every 30 minutes (shared with DeepSeek)'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===========================================
+// VIRAL CONTENT GENERATOR APIs
+// ===========================================
+
+// Get stored news for viral content generation
+app.get("/api/viral/stored-news", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC, fetched_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored news for viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate viral content from stored article
+// Updated endpoint in src/server.js
+app.post("/api/viral/generate-from-stored", async (req, res) => {
+  try {
+    const { articleId } = req.body;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: "Article ID is required"
+      });
+    }
+
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM cricket_news WHERE id = ? AND is_valid = true',
+      [articleId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found"
+      });
+    }
+
+    const article = rows[0];
+    
+    // Convert database article to GNews format
+    const gnewsArticle = {
+      title: article.title,
+      description: article.description,
+      content: article.content,
+      url: article.source_url,
+      publishedAt: article.published_at,
+      source: {
+        name: article.source_name,
+        url: article.source_url
+      }
+    };
+
+    console.log(`�� Generating viral content for stored article: ${article.title}`);
+
+    // Generate viral content
+    const result = await generateViralContent(gnewsArticle);
+
+    if (result.success) {
+      // ✅ STORE IN DATABASE - NEW ADDITION!
+      const [insertResult] = await pollDBPool.query(
+        `INSERT INTO viral_content 
+         (article_id, analysis, content, processing_time, generated_at) 
+         VALUES (?, ?, ?, ?, NOW())`,
+        [
+          articleId,
+          JSON.stringify(result.analysis),
+          JSON.stringify(result.content),
+          result.processingTime
+        ]
+      );
+
+      console.log(`💾 Viral content stored with ID: ${insertResult.insertId}`);
+
+      res.json({
+        success: true,
+        analysis: result.analysis,
+        content: result.content,
+        processingTime: result.processingTime,
+        originalArticle: gnewsArticle,
+        viralContentId: insertResult.insertId // Return the stored ID
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Generate viral content from stored article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate viral content"
+    });
+  }
+});
+
+// Get stored viral content history
+app.get("/api/viral/history", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM viral_content'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at
+       FROM viral_content vc
+       JOIN cricket_news cn ON vc.article_id = cn.id
+       ORDER BY vc.generated_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(row => ({
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    }));
+
+    res.json({
+      success: true,
+      viralContent: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting viral content history:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get specific viral content by ID
+app.get("/api/viral/content/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at, cn.description
+       FROM viral_content vc
+       JOIN cricket_news cn ON vc.article_id = cn.id
+       WHERE vc.id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Viral content not found"
+      });
+    }
+
+    const row = rows[0];
+    const result = {
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    };
+
+    res.json({
+      success: true,
+      viralContent: result
+    });
+  } catch (error) {
+    console.error('Error getting viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get viral content templates
+app.get("/api/viral/templates", async (req, res) => {
+  try {
+    const templates = {
+      instagram: {
+        reel: {
+          structure: "Hook (3s) → Story → CTA",
+          elements: ["Visual hook", "Story progression", "Strong CTA", "Trending hashtags"]
+        },
+        carousel: {
+          structure: "Title slide → 3-5 content slides → CTA slide",
+          elements: ["Eye-catching title", "Fact-based content", "Visual consistency", "Clear CTA"]
+        },
+        story: {
+          structure: "Multiple slides with polls/quizzes",
+          elements: ["Interactive polls", "Swipe-up actions", "Behind-the-scenes", "Quick facts"]
+        }
+      },
+      facebook: {
+        video: {
+          structure: "Hook → Narrative → CTA",
+          elements: ["Emotional hook", "Story progression", "Visual elements", "Share-worthy CTA"]
+        },
+        debate: {
+          structure: "Question → Image → Caption → CTA",
+          elements: ["Controversial question", "Supporting image", "Opinion-driven caption", "Discussion CTA"]
+        },
+        awareness: {
+          structure: "Story → Images → Emotional CTA",
+          elements: ["Personal story", "Supporting images", "Emotional connection", "Action CTA"]
+        }
+      },
+      twitter: {
+        thread: {
+          structure: "Hook tweet → 3-4 fact tweets → CTA tweet",
+          elements: ["Strong opening", "Fact progression", "Visual elements", "Engagement CTA"]
+        },
+        poll: {
+          structure: "Question → Poll options → Follow-up",
+          elements: ["Opinion question", "Multiple options", "Follow-up discussion", "Hashtags"]
+        },
+        opinion: {
+          structure: "Bold take → Supporting image → CTA",
+          elements: ["Controversial opinion", "Supporting visual", "Engagement CTA", "Relevant hashtags"]
+        }
+      },
+      youtube: {
+        shorts: {
+          structure: "Hook (3s) → Content → CTA",
+          elements: ["Visual hook", "Quick content", "Strong CTA", "Trending music"]
+        },
+        longform: {
+          structure: "Hook → Story → Analysis → CTA",
+          elements: ["Strong opening", "Story progression", "Deep analysis", "Subscription CTA"]
+        },
+        reaction: {
+          structure: "Reaction → Analysis → Opinion → CTA",
+          elements: ["Genuine reaction", "Fact analysis", "Personal opinion", "Engagement CTA"]
+        }
+      }
+    };
+
+    res.json({
+      success: true,
+      templates
+    });
+
+  } catch (error) {
+    console.error("Get viral content templates error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to get templates"
+    });
+  }
+});
+
+
 // helper to force ISO Z
 function toIsoZ(v) {
   if (!v) return null;
@@ -1792,8 +1755,8 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       console.log('✅ Using existing SEO recommendations');
     }
 
-    // 2) generate BODY HTML with outline - very low temperature for tight factual breaking news wire style
-    console.log('✍️ Generating tight, fact-driven wire-style cricket article (this may take up to 2 minutes)...');
+    // 2) generate ENHANCED BODY HTML with narrative elevation, data injection, and social reactions
+    console.log('✍️ Generating enhanced, narrative-rich cricket article with exclusive value (this may take up to 3 minutes)...');
     const bodyPrompt = buildRewriteBodyHtmlPrompt({
       rawTitle: article.title || "",
       rawDescription: article.description || "",
@@ -1803,9 +1766,12 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       recOutline: recs.outline,
       recPrimary: recs.keywords?.primary || "",
       recSecondary: recs.keywords?.secondary || "",
+      recTertiary: recs.keywords?.tertiary || "",
+      recLongtail: recs.keywords?.longtail || "",
+      recTrending: recs.keywords?.trending || "",
     });
-    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.6, max_tokens: 4000 });
-    console.log('✅ Article body generated');
+    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.7, max_tokens: 5000 });
+    console.log('✅ Enhanced article body generated with narrative elevation and exclusive value');
 
     // 3) wrap to full HTML doc and save
     console.log('📦 Building final HTML document...');
@@ -1849,52 +1815,6 @@ app.post("/api/articles/:id/generate", async (req, res) => {
 
 
 
-// ===========================================
-// CONTINUOUS CRICKET NEWS APIs
-// ===========================================
-
-// app.get('/api/stored-news', async (req, res) => {
-//   try {
-//     const limit  = Number(req.query.limit ?? 25);
-//     const offset = Number(req.query.offset ?? 0);
-
-//     // total count
-//     const [countResult] = await pollDBPool.query(
-//       'SELECT COUNT(*) AS total FROM cricket_news WHERE is_valid = true'
-//     );
-//     const totalCount = countResult[0].total;
-
-//     // page rows
-//     const raw = await newsScheduler.getStoredNews(limit, offset);
-
-//     // helper: normalize any MySQL DATETIME (string or Date) to ISO UTC with Z
-//     const toIsoUtc = (val) => {
-//       if (!val) return null;
-//       if (val instanceof Date) return val.toISOString();     // already UTC ISO
-//       const s = String(val);                                  // e.g. "2025-09-20 05:29:00"
-//       if (s.includes('T')) return s.endsWith('Z') ? s : (s + 'Z');
-//       return s.replace(' ', 'T') + 'Z';
-//     };
-
-//     const news = raw.map(n => ({
-//       ...n,
-//       published_at_iso: toIsoUtc(n.published_at),
-//       fetched_at_iso:   toIsoUtc(n.fetched_at),
-//       processed_at_iso: toIsoUtc(n.processed_at),
-//     }));
-
-//     res.json({
-//       success: true,
-//       news,
-//       totalCount,
-//       currentPage: Math.floor(offset / limit) + 1,
-//       totalPages: Math.max(1, Math.ceil(totalCount / limit)),
-//     });
-//   } catch (error) {
-//     console.error('Error getting stored news:', error);
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// });
 
 
 // Process single article
@@ -1937,40 +1857,7 @@ app.post('/api/process-article/:id', async (req, res) => {
   }
 });
 
-// Get processed articles
-// app.get('/api/processed-news', async (req, res) => {
-//   try {
-//     const { limit = 25, offset = 0 } = req.query;
-    
-//     // Get total count
-//     const [countResult] = await pollDBPool.query(
-//       'SELECT COUNT(*) as total FROM cricket_news WHERE processed = true'
-//     );
-//     const totalCount = countResult[0].total;
-    
-//     // Get paginated news
-//     const [rows] = await pollDBPool.query(
-//       `SELECT * FROM cricket_news 
-//        WHERE processed = true 
-//        ORDER BY processed_at DESC 
-//        LIMIT ? OFFSET ?`,
-//       [parseInt(limit), parseInt(offset)]
-//     );
-    
-//     res.json({ 
-//       success: true, 
-//       news: rows,
-//       totalCount,
-//       currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-//       totalPages: Math.ceil(totalCount / parseInt(limit))
-//     });
-//   } catch (error) {
-//     console.error('Error getting processed news:', error);
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// });
 
-// Manual fetch news (for testing)
 app.post('/api/manual-fetch-news', async (req, res) => {
   try {
     await newsScheduler.fetchAndStoreNews();
