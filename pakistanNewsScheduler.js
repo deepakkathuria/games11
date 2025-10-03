@@ -1,9 +1,3 @@
-
-
-
-
-
-// newsSheduler.js
 const axios = require('axios');
 require('dotenv').config();
 const https = require('https');
@@ -40,11 +34,11 @@ async function getWithRetry(url, opts = {}, tries = 3) {
   throw lastErr;
 }
 
-// GNews API Configuration
+// GNews API Configuration for Pakistan
 const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
-class NewsScheduler {
+class PakistanNewsScheduler {
   constructor() {
     this.isRunning = false;
     this.intervalId = null;
@@ -53,12 +47,12 @@ class NewsScheduler {
   // Start continuous news fetching
   async startScheduler(intervalMinutes = 30) {
     if (this.isRunning) {
-      console.log('Scheduler already running');
+      console.log('Pakistan News Scheduler already running');
       return;
     }
 
     this.isRunning = true;
-    console.log(`Starting news scheduler - fetching every ${intervalMinutes} minutes`);
+    console.log(`Starting Pakistan news scheduler - fetching every ${intervalMinutes} minutes`);
 
     // Fetch immediately
     await this.fetchAndStoreNews();
@@ -76,16 +70,16 @@ class NewsScheduler {
       this.intervalId = null;
     }
     this.isRunning = false;
-    console.log('News scheduler stopped');
+    console.log('Pakistan news scheduler stopped');
   }
 
-  // Fetch news from GNews API
+  // Fetch news from GNews API (Pakistan specific)
   async fetchNewsFromAPI() {
     try {
       const url = new URL(GNEWS_BASE_URL);
       url.searchParams.append("q", "cricket");
       url.searchParams.append("lang", "en");
-      // url.searchParams.append("country", "in");
+      url.searchParams.append("country", "pk"); // Pakistan filter
       url.searchParams.append("max", "50");
       url.searchParams.append("expand", "content");
       url.searchParams.append("apikey", GNEWS_API_KEY);
@@ -109,12 +103,12 @@ class NewsScheduler {
       }
       return [];
     } catch (error) {
-      console.error('Error fetching news from API:', error);
+      console.error('Error fetching Pakistan news from API:', error);
       return [];
     }
   }
 
-  // Store news in database using your existing pollDBPool
+  // Store news in database
   async storeNewsInDB(articles) {
     if (articles.length === 0) return;
 
@@ -122,14 +116,14 @@ class NewsScheduler {
       for (const article of articles) {
         // Check if article already exists
         const [existing] = await pollDBPool.query(
-          'SELECT id FROM cricket_news WHERE title = ? AND source_url = ?',
+          'SELECT id FROM pakistan_cricket_news WHERE title = ? AND source_url = ?',
           [article.title, article.url]
         );
 
         if (existing.length === 0) {
           // Insert new article
           await pollDBPool.query(
-            `INSERT INTO cricket_news 
+            `INSERT INTO pakistan_cricket_news 
              (title, description, content, source_name, source_url, published_at, word_count, is_valid) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
@@ -143,27 +137,27 @@ class NewsScheduler {
               true
             ]
           );
-          console.log(`Stored: ${article.title.substring(0, 50)}...`);
+          console.log(`Stored Pakistan news: ${article.title.substring(0, 50)}...`);
         }
       }
     } catch (error) {
-      console.error('Error storing news in database:', error);
+      console.error('Error storing Pakistan news in database:', error);
     }
   }
 
   // Main function to fetch and store news
   async fetchAndStoreNews() {
-    console.log('Fetching latest cricket news...');
+    console.log('Fetching latest Pakistan cricket news...');
     const articles = await this.fetchNewsFromAPI();
     await this.storeNewsInDB(articles);
-    console.log(`Fetched and stored ${articles.length} articles`);
+    console.log(`Fetched and stored ${articles.length} Pakistan articles`);
   }
 
-  // Get stored news from database using your existing pollDBPool
+  // Get stored news from database
   async getStoredNews(limit = 100, offset = 0) {
     try {
       const [rows] = await pollDBPool.query(
-        `SELECT * FROM cricket_news 
+        `SELECT * FROM pakistan_cricket_news 
          WHERE is_valid = true 
          ORDER BY published_at DESC, fetched_at DESC 
          LIMIT ? OFFSET ?`,
@@ -171,22 +165,22 @@ class NewsScheduler {
       );
       return rows;
     } catch (error) {
-      console.error('Error getting stored news:', error);
+      console.error('Error getting stored Pakistan news:', error);
       return [];
     }
   }
 
-  // Mark article as processed using your existing pollDBPool
+  // Mark article as processed
   async markAsProcessed(articleId, readyArticle) {
     try {
       await pollDBPool.query(
-        'UPDATE cricket_news SET processed = true, processed_at = NOW(), ready_article = ? WHERE id = ?',
+        'UPDATE pakistan_cricket_news SET processed = true, processed_at = NOW(), ready_article = ? WHERE id = ?',
         [readyArticle, articleId]
       );
     } catch (error) {
-      console.error('Error marking article as processed:', error);
+      console.error('Error marking Pakistan article as processed:', error);
     }
   }
 }
 
-module.exports = NewsScheduler;
+module.exports = PakistanNewsScheduler;

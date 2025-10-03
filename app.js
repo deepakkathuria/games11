@@ -122,8 +122,14 @@ const hindiAllNewsScheduler = new HindiAllNewsScheduler();
 hindiAllNewsScheduler.startScheduler(30); // Fetch every 30 minutes
 
 
+const PakistanNewsScheduler = require('./pakistanNewsScheduler');
+const pakistanNewsScheduler = new PakistanNewsScheduler();
+
+// Pakistan Manual Input Processor
+const { processPakistanManualInput } = require('./pakistanManualInputProcessor');
 
 
+pakistanNewsScheduler.startScheduler(10); // Every 30 minutes
 // ------------------------------------------------------HINDI ONE-------------------------------------------------
 
 
@@ -993,8 +999,497 @@ app.post('/api/all-viral/manual-fetch-news', async (req, res) => {
 
 
 
+// ===========================================
+// VIRAL CONTENT GENERATOR APIs
+// ===========================================
+
+// Get stored news for viral content generation
+app.get("/api/viral/stored-news", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC, fetched_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored news for viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate viral content from stored article
+// Updated endpoint in src/server.js
+app.post("/api/viral/generate-from-stored", async (req, res) => {
+  try {
+    const { articleId } = req.body;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: "Article ID is required"
+      });
+    }
+
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM cricket_news WHERE id = ? AND is_valid = true',
+      [articleId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found"
+      });
+    }
+
+    const article = rows[0];
+    
+    // Convert database article to GNews format
+    const gnewsArticle = {
+      title: article.title,
+      description: article.description,
+      content: article.content,
+      url: article.source_url,
+      publishedAt: article.published_at,
+      source: {
+        name: article.source_name,
+        url: article.source_url
+      }
+    };
+
+    console.log(`�� Generating viral content for stored article: ${article.title}`);
+
+    // Generate viral content
+    const result = await generateViralContent(gnewsArticle);
+
+    if (result.success) {
+      // ✅ STORE IN DATABASE - NEW ADDITION!
+      const [insertResult] = await pollDBPool.query(
+        `INSERT INTO viral_content 
+         (article_id, analysis, content, processing_time, generated_at) 
+         VALUES (?, ?, ?, ?, NOW())`,
+        [
+          articleId,
+          JSON.stringify(result.analysis),
+          JSON.stringify(result.content),
+          result.processingTime
+        ]
+      );
+
+      console.log(`💾 Viral content stored with ID: ${insertResult.insertId}`);
+
+      res.json({
+        success: true,
+        analysis: result.analysis,
+        content: result.content,
+        processingTime: result.processingTime,
+        originalArticle: gnewsArticle,
+        viralContentId: insertResult.insertId // Return the stored ID
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Generate viral content from stored article error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate viral content"
+    });
+  }
+});
+
+// Get stored viral content history
+app.get("/api/viral/history", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM viral_content'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at
+       FROM viral_content vc
+       JOIN cricket_news cn ON vc.article_id = cn.id
+       ORDER BY vc.generated_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(row => ({
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    }));
+
+    res.json({
+      success: true,
+      viralContent: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting viral content history:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get specific viral content by ID
+app.get("/api/viral/content/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at, cn.description
+       FROM viral_content vc
+       JOIN cricket_news cn ON vc.article_id = cn.id
+       WHERE vc.id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Viral content not found"
+      });
+    }
+
+    const row = rows[0];
+    const result = {
+      ...row,
+      analysis: JSON.parse(row.analysis),
+      content: JSON.parse(row.content),
+      generated_at_iso: toIsoZ(row.generated_at),
+      published_at_iso: toIsoZ(row.published_at)
+    };
+
+    res.json({
+      success: true,
+      viralContent: result
+    });
+  } catch (error) {
+    console.error('Error getting viral content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get viral content templates
+app.get("/api/viral/templates", async (req, res) => {
+  try {
+    const templates = {
+      instagram: {
+        reel: {
+          structure: "Hook (3s) → Story → CTA",
+          elements: ["Visual hook", "Story progression", "Strong CTA", "Trending hashtags"]
+        },
+        carousel: {
+          structure: "Title slide → 3-5 content slides → CTA slide",
+          elements: ["Eye-catching title", "Fact-based content", "Visual consistency", "Clear CTA"]
+        },
+        story: {
+          structure: "Multiple slides with polls/quizzes",
+          elements: ["Interactive polls", "Swipe-up actions", "Behind-the-scenes", "Quick facts"]
+        }
+      },
+      facebook: {
+        video: {
+          structure: "Hook → Narrative → CTA",
+          elements: ["Emotional hook", "Story progression", "Visual elements", "Share-worthy CTA"]
+        },
+        debate: {
+          structure: "Question → Image → Caption → CTA",
+          elements: ["Controversial question", "Supporting image", "Opinion-driven caption", "Discussion CTA"]
+        },
+        awareness: {
+          structure: "Story → Images → Emotional CTA",
+          elements: ["Personal story", "Supporting images", "Emotional connection", "Action CTA"]
+        }
+      },
+      twitter: {
+        thread: {
+          structure: "Hook tweet → 3-4 fact tweets → CTA tweet",
+          elements: ["Strong opening", "Fact progression", "Visual elements", "Engagement CTA"]
+        },
+        poll: {
+          structure: "Question → Poll options → Follow-up",
+          elements: ["Opinion question", "Multiple options", "Follow-up discussion", "Hashtags"]
+        },
+        opinion: {
+          structure: "Bold take → Supporting image → CTA",
+          elements: ["Controversial opinion", "Supporting visual", "Engagement CTA", "Relevant hashtags"]
+        }
+      },
+      youtube: {
+        shorts: {
+          structure: "Hook (3s) → Content → CTA",
+          elements: ["Visual hook", "Quick content", "Strong CTA", "Trending music"]
+        },
+        longform: {
+          structure: "Hook → Story → Analysis → CTA",
+          elements: ["Strong opening", "Story progression", "Deep analysis", "Subscription CTA"]
+        },
+        reaction: {
+          structure: "Reaction → Analysis → Opinion → CTA",
+          elements: ["Genuine reaction", "Fact analysis", "Personal opinion", "Engagement CTA"]
+        }
+      }
+    };
+
+    res.json({
+      success: true,
+      templates
+    });
+
+  } catch (error) {
+    console.error("Get viral content templates error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to get templates"
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
 
 // -------------------------------------------------------ENGLISH ONE --------------------
+
+
+
+// PAKISTAN ENGLISH ONE NEWS
+
+// Pakistan Manual Input Processor
+
+// Pakistan Stored News API
+app.get('/api/pakistan-stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM pakistan_cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const news = await pakistanNewsScheduler.getStoredNews(parseInt(limit), parseInt(offset));
+
+    const mapped = news.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      fetchedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Pakistan stored news error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Pakistan Processed News API
+app.get('/api/pakistan-processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM pakistan_cricket_news WHERE is_valid = true AND processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM pakistan_cricket_news 
+       WHERE is_valid = true AND processed = true 
+       ORDER BY processed_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      fetchedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Pakistan processed news error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Pakistan Manual Fetch News API
+app.post('/api/pakistan-manual-fetch-news', async (req, res) => {
+  try {
+    await pakistanNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Pakistan news fetched successfully' });
+  } catch (error) {
+    console.error('Pakistan manual fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Pakistan Article Generation API
+app.post('/api/pakistan-articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM pakistan_cricket_news WHERE id = ? AND is_valid = true',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Article not found' });
+    }
+
+    const article = rows[0];
+
+    // Process with Pakistan manual input processor
+    const result = await processPakistanManualInput(
+      {
+        title: article.title,
+        description: article.description,
+        content: article.content
+      },
+      {
+        language: "en",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      // Update database with processed article
+      await pollDBPool.query(
+        `UPDATE pakistan_cricket_news 
+         SET processed = true, 
+             processed_at = NOW(), 
+             ready_article = ?, 
+             final_title = ?, 
+             final_meta = ?, 
+             final_slug = ?,
+             prepublish_recs = ?
+         WHERE id = ?`,
+        [
+          result.readyToPublishArticle.readyArticle,
+          result.readyToPublishArticle.finalTitle,
+          result.readyToPublishArticle.finalMeta,
+          result.readyToPublishArticle.finalSlug,
+          JSON.stringify(result.readyToPublishArticle.recommendations),
+          id
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Pakistan article generated successfully',
+        processingTime: result.processingTime
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error('Pakistan article generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Start Pakistan news scheduler
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ENGLISH ONE 
 // ===========================================
 // AUTOMATED ALL NEWS APIs  ENGLISH
@@ -1344,289 +1839,6 @@ app.get('/api/openai-all/scheduler-status', async (req, res) => {
 
 
 
-
-
-// ===========================================
-// VIRAL CONTENT GENERATOR APIs
-// ===========================================
-
-// Get stored news for viral content generation
-app.get("/api/viral/stored-news", async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM cricket_news 
-       WHERE is_valid = true 
-       ORDER BY published_at DESC, fetched_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(n => ({
-      ...n,
-      published_at_iso: toIsoZ(n.published_at),
-      processed_at_iso: toIsoZ(n.processed_at),
-    }));
-
-    res.json({
-      success: true,
-      news: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting stored news for viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Generate viral content from stored article
-// Updated endpoint in src/server.js
-app.post("/api/viral/generate-from-stored", async (req, res) => {
-  try {
-    const { articleId } = req.body;
-
-    if (!articleId) {
-      return res.status(400).json({
-        success: false,
-        error: "Article ID is required"
-      });
-    }
-
-    // Get article from database
-    const [rows] = await pollDBPool.query(
-      'SELECT * FROM cricket_news WHERE id = ? AND is_valid = true',
-      [articleId]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Article not found"
-      });
-    }
-
-    const article = rows[0];
-    
-    // Convert database article to GNews format
-    const gnewsArticle = {
-      title: article.title,
-      description: article.description,
-      content: article.content,
-      url: article.source_url,
-      publishedAt: article.published_at,
-      source: {
-        name: article.source_name,
-        url: article.source_url
-      }
-    };
-
-    console.log(`�� Generating viral content for stored article: ${article.title}`);
-
-    // Generate viral content
-    const result = await generateViralContent(gnewsArticle);
-
-    if (result.success) {
-      // ✅ STORE IN DATABASE - NEW ADDITION!
-      const [insertResult] = await pollDBPool.query(
-        `INSERT INTO viral_content 
-         (article_id, analysis, content, processing_time, generated_at) 
-         VALUES (?, ?, ?, ?, NOW())`,
-        [
-          articleId,
-          JSON.stringify(result.analysis),
-          JSON.stringify(result.content),
-          result.processingTime
-        ]
-      );
-
-      console.log(`💾 Viral content stored with ID: ${insertResult.insertId}`);
-
-      res.json({
-        success: true,
-        analysis: result.analysis,
-        content: result.content,
-        processingTime: result.processingTime,
-        originalArticle: gnewsArticle,
-        viralContentId: insertResult.insertId // Return the stored ID
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: result.error
-      });
-    }
-
-  } catch (error) {
-    console.error("Generate viral content from stored article error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to generate viral content"
-    });
-  }
-});
-
-// Get stored viral content history
-app.get("/api/viral/history", async (req, res) => {
-  try {
-    const { limit = 25, offset = 0 } = req.query;
-
-    const [countResult] = await pollDBPool.query(
-      'SELECT COUNT(*) as total FROM viral_content'
-    );
-    const totalCount = countResult[0].total;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at
-       FROM viral_content vc
-       JOIN cricket_news cn ON vc.article_id = cn.id
-       ORDER BY vc.generated_at DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
-
-    const mapped = rows.map(row => ({
-      ...row,
-      analysis: JSON.parse(row.analysis),
-      content: JSON.parse(row.content),
-      generated_at_iso: toIsoZ(row.generated_at),
-      published_at_iso: toIsoZ(row.published_at)
-    }));
-
-    res.json({
-      success: true,
-      viralContent: mapped,
-      totalCount,
-      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-    });
-  } catch (error) {
-    console.error('Error getting viral content history:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get specific viral content by ID
-app.get("/api/viral/content/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [rows] = await pollDBPool.query(
-      `SELECT vc.*, cn.title, cn.source_name, cn.source_url, cn.published_at, cn.description
-       FROM viral_content vc
-       JOIN cricket_news cn ON vc.article_id = cn.id
-       WHERE vc.id = ?`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Viral content not found"
-      });
-    }
-
-    const row = rows[0];
-    const result = {
-      ...row,
-      analysis: JSON.parse(row.analysis),
-      content: JSON.parse(row.content),
-      generated_at_iso: toIsoZ(row.generated_at),
-      published_at_iso: toIsoZ(row.published_at)
-    };
-
-    res.json({
-      success: true,
-      viralContent: result
-    });
-  } catch (error) {
-    console.error('Error getting viral content:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get viral content templates
-app.get("/api/viral/templates", async (req, res) => {
-  try {
-    const templates = {
-      instagram: {
-        reel: {
-          structure: "Hook (3s) → Story → CTA",
-          elements: ["Visual hook", "Story progression", "Strong CTA", "Trending hashtags"]
-        },
-        carousel: {
-          structure: "Title slide → 3-5 content slides → CTA slide",
-          elements: ["Eye-catching title", "Fact-based content", "Visual consistency", "Clear CTA"]
-        },
-        story: {
-          structure: "Multiple slides with polls/quizzes",
-          elements: ["Interactive polls", "Swipe-up actions", "Behind-the-scenes", "Quick facts"]
-        }
-      },
-      facebook: {
-        video: {
-          structure: "Hook → Narrative → CTA",
-          elements: ["Emotional hook", "Story progression", "Visual elements", "Share-worthy CTA"]
-        },
-        debate: {
-          structure: "Question → Image → Caption → CTA",
-          elements: ["Controversial question", "Supporting image", "Opinion-driven caption", "Discussion CTA"]
-        },
-        awareness: {
-          structure: "Story → Images → Emotional CTA",
-          elements: ["Personal story", "Supporting images", "Emotional connection", "Action CTA"]
-        }
-      },
-      twitter: {
-        thread: {
-          structure: "Hook tweet → 3-4 fact tweets → CTA tweet",
-          elements: ["Strong opening", "Fact progression", "Visual elements", "Engagement CTA"]
-        },
-        poll: {
-          structure: "Question → Poll options → Follow-up",
-          elements: ["Opinion question", "Multiple options", "Follow-up discussion", "Hashtags"]
-        },
-        opinion: {
-          structure: "Bold take → Supporting image → CTA",
-          elements: ["Controversial opinion", "Supporting visual", "Engagement CTA", "Relevant hashtags"]
-        }
-      },
-      youtube: {
-        shorts: {
-          structure: "Hook (3s) → Content → CTA",
-          elements: ["Visual hook", "Quick content", "Strong CTA", "Trending music"]
-        },
-        longform: {
-          structure: "Hook → Story → Analysis → CTA",
-          elements: ["Strong opening", "Story progression", "Deep analysis", "Subscription CTA"]
-        },
-        reaction: {
-          structure: "Reaction → Analysis → Opinion → CTA",
-          elements: ["Genuine reaction", "Fact analysis", "Personal opinion", "Engagement CTA"]
-        }
-      }
-    };
-
-    res.json({
-      success: true,
-      templates
-    });
-
-  } catch (error) {
-    console.error("Get viral content templates error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to get templates"
-    });
-  }
-});
 
 
 // helper to force ISO Z
