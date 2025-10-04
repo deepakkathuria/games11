@@ -134,6 +134,13 @@ const {
   buildCricketHtmlDocument
 } = require('./cricketOpenAIProcessor');
 
+const { 
+  processHindiCricketNewsOpenAI, 
+  generateHindiCricketHeadline, 
+  generateHindiCricketMetaDescription,
+  buildHindiCricketHtmlDocument
+} = require('./hindiCricketOpenAIProcessor');
+
 
 pakistanNewsScheduler.startScheduler(10); // Every 30 minutes
 // ------------------------------------------------------HINDI ONE-------------------------------------------------
@@ -779,6 +786,196 @@ app.get('/api/hindi-all/scheduler-status', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Add this import at the top with other imports
+
+
+// ============= HINDI CRICKET NEWS OPENAI ENDPOINTS =============
+
+// Get stored Hindi cricket news for OpenAI processing
+app.get('/api/hindi-cricket-openai/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE is_valid = true
+       ORDER BY fetched_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi cricket news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi cricket news for OpenAI
+app.get('/api/hindi-cricket-openai/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE openai_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE openai_processed = true
+       ORDER BY openai_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.openai_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi cricket news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi cricket news article with OpenAI
+app.post('/api/hindi-cricket-openai/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with Hindi Cricket-specific OpenAI
+    const result = await processHindiCricketNewsOpenAI({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Use the recommended title and meta from the SEO analysis
+      const hindiTitle = result.recommendations.recommendedTitle || await generateHindiCricketHeadline(article.title);
+      const hindiMeta = result.recommendations.recommendedMeta || await generateHindiCricketMetaDescription(article.description);
+      const hindiSlug = result.recommendations.recommendedSlug || hindiTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Create HTML document with Hindi cricket content
+      const finalHtml = buildHindiCricketHtmlDocument({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      await pollDBPool.query(
+        `UPDATE hindi_cricket_news
+           SET openai_processed = 1,
+               openai_processed_at = NOW(),
+               openai_ready_article = ?,
+               openai_final_title = ?,
+               openai_final_meta  = ?,
+               openai_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml,
+          recommendations: result.recommendations
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate Hindi cricket OpenAI article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch Hindi cricket news for OpenAI
+app.post('/api/hindi-cricket-openai/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi cricket news fetched and stored successfully for OpenAI processing' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi cricket news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // ------------------------------------HINDI ONE COMPLETE --------------------------------------
