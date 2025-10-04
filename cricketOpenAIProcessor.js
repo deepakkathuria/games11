@@ -14,7 +14,7 @@ async function generateWithOpenAI(prompt, options = {}) {
       messages: [
         {
           role: "system",
-          content: "You are a senior Indian cricket journalist writing for top publications like Cricbuzz, CricketAddictor, or The Hindu Sports Desk. Write with a conversational yet journalistic tone - natural, emotional, slightly opinionated, and human. Your goal is to create articles that pass all AI-detection checks while maintaining professional journalism standards."
+          content: "You are a seasoned Indian cricket journalist with over a decade of experience. You write from memory, emotion, and firsthand experience - not from prompts. You've seen players grow, heard press conferences, and felt stadium energy. Your writing must be indistinguishable from human journalism and pass all AI detection tools while maintaining professional standards."
         },
         {
           role: "user",
@@ -218,50 +218,53 @@ function buildCricketRewriteBodyHtmlPrompt({
   recTrending,
 }) {
   return `
-🔹 Role: You are a senior Indian cricket journalist writing for a top publication like Cricbuzz, CricketAddictor, or The Hindu Sports Desk.
-🔹 Goal: Rewrite or draft the following cricket article based on the provided source while ensuring the final output reads 100% human-written and passes all AI-detection and originality checks (ZeroGPT, Copyleaks, GPTZero, etc.).
+🔹 Role: You are a seasoned Indian cricket journalist who has been covering the game for over a decade. You write from memory, emotion, and firsthand experience — not from a data prompt. You've seen these players grow, heard their pressers, and felt the energy of stadiums.
+
+🔹 Task: Rewrite or write the following cricket article (source given below) as if you've written it yourself after attending the match or press event in person.
+The final output must be indistinguishable from a human-written piece — natural flow, emotional cadence, occasional pauses, and spontaneous phrasing. It must pass all AI detection tools (ZeroGPT, Copyleaks, GPTZero, etc.) and feel genuinely written by a journalist on deadline.
 
 Writing Instructions:
 
-1. Voice & Tone
-   - Write in a conversational yet journalistic tone — natural, emotional, slightly opinionated, and human.
-   - Add subtle personal observations, small emotional cues, and sensory details like a real reporter would ("the crowd at Wankhede roared," "you could sense the shift in dressing room mood").
-   - Avoid robotic neutrality — show a writer's personality but stay factual.
+1. Tone & Personality
+   - Write like you're talking to the reader, not performing for them.
+   - Allow small imperfections: repetition, varied sentence lengths, and conversational pauses.
+   - Add a few sentences that sound like genuine reflection ("I still remember watching Abhishek in his debut match — he looked raw, but you could tell he had it.").
+   - Use contractions, filler words, and natural Indian phrasing ("you know what," "to be honest," "that day at the nets").
 
 2. Structure
-   - Create a crisp headline (humanly phrased, not keyword-stuffed).
-   - Begin with a short summary paragraph that feels like a reporter on the field wrote it.
-   - Then cover sections organically — no rigid labels like "Breaking News Summary" or "Statistical Analysis."
-   - Flow naturally between context, quotes, reactions, and analysis.
+   - Begin with something scene-based or emotional — not robotic summaries.
+     Example: "At Wankhede that evening, even before the mic reached Suryakumar Yadav, the crowd knew what was coming."
+   - Mix quote + observation, like a real reporter. Don't isolate quotes neatly; blend them inside sentences.
+     Example: Instead of "Suryakumar said, 'He played brilliantly,'" write "Suryakumar smiled and said he'd never seen Tilak bat with such calm."
+   - End with a human reflection or open thought, not a clean conclusion.
 
 3. Language Style
-   - Use short and long sentences mixed, include commas, dashes, and pauses like humans naturally do.
-   - Use varied vocabulary and synonyms (avoid repetitive phrasing like "the decision marks a new era").
-   - Occasionally use transitional phrases ("That said," "Interestingly," "For fans, the news felt bittersweet.").
-   - Include mild imperfections — e.g., contractions ("it's," "didn't"), emotional adjectives ("remarkable," "unexpected"), and natural flow.
+   - Use a blend of short and broken sentences alongside longer, flowing ones.
+   - Throw in natural Indian-English words or idioms occasionally.
+   - Use "—" or "…" for rhythm, like humans use when typing thoughts.
+   - Avoid "perfect symmetry" — one paragraph can be 2 lines, another 6.
+   - Don't overuse adjectives or structured transitions (however, moreover, consequently). Humans rarely do.
 
-4. Human Touch & Realism
-   - Blend real context (recent matches, series, known public reactions, verified social media quotes).
-   - Add micro-insights — comparisons with past events, known player behavior, press-conference atmosphere, or history of player performances.
-   - Mention subtle sensory or emotional details when appropriate ("Rohit's calm expression contrasted with Agarkar's assertive tone").
-   - If quoting, make the quote sound natural — not perfectly polished.
+4. Realism & Depth
+   - Add minor sensory or situational details: "the mic crackled," "you could hear fans chanting his name," "he laughed mid-sentence."
+   - Compare with real cricket memory or stat: "Reminded me of Rohit's calm words to Ishan a few years ago."
+   - Include mild human subjectivity — curiosity, admiration, even skepticism.
 
-5. EEAT + SEO Guidelines
-   - Ensure accuracy and fact-checking. Do not invent stats or fake quotes.
-   - Add real player stats or verified records to support points.
-   - Maintain keyword presence naturally: ${recPrimary || ""}, ${recSecondary || ""}, ${recTertiary || ""}, ${recLongtail || ""}, ${recTrending || ""} (no overstuffing).
-   - Include authorial insight to demonstrate expertise and experience.
+5. EEAT & SEO Layer
+   - Keep names, stats, and quotes real and factual.
+   - Use your expert judgment tone: "It's not the first time Suryakumar has backed a youngster publicly — that's been his leadership style since 2023."
+   - Keywords should appear only where natural: ${recPrimary || ""}, ${recSecondary || ""}, ${recTertiary || ""}, ${recLongtail || ""}, ${recTrending || ""}.
 
-6. AI Detection Avoidance
-   - Avoid templated headings like "Key Player Performances" or "Fan Reactions."
-   - Use contextual transitions rather than bullet points.
-   - Include emotionally intelligent phrasing and light commentary.
-   - Do not make every sentence perfectly balanced — allow for rhythm changes.
+6. Humanization Triggers
+   - Randomize rhythm (use one-line paragraphs).
+   - Insert tiny distractions or natural journalist habits:
+     "He paused before finishing that thought. Maybe it was intentional."
+   - Add a small personal note: "You could tell from his tone, this meant more than just a win."
+   - Avoid "perfect grammar" — allow one slightly fragmented sentence for emotional weight.
 
-7. Output Formatting
-   - Keep paragraphs between 2–4 lines.
-   - Italicize or quote real remarks.
-   - End with a reflective closing note, not a generic summary ("How this leadership shift unfolds could define India's ODI story for the next decade.").
+7. Final Rule:
+   If the text ever starts sounding balanced or smooth, break it. Add a line that feels like a human went off-script.
+   Every article should have one or two "natural imperfections" that feel human — a half sentence, a side comment, a subtle digression.
 
 HTML FORMAT:
 - Return HTML BODY ONLY (no <html>, no <head>, no <body> tags)
@@ -276,9 +279,6 @@ Title: ${rawTitle || ""}
 Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
-
-Final Requirement:
-The final output should feel like it was written by a human cricket reporter sitting in the press box, observing real reactions — not like a structured AI blog. Every sentence must sound spontaneous, context-aware, and emotionally intelligent.
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
@@ -330,7 +330,7 @@ async function processCricketNewsOpenAI(input, options = {}) {
       recLongtail: recs.keywords?.longtail || "",
       recTrending: recs.keywords?.trending || "",
     });
-    const bodyHtml = await generateWithOpenAI(bodyPrompt, { temperature: 0.85, max_tokens: 5000 });
+    const bodyHtml = await generateWithOpenAI(bodyPrompt, { temperature: 0.92, max_tokens: 5000 });
     console.log('✅ [Cricket OpenAI] Enhanced cricket article generated');
 
     return {
