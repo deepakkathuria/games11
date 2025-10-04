@@ -142,6 +142,7 @@ const {
 } = require('./hindiCricketOpenAIProcessor');
 
 
+
 pakistanNewsScheduler.startScheduler(10); // Every 30 minutes
 // ------------------------------------------------------HINDI ONE-------------------------------------------------
 
@@ -1867,6 +1868,168 @@ app.get('/api/all/scheduler-status', async (req, res) => {
 // ============= ENGLISH CRICKET NEWS OPENAI ENDPOINTS =============
 
 // Get stored cricket news for OpenAI processing
+// app.get('/api/cricket-openai/stored-news', async (req, res) => {
+//   try {
+//     const { limit = 25, offset = 0 } = req.query;
+
+//     const [countResult] = await pollDBPool.query(
+//       'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+//     );
+//     const totalCount = countResult[0].total;
+
+//     const [rows] = await pollDBPool.query(
+//       `SELECT * FROM cricket_news
+//        WHERE is_valid = true
+//        ORDER BY fetched_at DESC
+//        LIMIT ? OFFSET ?`,
+//       [parseInt(limit), parseInt(offset)]
+//     );
+
+//     const mapped = rows.map(n => ({
+//       ...n,
+//       published_at_iso: toIsoZ(n.published_at),
+//       processed_at_iso: toIsoZ(n.processed_at),
+//     }));
+
+//     res.json({
+//       success: true,
+//       news: mapped,
+//       totalCount,
+//       currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+//       totalPages: Math.ceil(totalCount / parseInt(limit)),
+//     });
+//   } catch (error) {
+//     console.error('Error getting stored cricket news for OpenAI:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// // Get processed cricket news for OpenAI
+// app.get('/api/cricket-openai/processed-news', async (req, res) => {
+//   try {
+//     const { limit = 25, offset = 0 } = req.query;
+
+//     const [countResult] = await pollDBPool.query(
+//       'SELECT COUNT(*) as total FROM cricket_news WHERE openai_processed = true'
+//     );
+//     const totalCount = countResult[0].total;
+
+//     const [rows] = await pollDBPool.query(
+//       `SELECT * FROM cricket_news
+//        WHERE openai_processed = true
+//        ORDER BY openai_processed_at DESC
+//        LIMIT ? OFFSET ?`,
+//       [parseInt(limit), parseInt(offset)]
+//     );
+
+//     const mapped = rows.map(n => ({
+//       ...n,
+//       published_at_iso: toIsoZ(n.published_at),
+//       processed_at_iso: toIsoZ(n.openai_processed_at),
+//     }));
+
+//     res.json({
+//       success: true,
+//       news: mapped,
+//       totalCount,
+//       currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+//       totalPages: Math.ceil(totalCount / parseInt(limit)),
+//     });
+//   } catch (error) {
+//     console.error('Error getting processed cricket news for OpenAI:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// // Process cricket news article with OpenAI (using prepublish.js style prompts)
+// app.post('/api/cricket-openai/articles/:id/generate', async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const [rows] = await pollDBPool.query(
+//       "SELECT * FROM cricket_news WHERE id = ?",
+//       [id]
+//     );
+//     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+//     const article = rows[0];
+
+//     // Process with Cricket-specific OpenAI (using prepublish.js style)
+//     const result = await processCricketNewsOpenAI({
+//       title: article.title,
+//       description: article.description,
+//       content: article.content
+//     });
+
+//     if (result.success) {
+//       // Use the recommended title and meta from the SEO analysis
+//       const cricketTitle = result.recommendations.recommendedTitle || await generateCricketHeadline(article.title);
+//       const cricketMeta = result.recommendations.recommendedMeta || await generateCricketMetaDescription(article.description);
+//       const cricketSlug = result.recommendations.recommendedSlug || cricketTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+//       // Create HTML document with cricket content
+//       const finalHtml = buildCricketHtmlDocument({
+//         title: cricketTitle,
+//         metaDescription: cricketMeta,
+//         bodyHtml: result.readyToPublishArticle,
+//       });
+
+//       await pollDBPool.query(
+//         `UPDATE cricket_news
+//            SET openai_processed = 1,
+//                openai_processed_at = NOW(),
+//                openai_ready_article = ?,
+//                openai_final_title = ?,
+//                openai_final_meta  = ?,
+//                openai_final_slug  = ?
+//          WHERE id = ?`,
+//         [finalHtml, cricketTitle, cricketMeta, cricketSlug, id]
+//       );
+
+//       return res.json({
+//         success: true,
+//         final: {
+//           title: cricketTitle,
+//           meta: cricketMeta,
+//           slug: cricketSlug,
+//           html: finalHtml,
+//           recommendations: result.recommendations
+//         }
+//       });
+//     } else {
+//       return res.status(500).json({ success: false, error: result.error });
+//     }
+//   } catch (err) {
+//     console.error("generate cricket OpenAI article error", err);
+//     return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+//   }
+// });
+
+// // Manual fetch cricket news for OpenAI
+// app.post('/api/cricket-openai/manual-fetch-news', async (req, res) => {
+//   try {
+//     await newsScheduler.fetchAndStoreNews();
+//     res.json({ success: true, message: 'Cricket news fetched and stored successfully for OpenAI processing' });
+//   } catch (error) {
+//     console.error('Error manually fetching cricket news for OpenAI:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// // Get cricket news scheduler status
+// app.get('/api/cricket-openai/scheduler-status', async (req, res) => {
+//   try {
+//     res.json({ 
+//       success: true, 
+//       isRunning: newsScheduler.isRunning,
+//       message: 'Cricket news scheduler is running and fetching news every 30 minutes'
+//     });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+
+
 app.get('/api/cricket-openai/stored-news', async (req, res) => {
   try {
     const { limit = 25, offset = 0 } = req.query;
@@ -1940,7 +2103,7 @@ app.get('/api/cricket-openai/processed-news', async (req, res) => {
   }
 });
 
-// Process cricket news article with OpenAI (using prepublish.js style prompts)
+// Process cricket news article with OpenAI (Raw Human Reporter Mode)
 app.post('/api/cricket-openai/articles/:id/generate', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1952,7 +2115,7 @@ app.post('/api/cricket-openai/articles/:id/generate', async (req, res) => {
     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
     const article = rows[0];
 
-    // Process with Cricket-specific OpenAI (using prepublish.js style)
+    // Process with Raw Human Reporter Mode
     const result = await processCricketNewsOpenAI({
       title: article.title,
       description: article.description,
@@ -1960,17 +2123,13 @@ app.post('/api/cricket-openai/articles/:id/generate', async (req, res) => {
     });
 
     if (result.success) {
-      // Use the recommended title and meta from the SEO analysis
-      const cricketTitle = result.recommendations.recommendedTitle || await generateCricketHeadline(article.title);
-      const cricketMeta = result.recommendations.recommendedMeta || await generateCricketMetaDescription(article.description);
-      const cricketSlug = result.recommendations.recommendedSlug || cricketTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-
-      // Create HTML document with cricket content
-      const finalHtml = buildCricketHtmlDocument({
-        title: cricketTitle,
-        metaDescription: cricketMeta,
-        bodyHtml: result.readyToPublishArticle,
-      });
+      // Simple slug generation from original title
+      const cricketTitle = article.title;
+      const cricketMeta = article.description.substring(0, 160);
+      const cricketSlug = article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      
+      // HTML is already complete from OpenAI (human-like rewrite)
+      const finalHtml = result.readyToPublishArticle;
 
       await pollDBPool.query(
         `UPDATE cricket_news
@@ -1991,7 +2150,6 @@ app.post('/api/cricket-openai/articles/:id/generate', async (req, res) => {
           meta: cricketMeta,
           slug: cricketSlug,
           html: finalHtml,
-          recommendations: result.recommendations
         }
       });
     } else {
@@ -2026,10 +2184,6 @@ app.get('/api/cricket-openai/scheduler-status', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-
-
-
 
 
 
