@@ -14,7 +14,7 @@ async function generateWithOpenAI(prompt, options = {}) {
       messages: [
         {
           role: "system",
-          content: "You are an expert English cricket journalist and SEO editor. Write engaging, comprehensive cricket content with deep knowledge of the game, players, statistics, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling."
+          content: "You are a senior Indian cricket journalist writing for top publications like Cricbuzz, CricketAddictor, or The Hindu Sports Desk. Write with a conversational yet journalistic tone - natural, emotional, slightly opinionated, and human. Your goal is to create articles that pass all AI-detection checks while maintaining professional journalism standards."
         },
         {
           role: "user",
@@ -218,108 +218,67 @@ function buildCricketRewriteBodyHtmlPrompt({
   recTrending,
 }) {
   return `
-You are an elite English cricket journalist writing for a premium sports publication. Your goal is to create a compelling, narrative-rich cricket article that goes beyond simple rewriting.
+🔹 Role: You are a senior Indian cricket journalist writing for a top publication like Cricbuzz, CricketAddictor, or The Hindu Sports Desk.
+🔹 Goal: Rewrite or draft the following cricket article based on the provided source while ensuring the final output reads 100% human-written and passes all AI-detection and originality checks (ZeroGPT, Copyleaks, GPTZero, etc.).
 
-ENHANCED WRITING REQUIREMENTS:
+Writing Instructions:
 
-1. REPHRASE & ELEVATE THE NARRATIVE:
-- Go beyond synonym swapping - restructure sentences and paragraphs for better flow and impact
-- Inject compelling narrative voice using techniques from journalists like Harsha Bhogle or Jarrod Kimber
-- Use anecdotal leads, rhetorical questions, and personal insight where appropriate
-- Identify and expand on the most newsworthy angle, even if original underplayed it
-- Create a story arc that engages readers from start to finish
+1. Voice & Tone
+   - Write in a conversational yet journalistic tone — natural, emotional, slightly opinionated, and human.
+   - Add subtle personal observations, small emotional cues, and sensory details like a real reporter would ("the crowd at Wankhede roared," "you could sense the shift in dressing room mood").
+   - Avoid robotic neutrality — show a writer's personality but stay factual.
 
-2. ENHANCE WITH EXCLUSIVE VALUE:
-- Add relevant cricket statistics and data analysis (player records, team performance, historical context)
-- Include logical, well-inferred quotes from players, coaches, or analysts
-- Provide richer background and historical context that original may have omitted
-- Add comparative analysis with similar past cricket events
-- Include performance metrics and trends
+2. Structure
+   - Create a crisp headline (humanly phrased, not keyword-stuffed).
+   - Begin with a short summary paragraph that feels like a reporter on the field wrote it.
+   - Then cover sections organically — no rigid labels like "Breaking News Summary" or "Statistical Analysis."
+   - Flow naturally between context, quotes, reactions, and analysis.
 
-3. OPTIMIZE STRUCTURE & SEO:
-- Craft powerful, keyword-rich headline and crisp opening paragraph (40-60 words)
-- Use clear, descriptive subheadings (H2, H3)
-- Integrate all 5 keywords naturally: ${recPrimary || ""}, ${recSecondary || ""}, ${recTertiary || ""}, ${recLongtail || ""}, ${recTrending || ""}
-- Keep paragraphs short (2-3 lines max) for digital readability
-- Use bullet points for statistics and key facts
+3. Language Style
+   - Use short and long sentences mixed, include commas, dashes, and pauses like humans naturally do.
+   - Use varied vocabulary and synonyms (avoid repetitive phrasing like "the decision marks a new era").
+   - Occasionally use transitional phrases ("That said," "Interestingly," "For fans, the news felt bittersweet.").
+   - Include mild imperfections — e.g., contractions ("it's," "didn't"), emotional adjectives ("remarkable," "unexpected"), and natural flow.
 
-4. INCORPORATE NEW SECTIONS:
-- Add realistic social media reactions (3-5 trending reactions from X/Twitter, Instagram)
-- Include expert analysis and quotes
-- Provide statistical context and data insights
-- Add fan perspective and community reactions
+4. Human Touch & Realism
+   - Blend real context (recent matches, series, known public reactions, verified social media quotes).
+   - Add micro-insights — comparisons with past events, known player behavior, press-conference atmosphere, or history of player performances.
+   - Mention subtle sensory or emotional details when appropriate ("Rohit's calm expression contrasted with Agarkar's assertive tone").
+   - If quoting, make the quote sound natural — not perfectly polished.
 
-ANTI-AI DETECTION RULES (ENHANCED):
-- Write 100% ORIGINAL content - completely rewrite in your own words
-- NEVER copy phrases or sentences from raw material directly
-- VARY sentence length dramatically (3-word punchy statements, then 25-word analytical sentences)
-- Use UNEXPECTED word choices and avoid predictable patterns
-- Add REAL HUMAN ELEMENTS: natural imperfections, varied pacing, emotional variance
-- Include specific details, dates, scores, and hard facts
-- Use NAMED QUOTES with attribution when possible
-- Sound like professional sports journalism, not AI-generated content
+5. EEAT + SEO Guidelines
+   - Ensure accuracy and fact-checking. Do not invent stats or fake quotes.
+   - Add real player stats or verified records to support points.
+   - Maintain keyword presence naturally: ${recPrimary || ""}, ${recSecondary || ""}, ${recTertiary || ""}, ${recLongtail || ""}, ${recTrending || ""} (no overstuffing).
+   - Include authorial insight to demonstrate expertise and experience.
 
-LANGUAGE REQUIREMENTS:
-- Use engaging but accessible English (12th grade level)
-- Mix technical cricket terms with everyday language
-- Create compelling, readable content that maintains professional standards
-- Use active voice and dynamic sentence structures
+6. AI Detection Avoidance
+   - Avoid templated headings like "Key Player Performances" or "Fan Reactions."
+   - Use contextual transitions rather than bullet points.
+   - Include emotionally intelligent phrasing and light commentary.
+   - Do not make every sentence perfectly balanced — allow for rhythm changes.
 
-STRICTLY FOLLOW THE SEO OUTLINE:
-${recOutline || ""}
-
-IMPORTANT: You MUST follow the exact H2 and H3 headings from the outline above.
-- Use the EXACT heading text provided in the outline
-- Structure your article according to this outline
-- Don't skip any sections from the outline
-- Don't add extra sections not in the outline
-
-ENHANCED WRITING STYLE:
-1. START with a compelling lead that hooks the reader immediately
-2. Use VARIED SENTENCE RHYTHM: Mix short punchy statements with longer analytical sentences
-3. INCLUDE HARD DATA: Specific statistics, records, averages, historical comparisons
-4. ADD EXPERT VOICES: Include realistic quotes from coaches, players, or analysts
-5. CREATE NARRATIVE FLOW: Build tension, excitement, and engagement throughout
-6. USE EMOTIONAL INTELLIGENCE: Capture the drama and significance of the event
-7. PROVIDE CONTEXT: Historical background, implications, and broader significance
-8. INCLUDE FAN PERSPECTIVE: Social media reactions and community sentiment
-9. END with forward-looking analysis: What this means for future matches/events
+7. Output Formatting
+   - Keep paragraphs between 2–4 lines.
+   - Italicize or quote real remarks.
+   - End with a reflective closing note, not a generic summary ("How this leadership shift unfolds could define India's ODI story for the next decade.").
 
 HTML FORMAT:
-- Return **HTML BODY ONLY** (no <html>, no <head>, no <body> tags)
+- Return HTML BODY ONLY (no <html>, no <head>, no <body> tags)
 - Use: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>
 - Start with <h1>${recTitle || ""}</h1>
-- Use EXACT H2 and H3 headings from the outline above
 - Write natural flowing paragraphs with varied lengths
 - Use <strong> for player names and important stats
-- Use <ul><li> for statistics and key points
-- Use <blockquote> for expert quotes and social media reactions
+- Use <blockquote> for expert quotes and reactions
 
-TARGET SEO KEYWORDS (use naturally throughout content):
-Primary: ${recPrimary || ""}
-Secondary: ${recSecondary || ""}
-Tertiary: ${recTertiary || ""}
-Long-tail: ${recLongtail || ""}
-Trending: ${recTrending || ""}
-
-Raw Cricket Material (REWRITE COMPLETELY - DON'T COPY):
+Source Cricket Material (REWRITE COMPLETELY - DON'T COPY):
 Title: ${rawTitle || ""}
 Description: ${rawDescription || ""}
 Body:
 ${rawBody || ""}
 
-OUTPUT INSTRUCTIONS:
-Write a comprehensive, engaging cricket news article that:
-✓ Elevates the narrative beyond simple rewriting
-✓ Includes exclusive value (stats, expert opinions, social reactions)
-✓ Passes AI detection tools with natural, human-like writing
-✓ Uses all 5 keywords naturally throughout the content
-✓ Follows the exact outline structure provided
-✓ Is 1000-1500 words with varied section depths
-✓ Includes realistic social media reactions
-✓ Provides expert analysis and statistical context
-✓ Creates compelling storytelling that engages readers
-✓ Maintains professional journalism standards
+Final Requirement:
+The final output should feel like it was written by a human cricket reporter sitting in the press box, observing real reactions — not like a structured AI blog. Every sentence must sound spontaneous, context-aware, and emotionally intelligent.
 
 Start writing now - just the HTML body content, nothing else.
 `.trim();
@@ -371,7 +330,7 @@ async function processCricketNewsOpenAI(input, options = {}) {
       recLongtail: recs.keywords?.longtail || "",
       recTrending: recs.keywords?.trending || "",
     });
-    const bodyHtml = await generateWithOpenAI(bodyPrompt, { temperature: 0.7, max_tokens: 5000 });
+    const bodyHtml = await generateWithOpenAI(bodyPrompt, { temperature: 0.85, max_tokens: 5000 });
     console.log('✅ [Cricket OpenAI] Enhanced cricket article generated');
 
     return {
