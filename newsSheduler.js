@@ -41,7 +41,7 @@ async function getWithRetry(url, opts = {}, tries = 3) {
 }
 
 // GNews API Configuration
-const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
+const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "fe7ae24f706a3904399790443a6b2034";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
 class NewsScheduler {

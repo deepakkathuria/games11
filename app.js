@@ -144,6 +144,102 @@ const {
 
 
 pakistanNewsScheduler.startScheduler(10); // Every 30 minutes
+
+
+
+
+
+// Get current prompt configuration
+app.get('/api/cricket-openai/prompt-config', async (req, res) => {
+  try {
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM openai_prompts WHERE prompt_type = 'cricket_human_reporter' LIMIT 1"
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Prompt configuration not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      config: rows[0]
+    });
+  } catch (error) {
+    console.error('Error fetching prompt config:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update prompt configuration
+app.put('/api/cricket-openai/prompt-config', async (req, res) => {
+  try {
+    const { 
+      system_prompt, 
+      user_prompt_template, 
+      temperature, 
+      max_tokens, 
+      top_p, 
+      frequency_penalty, 
+      presence_penalty 
+    } = req.body;
+    
+    await pollDBPool.query(
+      `UPDATE openai_prompts 
+       SET system_prompt = ?,
+           user_prompt_template = ?,
+           temperature = ?,
+           max_tokens = ?,
+           top_p = ?,
+           frequency_penalty = ?,
+           presence_penalty = ?
+       WHERE prompt_type = 'cricket_human_reporter'`,
+      [
+        system_prompt, 
+        user_prompt_template, 
+        temperature, 
+        max_tokens, 
+        top_p, 
+        frequency_penalty, 
+        presence_penalty
+      ]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Prompt configuration updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating prompt config:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ------------------------------------------------------HINDI ONE-------------------------------------------------
 
 
@@ -457,7 +553,7 @@ app.post("/api/hindi/get-ready-article", async (req, res) => {
 // DEBUG: test GNews from server (GET only; HEAD 404 deta hai)
 app.get('/api/debug-gnews', async (req, res) => {
   try {
-    const key = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
+    const key = process.env.GNEWS_API_KEY || "fe7ae24f706a3904399790443a6b2034";
     const url = `https://gnews.io/api/v4/search?q=cricket&lang=en&max=3&expand=content&apikey=${key}`;
 
     const https = require('https');

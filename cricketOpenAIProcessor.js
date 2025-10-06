@@ -690,3 +690,172 @@ async function processCricketNewsOpenAI(input, options = {}) {
 module.exports = {
   processCricketNewsOpenAI,
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// const axios = require('axios');
+// const mysql = require('mysql2/promise');
+
+// const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
+
+// // Database connection for fetching prompts
+// const dbConfig = {
+//   host: process.env.DB_HOST,
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.POLL_DB_NAME,
+// };
+
+// // Fetch prompt config from database
+// async function getPromptConfig() {
+//   const connection = await mysql.createConnection(dbConfig);
+//   try {
+//     const [rows] = await connection.query(
+//       "SELECT * FROM openai_prompts WHERE prompt_type = 'cricket_human_reporter' LIMIT 1"
+//     );
+//     return rows[0] || null;
+//   } finally {
+//     await connection.end();
+//   }
+// }
+
+// async function generateWithOpenAI(prompt, options = {}) {
+//   try {
+//     console.log('🤖 OpenAI API call started...');
+//     console.log('📊 Temperature:', options.temperature ?? 0.97);
+//     console.log('📝 Max tokens:', options.max_tokens ?? 5000);
+    
+//     const response = await axios.post(OPENAI_BASE_URL, {
+//       model: options.model || "gpt-4o-mini",
+//       messages: [
+//         {
+//           role: "system",
+//           content: options.systemPrompt || "You are a helpful assistant."
+//         },
+//         {
+//           role: "user",
+//           content: prompt
+//         }
+//       ],
+//       temperature: options.temperature ?? 0.97,
+//       max_tokens: options.max_tokens ?? 5000,
+//       top_p: options.top_p ?? 0.88,
+//       frequency_penalty: options.frequency_penalty ?? 0.5,
+//       presence_penalty: options.presence_penalty ?? 0.45,
+//     }, {
+//       headers: {
+//         'Authorization': `Bearer ${OPENAI_API_KEY}`,
+//         'Content-Type': 'application/json'
+//       },
+//       timeout: 120000,
+//     });
+    
+//     const content = response.data?.choices?.[0]?.message?.content || "";
+//     console.log('✅ OpenAI API call completed, content length:', content.length);
+//     return content;
+//   } catch (error) {
+//     console.error('❌ OpenAI API error:', error.message);
+//     if (error.code === 'ECONNABORTED') {
+//       throw new Error('Request timeout - article generation took too long. Try again.');
+//     }
+//     if (error.response) {
+//       console.error('Response status:', error.response.status);
+//       console.error('Response data:', error.response.data);
+//       throw new Error(`OpenAI API error: ${error.response.data?.error?.message || error.message}`);
+//     }
+//     throw error;
+//   }
+// }
+
+// async function processCricketNewsOpenAI(input, options = {}) {
+//   const startTime = Date.now();
+  
+//   try {
+//     console.log('🏏 [Cricket OpenAI] Processing cricket article:', input.title);
+    
+//     if (!input.title || input.title.length < 10) {
+//       throw new Error('Title too short');
+//     }
+//     if (!input.description || input.description.length < 20) {
+//       throw new Error('Description too short');
+//     }
+//     if (!input.content || input.content.length < 300) {
+//       throw new Error('Content too short');
+//     }
+
+//     // Fetch dynamic prompt from database
+//     console.log('📥 [Cricket OpenAI] Fetching prompt configuration from database...');
+//     const promptConfig = await getPromptConfig();
+    
+//     if (!promptConfig) {
+//       throw new Error('Prompt configuration not found in database');
+//     }
+    
+//     console.log('✅ [Cricket OpenAI] Prompt config loaded');
+
+//     // Replace placeholders in user prompt template
+//     const userPrompt = promptConfig.user_prompt_template
+//       .replace('{{TITLE}}', input.title || "")
+//       .replace('{{DESCRIPTION}}', input.description || "")
+//       .replace('{{BODY}}', input.content || "");
+    
+//     console.log('✍️ [Cricket OpenAI] Generating article with dynamic prompt...');
+    
+//     const bodyHtml = await generateWithOpenAI(userPrompt, { 
+//       systemPrompt: promptConfig.system_prompt,
+//       temperature: promptConfig.temperature,
+//       max_tokens: promptConfig.max_tokens,
+//       top_p: promptConfig.top_p,
+//       frequency_penalty: promptConfig.frequency_penalty,
+//       presence_penalty: promptConfig.presence_penalty
+//     });
+    
+//     console.log('✅ [Cricket OpenAI] Article generated successfully');
+
+//     return {
+//       success: true,
+//       readyToPublishArticle: bodyHtml,
+//       processingTime: Date.now() - startTime,
+//       promptUsed: {
+//         system: promptConfig.system_prompt,
+//         template: promptConfig.user_prompt_template
+//       }
+//     };
+
+//   } catch (error) {
+//     console.error('Process cricket news OpenAI error:', error);
+//     return {
+//       success: false,
+//       error: error.message,
+//       processingTime: Date.now() - startTime
+//     };
+//   }
+// }
+
+// module.exports = {
+//   processCricketNewsOpenAI,
+// };
