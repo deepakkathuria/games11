@@ -89,19 +89,35 @@ const { processManualInput } = require('./manualInputProcessor');
 //   generateSocialMediaReactions,
 // } = require("./prepublish");
 
+// const {
+//   generateWithDeepSeek,
+//   buildPrePublishPrompt,
+//   buildRewriteBodyHtmlPrompt,
+//   parsePrePublishTextToJSON,
+//   buildHtmlDocument,
+//   fetchCricketStats,
+//   generateExpertOpinion,
+//   generateSocialMediaReactions,
+//   // NEW IMPORTS
+//   extractFactsFromContent,
+//   calculateNgramOverlap,
+//   generateEnhancedArticle,
+// } = require("./prepublish");
+
+
 const {
   generateWithDeepSeek,
   buildPrePublishPrompt,
   buildRewriteBodyHtmlPrompt,
   parsePrePublishTextToJSON,
   buildHtmlDocument,
-  fetchCricketStats,
-  generateExpertOpinion,
-  generateSocialMediaReactions,
-  // NEW IMPORTS
-  extractFactsFromContent,
   calculateNgramOverlap,
-  generateEnhancedArticle,
+  // NEW 4-STEP PIPELINE IMPORTS
+  generate4StepArticle,
+  buildPrePublishingChecklistPrompt,
+  buildHumanLikeRewritePrompt,
+  buildSEOOptimizationPrompt,
+  buildFinalFormattingPrompt,
 } = require("./prepublish");
 
 // Initialize news scheduler
@@ -2691,10 +2707,132 @@ app.get('/api/processed-news', async (req, res) => {
 // });
 
 
+// app.post("/api/articles/:id/generate", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     console.log(`\n🚀 Starting article generation for ID: ${id}`);
+
+//     const [rows] = await pollDBPool.query(
+//       "SELECT * FROM cricket_news WHERE id = ?",
+//       [id]
+//     );
+//     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+//     const article = rows[0];
+//     console.log(`📰 Article found: ${article.title?.substring(0, 50)}...`);
+
+//     // 1) ensure recommendations exist
+//     let recs = null;
+//     if (article.prepublish_recs) {
+//       try { recs = JSON.parse(article.prepublish_recs); } catch {}
+//     }
+//     if (!recs || !recs.recommendedTitle) {
+//       console.log('📋 Generating SEO recommendations...');
+//       const prePrompt = buildPrePublishPrompt({
+//         title: article.title || "",
+//         description: article.description || "",
+//         body: article.content || "",
+//       });
+//       const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
+//       recs = parsePrePublishTextToJSON(recText);
+//       console.log('✅ SEO recommendations generated');
+
+//       await pollDBPool.query(
+//         "UPDATE cricket_news SET prepublish_recs = ? WHERE id = ?",
+//         [JSON.stringify(recs), id]
+//       );
+//     } else {
+//       console.log('✅ Using existing SEO recommendations');
+//     }
+
+//     // 2) generate ENHANCED BODY HTML with fact extraction & plagiarism check
+//     console.log('✍️ Generating enhanced article with fact extraction & plagiarism detection (this may take 2-3 minutes)...');
+//     const result = await generateEnhancedArticle({
+//       rawTitle: article.title || "",
+//       rawDescription: article.description || "",
+//       rawBody: article.content || "",
+//       recTitle: recs.recommendedTitle,
+//       recMeta: recs.recommendedMeta,
+//       recOutline: recs.outline,
+//       keywords: recs.keywords,
+//       useSimpleMode: false  // Set true for simpler, faster generation
+//     });
+    
+//     const bodyHtml = result.html;
+//     const plagiarismPercent = (result.plagiarismScore * 100).toFixed(2);
+//     console.log(`✅ Article generated successfully!`);
+//     console.log(`   📊 Plagiarism Score: ${plagiarismPercent}%`);
+//     console.log(`   📝 Facts Extracted: ${result.facts.length}`);
+//     console.log(`   🔄 Regenerated: ${result.wasRegenerated ? 'Yes' : 'No'}`);
+
+//     // 3) wrap to full HTML doc and save
+//     console.log('📦 Building final HTML document...');
+//     const finalHtml = buildHtmlDocument({
+//       title: recs.recommendedTitle,
+//       metaDescription: recs.recommendedMeta,
+//       bodyHtml,
+//     });
+
+//     // 4) Save to database with enhanced metadata
+//     await pollDBPool.query(
+//       `UPDATE cricket_news
+//          SET processed = 1,
+//              processed_at = NOW(),
+//              ready_article = ?,
+//              final_title = ?,
+//              final_meta  = ?,
+//              final_slug  = ?,
+//              prepublish_recs = ?
+//        WHERE id = ?`,
+//       [
+//         finalHtml, 
+//         recs.recommendedTitle, 
+//         recs.recommendedMeta, 
+//         recs.recommendedSlug,
+//         JSON.stringify({
+//           ...recs,
+//           plagiarismScore: plagiarismPercent + '%',
+//           factsExtracted: result.facts.length,
+//           wasRegenerated: result.wasRegenerated,
+//           generatedAt: new Date().toISOString()
+//         }),
+//         id
+//       ]
+//     );
+
+//     console.log(`✅ Article generation complete for ID: ${id}\n`);
+//     return res.json({
+//       success: true,
+//       final: {
+//         title: recs.recommendedTitle,
+//         meta: recs.recommendedMeta,
+//         slug: recs.recommendedSlug,
+//         html: finalHtml
+//       },
+//       metadata: {
+//         plagiarismScore: plagiarismPercent + '%',
+//         factsExtracted: result.facts.length,
+//         wasRegenerated: result.wasRegenerated,
+//         facts: result.facts
+//       }
+//     });
+//   } catch (err) {
+//     console.error("❌ Generate error:", err.message);
+//     console.error("Full error:", err);
+//     return res.status(500).json({ 
+//       success: false, 
+//       error: err.message || "Article generation failed. Please try again." 
+//     });
+//   }
+// });
+
+// ONE-CLICK GENERATE: 4-Step Human-Like Pipeline
 app.post("/api/articles/:id/generate", async (req, res) => {
   try {
     const { id } = req.params;
+    const { use4Step = 'true' } = req.query; // Enable/disable 4-step pipeline
+    
     console.log(`\n🚀 Starting article generation for ID: ${id}`);
+    console.log(`📋 Pipeline mode: ${use4Step === 'true' ? '4-Step Human-Like' : 'Legacy'}`);
 
     const [rows] = await pollDBPool.query(
       "SELECT * FROM cricket_news WHERE id = ?",
@@ -2704,101 +2842,195 @@ app.post("/api/articles/:id/generate", async (req, res) => {
     const article = rows[0];
     console.log(`📰 Article found: ${article.title?.substring(0, 50)}...`);
 
-    // 1) ensure recommendations exist
-    let recs = null;
-    if (article.prepublish_recs) {
-      try { recs = JSON.parse(article.prepublish_recs); } catch {}
-    }
-    if (!recs || !recs.recommendedTitle) {
-      console.log('📋 Generating SEO recommendations...');
-      const prePrompt = buildPrePublishPrompt({
+    if (use4Step === 'true') {
+      // ========== NEW: 4-STEP HUMAN-LIKE PIPELINE ==========
+      console.log('🎯 Using 4-Step Human-Like Pipeline...\n');
+      
+      const result = await generate4StepArticle({
         title: article.title || "",
         description: article.description || "",
-        body: article.content || "",
+        content: article.content || ""
       });
-      const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
-      recs = parsePrePublishTextToJSON(recText);
-      console.log('✅ SEO recommendations generated');
+
+      if (!result.success) {
+        return res.status(500).json({ 
+          success: false, 
+          error: result.error,
+          completedSteps: result.completedSteps,
+          partialResults: result.partialResults
+        });
+      }
+
+      // Check plagiarism
+      const plagiarismScore = calculateNgramOverlap(
+        result.finalOutput.article, 
+        article.content, 
+        4
+      );
+      const plagiarismPercent = (plagiarismScore * 100).toFixed(2);
+      
+      console.log(`\n📊 Quality Metrics:`);
+      console.log(`   Plagiarism: ${plagiarismPercent}%`);
+      console.log(`   Processing Time: ${(result.processingTime / 1000).toFixed(2)}s`);
+
+      const finalHtml = buildHtmlDocument({
+        title: result.finalOutput.title,
+        metaDescription: result.finalOutput.metaDescription,
+        bodyHtml: result.finalOutput.article,
+      });
 
       await pollDBPool.query(
-        "UPDATE cricket_news SET prepublish_recs = ? WHERE id = ?",
-        [JSON.stringify(recs), id]
+        `UPDATE cricket_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?,
+               prepublish_recs = ?
+         WHERE id = ?`,
+        [
+          finalHtml,
+          result.finalOutput.title,
+          result.finalOutput.metaDescription,
+          result.finalOutput.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
+          JSON.stringify({
+            title: result.finalOutput.title,
+            meta: result.finalOutput.metaDescription,
+            plagiarismScore: plagiarismPercent + '%',
+            pipeline: '4-step-human-like',
+            processingTime: result.processingTime,
+            generatedAt: new Date().toISOString(),
+            steps: {
+              checklist: result.steps.step1_checklist ? 'completed' : 'failed',
+              humanRewrite: result.steps.step2_humanRewritten ? 'completed' : 'failed',
+              seoOptimization: result.steps.step3_seoOptimized ? 'completed' : 'failed',
+              finalFormatting: result.steps.step4_finalArticle ? 'completed' : 'failed'
+            }
+          }),
+          id
+        ]
       );
+
+      console.log(`✅ 4-Step article generation complete for ID: ${id}\n`);
+      
+      return res.json({
+        success: true,
+        pipeline: '4-step-human-like',
+        final: {
+          title: result.finalOutput.title,
+          meta: result.finalOutput.metaDescription,
+          slug: result.finalOutput.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
+          html: finalHtml
+        },
+        metadata: {
+          plagiarismScore: plagiarismPercent + '%',
+          processingTime: result.processingTime,
+          stepsCompleted: 4,
+          steps: result.steps
+        }
+      });
+      
     } else {
-      console.log('✅ Using existing SEO recommendations');
+      // ========== LEGACY PIPELINE ==========
+      console.log('📋 Using Legacy Pipeline...\n');
+      
+      // 1) ensure recommendations exist
+      let recs = null;
+      if (article.prepublish_recs) {
+        try { recs = JSON.parse(article.prepublish_recs); } catch {}
+      }
+      if (!recs || !recs.recommendedTitle) {
+        console.log('📋 Generating SEO recommendations...');
+        const prePrompt = buildPrePublishPrompt({
+          title: article.title || "",
+          description: article.description || "",
+          body: article.content || "",
+        });
+        const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
+        recs = parsePrePublishTextToJSON(recText);
+        console.log('✅ SEO recommendations generated');
+
+        await pollDBPool.query(
+          "UPDATE cricket_news SET prepublish_recs = ? WHERE id = ?",
+          [JSON.stringify(recs), id]
+        );
+      } else {
+        console.log('✅ Using existing SEO recommendations');
+      }
+
+      // 2) generate ENHANCED BODY HTML
+      console.log('✍️ Generating article...');
+      const bodyPrompt = buildRewriteBodyHtmlPrompt({
+        rawTitle: article.title || "",
+        rawDescription: article.description || "",
+        rawBody: article.content || "",
+        recTitle: recs.recommendedTitle,
+        recMeta: recs.recommendedMeta,
+        recOutline: recs.outline,
+        recPrimary: recs.keywords?.primary || "",
+        recSecondary: recs.keywords?.secondary || "",
+        recTertiary: recs.keywords?.tertiary || "",
+        recLongtail: recs.keywords?.longtail || "",
+        recTrending: recs.keywords?.trending || "",
+      });
+      const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.7, max_tokens: 5000 });
+      console.log('✅ Article body generated');
+
+      // 3) Check plagiarism
+      const plagiarismScore = calculateNgramOverlap(bodyHtml, article.content, 4);
+      const plagiarismPercent = (plagiarismScore * 100).toFixed(2);
+      console.log(`📊 Plagiarism: ${plagiarismPercent}%`);
+
+      // 4) wrap to full HTML doc and save
+      console.log('📦 Building final HTML document...');
+      const finalHtml = buildHtmlDocument({
+        title: recs.recommendedTitle,
+        metaDescription: recs.recommendedMeta,
+        bodyHtml,
+      });
+
+      await pollDBPool.query(
+        `UPDATE cricket_news
+           SET processed = 1,
+               processed_at = NOW(),
+               ready_article = ?,
+               final_title = ?,
+               final_meta  = ?,
+               final_slug  = ?,
+               prepublish_recs = ?
+         WHERE id = ?`,
+        [
+          finalHtml, 
+          recs.recommendedTitle, 
+          recs.recommendedMeta, 
+          recs.recommendedSlug,
+          JSON.stringify({
+            ...recs,
+            plagiarismScore: plagiarismPercent + '%',
+            pipeline: 'legacy',
+            generatedAt: new Date().toISOString()
+          }),
+          id
+        ]
+      );
+
+      console.log(`✅ Article generation complete for ID: ${id}\n`);
+      return res.json({
+        success: true,
+        pipeline: 'legacy',
+        final: {
+          title: recs.recommendedTitle,
+          meta: recs.recommendedMeta,
+          slug: recs.recommendedSlug,
+          html: finalHtml
+        },
+        metadata: {
+          plagiarismScore: plagiarismPercent + '%'
+        }
+      });
     }
 
-    // 2) generate ENHANCED BODY HTML with fact extraction & plagiarism check
-    console.log('✍️ Generating enhanced article with fact extraction & plagiarism detection (this may take 2-3 minutes)...');
-    const result = await generateEnhancedArticle({
-      rawTitle: article.title || "",
-      rawDescription: article.description || "",
-      rawBody: article.content || "",
-      recTitle: recs.recommendedTitle,
-      recMeta: recs.recommendedMeta,
-      recOutline: recs.outline,
-      keywords: recs.keywords,
-      useSimpleMode: false  // Set true for simpler, faster generation
-    });
-    
-    const bodyHtml = result.html;
-    const plagiarismPercent = (result.plagiarismScore * 100).toFixed(2);
-    console.log(`✅ Article generated successfully!`);
-    console.log(`   📊 Plagiarism Score: ${plagiarismPercent}%`);
-    console.log(`   📝 Facts Extracted: ${result.facts.length}`);
-    console.log(`   🔄 Regenerated: ${result.wasRegenerated ? 'Yes' : 'No'}`);
-
-    // 3) wrap to full HTML doc and save
-    console.log('📦 Building final HTML document...');
-    const finalHtml = buildHtmlDocument({
-      title: recs.recommendedTitle,
-      metaDescription: recs.recommendedMeta,
-      bodyHtml,
-    });
-
-    // 4) Save to database with enhanced metadata
-    await pollDBPool.query(
-      `UPDATE cricket_news
-         SET processed = 1,
-             processed_at = NOW(),
-             ready_article = ?,
-             final_title = ?,
-             final_meta  = ?,
-             final_slug  = ?,
-             prepublish_recs = ?
-       WHERE id = ?`,
-      [
-        finalHtml, 
-        recs.recommendedTitle, 
-        recs.recommendedMeta, 
-        recs.recommendedSlug,
-        JSON.stringify({
-          ...recs,
-          plagiarismScore: plagiarismPercent + '%',
-          factsExtracted: result.facts.length,
-          wasRegenerated: result.wasRegenerated,
-          generatedAt: new Date().toISOString()
-        }),
-        id
-      ]
-    );
-
-    console.log(`✅ Article generation complete for ID: ${id}\n`);
-    return res.json({
-      success: true,
-      final: {
-        title: recs.recommendedTitle,
-        meta: recs.recommendedMeta,
-        slug: recs.recommendedSlug,
-        html: finalHtml
-      },
-      metadata: {
-        plagiarismScore: plagiarismPercent + '%',
-        factsExtracted: result.facts.length,
-        wasRegenerated: result.wasRegenerated,
-        facts: result.facts
-      }
-    });
   } catch (err) {
     console.error("❌ Generate error:", err.message);
     console.error("Full error:", err);
@@ -2808,8 +3040,6 @@ app.post("/api/articles/:id/generate", async (req, res) => {
     });
   }
 });
-
-
 
 
 // Process single article
