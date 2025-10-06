@@ -78,6 +78,17 @@ const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForP
 const NewsScheduler = require('./newsSheduler');
 const { processManualInput } = require('./manualInputProcessor');
 // ⬇️ ADD THESE
+// const {
+//   generateWithDeepSeek,
+//   buildPrePublishPrompt,
+//   buildRewriteBodyHtmlPrompt,
+//   parsePrePublishTextToJSON,
+//   buildHtmlDocument,
+//   fetchCricketStats,
+//   generateExpertOpinion,
+//   generateSocialMediaReactions,
+// } = require("./prepublish");
+
 const {
   generateWithDeepSeek,
   buildPrePublishPrompt,
@@ -87,7 +98,12 @@ const {
   fetchCricketStats,
   generateExpertOpinion,
   generateSocialMediaReactions,
+  // NEW IMPORTS
+  extractFactsFromContent,
+  calculateNgramOverlap,
+  generateEnhancedArticle,
 } = require("./prepublish");
+
 // Initialize news scheduler
 const newsScheduler = new NewsScheduler();
 newsScheduler.startScheduler(1); // Fetch every 30 minutes
@@ -2578,7 +2594,103 @@ app.get('/api/processed-news', async (req, res) => {
 
 // -------------- NEW: Pre-Publish Recs + Rewrite --------------
 
-// ONE-CLICK GENERATE: make recs (if missing) -> write FULL HTML -> save
+// // ONE-CLICK GENERATE: make recs (if missing) -> write FULL HTML -> save
+// app.post("/api/articles/:id/generate", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     console.log(`\n🚀 Starting article generation for ID: ${id}`);
+
+//     const [rows] = await pollDBPool.query(
+//       "SELECT * FROM cricket_news WHERE id = ?",
+//       [id]
+//     );
+//     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+//     const article = rows[0];
+//     console.log(`📰 Article found: ${article.title?.substring(0, 50)}...`);
+
+//     // 1) ensure recommendations exist
+//     let recs = null;
+//     if (article.prepublish_recs) {
+//       try { recs = JSON.parse(article.prepublish_recs); } catch {}
+//     }
+//     if (!recs || !recs.recommendedTitle) {
+//       console.log('📋 Generating SEO recommendations...');
+//       const prePrompt = buildPrePublishPrompt({
+//         title: article.title || "",
+//         description: article.description || "",
+//         body: article.content || "",
+//       });
+//       const recText = await generateWithDeepSeek(prePrompt, { temperature: 0.2, max_tokens: 1200 });
+//       recs = parsePrePublishTextToJSON(recText);
+//       console.log('✅ SEO recommendations generated');
+
+//       await pollDBPool.query(
+//         "UPDATE cricket_news SET prepublish_recs = ? WHERE id = ?",
+//         [JSON.stringify(recs), id]
+//       );
+//     } else {
+//       console.log('✅ Using existing SEO recommendations');
+//     }
+
+//     // 2) generate ENHANCED BODY HTML with narrative elevation, data injection, and social reactions
+//     console.log('✍️ Generating enhanced, narrative-rich cricket article with exclusive value (this may take up to 3 minutes)...');
+//     const bodyPrompt = buildRewriteBodyHtmlPrompt({
+//       rawTitle: article.title || "",
+//       rawDescription: article.description || "",
+//       rawBody: article.content || "",
+//       recTitle: recs.recommendedTitle,
+//       recMeta: recs.recommendedMeta,
+//       recOutline: recs.outline,
+//       recPrimary: recs.keywords?.primary || "",
+//       recSecondary: recs.keywords?.secondary || "",
+//       recTertiary: recs.keywords?.tertiary || "",
+//       recLongtail: recs.keywords?.longtail || "",
+//       recTrending: recs.keywords?.trending || "",
+//     });
+//     const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.7, max_tokens: 5000 });
+//     console.log('✅ Enhanced article body generated with narrative elevation and exclusive value');
+
+//     // 3) wrap to full HTML doc and save
+//     console.log('📦 Building final HTML document...');
+//     const finalHtml = buildHtmlDocument({
+//       title: recs.recommendedTitle,
+//       metaDescription: recs.recommendedMeta,
+//       bodyHtml,
+//     });
+
+//     await pollDBPool.query(
+//       `UPDATE cricket_news
+//          SET processed = 1,
+//              processed_at = NOW(),
+//              ready_article = ?,
+//              final_title = ?,
+//              final_meta  = ?,
+//              final_slug  = ?
+//        WHERE id = ?`,
+//       [finalHtml, recs.recommendedTitle, recs.recommendedMeta, recs.recommendedSlug, id]
+//     );
+
+//     console.log(`✅ Article generation complete for ID: ${id}\n`);
+//     return res.json({
+//       success: true,
+//       final: {
+//         title: recs.recommendedTitle,
+//         meta: recs.recommendedMeta,
+//         slug: recs.recommendedSlug,
+//         html: finalHtml
+//       }
+//     });
+//   } catch (err) {
+//     console.error("❌ Generate error:", err.message);
+//     console.error("Full error:", err);
+//     return res.status(500).json({ 
+//       success: false, 
+//       error: err.message || "Article generation failed. Please try again." 
+//     });
+//   }
+// });
+
+
 app.post("/api/articles/:id/generate", async (req, res) => {
   try {
     const { id } = req.params;
@@ -2616,23 +2728,25 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       console.log('✅ Using existing SEO recommendations');
     }
 
-    // 2) generate ENHANCED BODY HTML with narrative elevation, data injection, and social reactions
-    console.log('✍️ Generating enhanced, narrative-rich cricket article with exclusive value (this may take up to 3 minutes)...');
-    const bodyPrompt = buildRewriteBodyHtmlPrompt({
+    // 2) generate ENHANCED BODY HTML with fact extraction & plagiarism check
+    console.log('✍️ Generating enhanced article with fact extraction & plagiarism detection (this may take 2-3 minutes)...');
+    const result = await generateEnhancedArticle({
       rawTitle: article.title || "",
       rawDescription: article.description || "",
       rawBody: article.content || "",
       recTitle: recs.recommendedTitle,
       recMeta: recs.recommendedMeta,
       recOutline: recs.outline,
-      recPrimary: recs.keywords?.primary || "",
-      recSecondary: recs.keywords?.secondary || "",
-      recTertiary: recs.keywords?.tertiary || "",
-      recLongtail: recs.keywords?.longtail || "",
-      recTrending: recs.keywords?.trending || "",
+      keywords: recs.keywords,
+      useSimpleMode: false  // Set true for simpler, faster generation
     });
-    const bodyHtml = await generateWithDeepSeek(bodyPrompt, { temperature: 0.7, max_tokens: 5000 });
-    console.log('✅ Enhanced article body generated with narrative elevation and exclusive value');
+    
+    const bodyHtml = result.html;
+    const plagiarismPercent = (result.plagiarismScore * 100).toFixed(2);
+    console.log(`✅ Article generated successfully!`);
+    console.log(`   📊 Plagiarism Score: ${plagiarismPercent}%`);
+    console.log(`   📝 Facts Extracted: ${result.facts.length}`);
+    console.log(`   🔄 Regenerated: ${result.wasRegenerated ? 'Yes' : 'No'}`);
 
     // 3) wrap to full HTML doc and save
     console.log('📦 Building final HTML document...');
@@ -2642,6 +2756,7 @@ app.post("/api/articles/:id/generate", async (req, res) => {
       bodyHtml,
     });
 
+    // 4) Save to database with enhanced metadata
     await pollDBPool.query(
       `UPDATE cricket_news
          SET processed = 1,
@@ -2649,9 +2764,23 @@ app.post("/api/articles/:id/generate", async (req, res) => {
              ready_article = ?,
              final_title = ?,
              final_meta  = ?,
-             final_slug  = ?
+             final_slug  = ?,
+             prepublish_recs = ?
        WHERE id = ?`,
-      [finalHtml, recs.recommendedTitle, recs.recommendedMeta, recs.recommendedSlug, id]
+      [
+        finalHtml, 
+        recs.recommendedTitle, 
+        recs.recommendedMeta, 
+        recs.recommendedSlug,
+        JSON.stringify({
+          ...recs,
+          plagiarismScore: plagiarismPercent + '%',
+          factsExtracted: result.facts.length,
+          wasRegenerated: result.wasRegenerated,
+          generatedAt: new Date().toISOString()
+        }),
+        id
+      ]
     );
 
     console.log(`✅ Article generation complete for ID: ${id}\n`);
@@ -2662,6 +2791,12 @@ app.post("/api/articles/:id/generate", async (req, res) => {
         meta: recs.recommendedMeta,
         slug: recs.recommendedSlug,
         html: finalHtml
+      },
+      metadata: {
+        plagiarismScore: plagiarismPercent + '%',
+        factsExtracted: result.facts.length,
+        wasRegenerated: result.wasRegenerated,
+        facts: result.facts
       }
     });
   } catch (err) {
@@ -2673,7 +2808,6 @@ app.post("/api/articles/:id/generate", async (req, res) => {
     });
   }
 });
-
 
 
 
