@@ -118,6 +118,11 @@ const {
   buildHumanLikeRewritePrompt,
   buildSEOOptimizationPrompt,
   buildFinalFormattingPrompt,
+
+
+  regenerateWithOpenAI,
+  generateWithOpenAI,
+  buildCricketAddictorPrompt,
 } = require("./prepublish");
 
 // Initialize news scheduler
@@ -3103,6 +3108,105 @@ app.get('/api/scheduler-status', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========== OPENAI GPT-4 REGENERATION ENDPOINT ==========
+app.post("/api/articles/:id/regenerate-openai", async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`\n🎨 Starting OpenAI GPT-4 regeneration for ID: ${id}`);
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM cricket_news WHERE id = ? AND processed = 1",
+      [id]
+    );
+    
+    if (!rows.length) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Processed article not found" 
+      });
+    }
+    
+    const article = rows[0];
+    console.log(`📰 Article found: ${article.title?.substring(0, 50)}...`);
+
+    // Regenerate with OpenAI GPT-4
+    const result = await regenerateWithOpenAI({
+      title: article.title || "",
+      description: article.description || "",
+      content: article.content || ""
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+
+    // Build full HTML document
+    const finalHtml = buildHtmlDocument({
+      title: result.title,
+      metaDescription: result.metaDescription,
+      bodyHtml: result.generatedArticle,
+    });
+
+    // Update database with OpenAI generated version
+    await pollDBPool.query(
+      `UPDATE cricket_news
+         SET ready_article = ?,
+             final_title = ?,
+             final_meta  = ?,
+             final_slug  = ?,
+             prepublish_recs = ?
+       WHERE id = ?`,
+      [
+        finalHtml,
+        result.title,
+        result.metaDescription,
+        result.slug,
+        JSON.stringify({
+          title: result.title,
+          meta: result.metaDescription,
+          slug: result.slug,
+          plagiarismScore: result.plagiarismScore,
+          pipeline: 'openai-gpt4-cricket-addictor',
+          model: result.model,
+          style: result.style,
+          processingTime: result.processingTime,
+          regeneratedAt: new Date().toISOString()
+        }),
+        id
+      ]
+    );
+
+    console.log(`✅ OpenAI regeneration complete for ID: ${id}\n`);
+    
+    return res.json({
+      success: true,
+      pipeline: 'openai-gpt4-regeneration',
+      final: {
+        title: result.title,
+        meta: result.metaDescription,
+        slug: result.slug,
+        html: finalHtml
+      },
+      metadata: {
+        plagiarismScore: result.plagiarismScore,
+        processingTime: result.processingTime,
+        model: result.model,
+        style: result.style
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ OpenAI regeneration error:", err.message);
+    return res.status(500).json({ 
+      success: false, 
+      error: err.message || "OpenAI regeneration failed" 
+    });
   }
 });
 
