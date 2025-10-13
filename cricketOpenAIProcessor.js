@@ -10,7 +10,7 @@
 //     console.log('📝 Max tokens:', options.max_tokens ?? 2000);
     
 //     const response = await axios.post(OPENAI_BASE_URL, {
-//       model: options.model || "gpt-4o-mini",
+//       model: options.model || "gpt-5",
 //       messages: [
 //         {
 //           role: "system",
@@ -521,7 +521,7 @@
 //     console.log('📝 Max tokens:', options.max_tokens ?? 5000);
     
 //     const response = await axios.post(OPENAI_BASE_URL, {
-//       model: options.model || "gpt-4o-mini",
+//       model: options.model || "gpt-5",
 //       messages: [
 //         {
 //           role: "system",
@@ -750,7 +750,7 @@
 //     console.log('📝 Max tokens:', options.max_tokens ?? 5000);
     
 //     const response = await axios.post(OPENAI_BASE_URL, {
-//       model: options.model || "gpt-4o-mini",
+//       model: options.model || "gpt-5",
 //       messages: [
 //         {
 //           role: "system",
@@ -1092,7 +1092,7 @@ async function callOpenAI(systemPrompt, userPrompt, options = {}) {
     
     const response = await withTimeout(
       axios.post(OPENAI_BASE_URL, {
-        model: options.model || "gpt-4o-mini",
+        model: options.model || "gpt-5",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
