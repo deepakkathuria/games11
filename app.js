@@ -77,6 +77,8 @@ const { runHindiGscContentQueryMatch } = require('./hindiGscContentQueryMatch');
 const { fetchCricketNews, filterArticles, getArticleSummary, validateArticleForProcessing } = require('./newsFetcher');
 const NewsScheduler = require('./newsSheduler');
 const { processManualInput } = require('./manualInputProcessor');
+
+const { processHindiCricketNewsWithOpenAI } = require('./hindiCricketNewsProcessor');
 // ⬇️ ADD THESE
 // const {
 //   generateWithDeepSeek,
@@ -181,6 +183,173 @@ const {
 
 
 pakistanNewsScheduler.startScheduler(10); // Every 30 minutes
+
+
+
+
+
+
+
+// ========== HINDI CRICKET NEWS APIs (Using same cricket_news table) ==========
+
+// Get stored cricket news for Hindi processing
+app.get('/api/hindi-cricket-news/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE is_valid = true
+       ORDER BY fetched_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.hindi_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored cricket news for Hindi:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi processed cricket news
+app.get('/api/hindi-cricket-news/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE hindi_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE hindi_processed = true
+       ORDER BY hindi_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.hindi_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting Hindi processed cricket news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate Hindi cricket article from cricket_news table
+app.post('/api/hindi-cricket-news/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with Hindi OpenAI
+    console.log(`🏏 Processing article ${id} for Hindi conversion...`);
+    const result = await processHindiCricketNewsWithOpenAI({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Build full HTML document
+      const finalHtml = buildHtmlDocument({
+        title: result.hindiTitle,
+        metaDescription: result.hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
+
+      // Update same cricket_news table with Hindi columns
+      await pollDBPool.query(
+        `UPDATE cricket_news
+           SET hindi_processed = 1,
+               hindi_processed_at = NOW(),
+               hindi_ready_article = ?,
+               hindi_final_title = ?,
+               hindi_final_meta  = ?,
+               hindi_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, result.hindiTitle, result.hindiMeta, result.hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: result.hindiTitle,
+          meta: result.hindiMeta,
+          slug: result.hindiSlug,
+          html: finalHtml,
+        },
+        metadata: result.metadata
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("Generate Hindi cricket article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
