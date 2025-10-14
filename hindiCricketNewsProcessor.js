@@ -16,7 +16,7 @@ async function generateHindiWithOpenAI(prompt, options = {}) {
     console.log('📝 Max tokens:', options.max_tokens ?? 5000);
     
     const response = await axios.post(OPENAI_BASE_URL, {
-      model: options.model || "gpt-5o", 
+      model: options.model || "gpt-4o", 
 
      
       messages: [
@@ -185,7 +185,7 @@ Write now - pure HTML body content in professional Hindi:`;
       metadata: {
         language: 'Hindi',
         style: 'Professional Cricket Journalism (hindi.cricketAddictor.com)',
-        model: options.model || "gpt-5o",
+        model: 'OpenAI GPT-4o',
         processingMethod: 'Professional Hindi Cricket Article',
         experience: '2-3 years journalist level'
       }
