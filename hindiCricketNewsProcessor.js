@@ -75,59 +75,36 @@ async function processHindiCricketNewsWithOpenAI(input, options = {}) {
     const hindiUserPrompt = `
 Write a professional cricket news article based on the following source text or topic.
 
-🎯 OBJECTIVE: 
+🎯 Objective: 
 The article must sound 100% human-written — not robotic or AI-generated. It should read like it's written by a sports journalist with 2–3 years of experience at Hindi Cricket Addictor.
 
-Article Language: HINDI
+Article Language - Hindi
 
-🗞️ TONE & STYLE:
-- Conversational yet professional (like a passionate cricket writer)
-- Add light human elements — curiosity, mild opinions, nostalgic phrases, or natural imperfections
-- Avoid robotic sentence flow or perfect grammar; include minor sentence-length variations or natural human pauses
-- Keep it engaging, readable, and emotionally connected to cricket fans
+🗞️ Tone & Style:
+• Conversational yet professional (like a passionate cricket writer).
+• Add light human elements — curiosity, mild opinions, nostalgic phrases, or natural imperfections.
+• Avoid robotic sentence flow or perfect grammar; include minor sentence-length variations or natural human pauses.
+• Keep it engaging, readable, and emotionally connected to cricket fans.
 
-✍️ STRUCTURE:
-1. Headline: 
-   - Short, strong, and clear (avoid clickbait)
-   - DON'T just translate the English headline
-   - Write amazing headline using your brain based on the content body
-   - Use statements from the article
-   - Make it Hindi-specific and engaging
-
-2. Intro paragraph: 
-   - Hook the reader with context and tone
-   - Set the scene
-
-3. Sub-headings (<h2>):
-   - Break sections with storytelling flow
-   - 3-4 sub-headings
-   - Natural, conversational headings
-
+✍️ Structure:
+1. Headline: Short, strong, and clear (avoid clickbait).
+2. Intro paragraph: Hook the reader with context and tone.
+3. Sub-headings (###) to break sections (use storytelling flow).
 4. Body paragraphs:
-   - Include facts, quotes, and emotions
-   - Use a mix of short and medium sentences
-   - Add 1-2 human touch lines (e.g., "याद है जब..." या "शायद यही वजह है...")
-   - Use cricket terminology naturally
-   - Add reactions: "यार, क्या खेल!", "अरे वाह!", "भाई साहब!"
+   o Include facts, quotes, and emotions.
+   o Use a mix of short and medium sentences.
+   o Add 1–2 human touch lines 
+5. Ending paragraph: A personal reflection or fan-like takeaway.
 
-5. Ending paragraph: 
-   - A personal reflection or fan-like takeaway
-   - Natural conclusion, not forced
+⚙️ Rules:
+• No generic AI phrases like "In conclusion," "Overall," or "According to reports."
+• Avoid over-polished or repetitive structures.
+• Include 1–2 natural errors (for realism), but keep it subtle.
+• Do not use overly complex words or filler fluff.
+• Ensure the final output is ready to publish on hindi.cricketAddictor.com.
 
-⚙️ RULES:
-- NO generic AI phrases like "निष्कर्ष में," "कुल मिलाकर," "रिपोर्ट के अनुसार"
-- Avoid over-polished or repetitive structures
-- Include 1-2 natural errors (for realism), but keep it subtle (e.g., missing comma, casual phrasing)
-- Do NOT use overly complex words or filler fluff
-- Ensure the final output is ready to publish on hindi.cricketAddictor.com
-- Mix Hindi and English naturally (keep cricket terms like century, wicket, runs, over in English)
-
-🏏 STYLE REFERENCE:
-Write like articles from hindi.cricketAddictor.com → News Section
-- Passionate but professional
-- Fan-friendly language
-- Emotional connection with readers
-- Natural flow, not stiff journalism
+🏏 Example Style Reference:
+Articles from hindi.cricketAddictor.com → News Section Reference
 
 HTML FORMAT:
 - Return HTML BODY ONLY (no <html>, <head>, <body> tags)
@@ -139,16 +116,22 @@ HTML FORMAT:
 - <em> for emphasis
 - <ul> and <li> for lists if needed
 
-🔍 INPUT (Source Content in English):
+🔍 Input (Don't just translate the headlines. Write the headlines from using the content body content, or use the statement from the article or Write amazing headlines using your brain in Hindi):
+
+Source Content:
 Title: ${input.title}
 Description: ${input.description}
 Content: ${input.content}
+
+✅ Output:
+A 450–700 word news article written in the style of a young cricket journalist, following all the above rules.
 
 IMPORTANT:
 - Don't just translate the headlines. Write the headlines using the content body, or use statements from the article, or write amazing headlines using your brain in Hindi
 - Make it sound like a real Hindi cricket journalist wrote this
 - Add your own creative touch while keeping facts accurate
 - Write with passion and emotion that cricket fans love
+- Target word count: 450-700 words
 
 Write now - pure HTML body content in professional Hindi:`;
 
