@@ -183,6 +183,8 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
 क्रिकेट समाचार के लिए उन्नत SEO नियम:
 - केवल इनपुट से तथ्यों का उपयोग करें (कोई आविष्कृत स्कोर/उद्धरण/दिनांक/स्थान नहीं)
 - शीर्षक को आकर्षक और क्रिकेट-विशिष्ट बनाएं (टीम नाम, मैच प्रकार, मुख्य परिणाम शामिल करें)
+- हर आर्टिकल के लिए UNIQUE और SPECIFIC हेडलाइन बनाएं - generic titles का उपयोग न करें
+- हेडलाइन में खिलाड़ी का नाम, टीम का नाम, या मुख्य घटना जरूर शामिल करें
 - मेटा विवरण मुख्य क्रिकेट कहानी को उजागर करना चाहिए और जिज्ञासा पैदा करना चाहिए
 - आउटलाइन उन्नत क्रिकेट पत्रकारिता संरचना का पालन करना चाहिए:
   * H2: ब्रेकिंग न्यूज सारांश (40-60 शब्द)
@@ -195,6 +197,8 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
 - 5 विविध कीवर्ड प्रदान करें: प्राथमिक (मुख्य विषय), द्वितीयक (संबंधित शब्द), तृतीयक (विशिष्ट विवरण), लॉन्ग-टेल (विस्तृत वाक्यांश), ट्रेंडिंग (वर्तमान बज़वर्ड्स)
 - हिंदी आउटपुट
 - आकर्षक और व्यापक बनें
+
+महत्वपूर्ण: RECOMMENDED TITLE हर आर्टिकल के लिए अलग और विशिष्ट होना चाहिए। नीचे दिए गए content के आधार पर एक यूनिक हेडलाइन बनाएं।
 
 इनपुट
 शीर्षक: ${title || ""}
@@ -232,7 +236,11 @@ Article Language - Hindi
 • Keep it engaging, readable, and emotionally connected to cricket fans.
 
 ✍️ Structure:
-1. Headline: Short, strong, and clear (avoid clickbait).
+1. Headline: 
+   • Create a UNIQUE headline specific to THIS article
+   • Include player names, team names, or specific events from the content
+   • DO NOT use generic headlines like "क्रिकेट अपडेट" or "क्रिकेट समाचार"
+   • Make it short, strong, and clear (avoid clickbait)
 2. Intro paragraph: Hook the reader with context and tone.
 3. Sub-headings (H2) to break sections (use storytelling flow).
 4. Body paragraphs:
@@ -289,6 +297,9 @@ A 450–700 word news article written in the style of a young cricket journalist
 
 IMPORTANT:
 - Don't just translate the headlines. Write the headlines using the content body, or use statements from the article, or write amazing headlines using your brain in Hindi
+- Create a UNIQUE, SPECIFIC headline for THIS article - avoid generic titles
+- Include player names, team names, match details, or specific events in the headline
+- Every article should have a DIFFERENT headline based on its unique content
 - Make it sound like a real Hindi cricket journalist wrote this
 - Add your own creative touch while keeping facts accurate
 - Write with passion and emotion that cricket fans love
@@ -326,8 +337,9 @@ async function processHindiCricketNewsOpenAI(input, options = {}) {
       body: input.content || "",
     });
     const recText = await generateWithOpenAI(prePrompt, { temperature: 0.2, max_tokens: 1200 });
-    const recs = parseHindiPrePublishTextToJSON(recText);
+    const recs = parseHindiPrePublishTextToJSON(recText, input.title);
     console.log('✅ [Hindi Cricket OpenAI] SEO recommendations generated');
+    console.log('📰 [Hindi Cricket OpenAI] Generated Title:', recs.recommendedTitle);
 
     // 2) Generate enhanced Hindi cricket article
     console.log('✍️ [Hindi Cricket OpenAI] Generating enhanced Hindi cricket article...');
@@ -366,7 +378,7 @@ async function processHindiCricketNewsOpenAI(input, options = {}) {
 
 /* ---------- PARSERS & HELPERS ---------- */
 
-function parseHindiPrePublishTextToJSON(text = "") {
+function parseHindiPrePublishTextToJSON(text = "", originalTitle = "") {
   const get = (re) => {
     const m = text.match(re);
     return m ? m[1].trim() : "";
@@ -384,9 +396,9 @@ function parseHindiPrePublishTextToJSON(text = "") {
   let longtail  = get(/Long-tail:\s*([^\n]+)/i);
   let trending  = get(/Trending:\s*([^\n]+)/i);
 
-  // Fallbacks
-  if (!recommendedTitle) recommendedTitle = "क्रिकेट अपडेट";
-  if (!recommendedMeta)  recommendedMeta  = "नवीनतम क्रिकेट अपडेट।";
+  // Fallbacks - Use original title if available
+  if (!recommendedTitle) recommendedTitle = originalTitle || "क्रिकेट अपडेट";
+  if (!recommendedMeta)  recommendedMeta  = originalTitle ? `${originalTitle.slice(0, 140)} के बारे में जानें।` : "नवीनतम क्रिकेट अपडेट।";
   if (!recommendedSlug)  recommendedSlug  = recommendedTitle;
   if (!outline)          outline          = "H2: मैच सारांश\nH3: मुख्य क्षण";
   if (!primary)          primary          = "क्रिकेट";
