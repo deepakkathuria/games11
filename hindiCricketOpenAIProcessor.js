@@ -182,6 +182,8 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
 
 क्रिकेट समाचार के लिए उन्नत SEO नियम:
 - केवल इनपुट से तथ्यों का उपयोग करें (कोई आविष्कृत स्कोर/उद्धरण/दिनांक/स्थान नहीं)
+- सरल और बोलचाल की हिंदी का उपयोग करें - जो भारत में रोजमर्रा की बातचीत में इस्तेमाल होती है
+- भारी संस्कृत शब्दों से बचें - क्रिकेट फैंस द्वारा बोली जाने वाली प्राकृतिक हिंदी का उपयोग करें
 - शीर्षक को आकर्षक और क्रिकेट-विशिष्ट बनाएं (टीम नाम, मैच प्रकार, मुख्य परिणाम शामिल करें)
 - हर आर्टिकल के लिए UNIQUE और SPECIFIC हेडलाइन बनाएं - generic titles का उपयोग न करें
 - हेडलाइन में खिलाड़ी का नाम, टीम का नाम, या मुख्य घटना जरूर शामिल करें
@@ -195,10 +197,13 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
   * H2: प्रशंसक प्रतिक्रिया और सोशल मीडिया बज़
   * H2: आगे क्या होगा
 - 5 विविध कीवर्ड प्रदान करें: प्राथमिक (मुख्य विषय), द्वितीयक (संबंधित शब्द), तृतीयक (विशिष्ट विवरण), लॉन्ग-टेल (विस्तृत वाक्यांश), ट्रेंडिंग (वर्तमान बज़वर्ड्स)
-- हिंदी आउटपुट
+- हिंदी आउटपुट - सरल, बोलचाल की हिंदी का उपयोग करें
 - आकर्षक और व्यापक बनें
 
-महत्वपूर्ण: RECOMMENDED TITLE हर आर्टिकल के लिए अलग और विशिष्ट होना चाहिए। नीचे दिए गए content के आधार पर एक यूनिक हेडलाइन बनाएं।
+महत्वपूर्ण: 
+- RECOMMENDED TITLE हर आर्टिकल के लिए अलग और विशिष्ट होना चाहिए। नीचे दिए गए content के आधार पर एक यूनिक हेडलाइन बनाएं।
+- सरल हिंदी का उपयोग करें जो भारत में रोजमर्रा की बातचीत में इस्तेमाल होती है
+- आर्टिकल 600-800 शब्दों का होना चाहिए
 
 इनपुट
 शीर्षक: ${title || ""}
@@ -231,6 +236,8 @@ Article Language - Hindi
 
 🗞️ Tone & Style:
 • Conversational yet professional (like a passionate cricket writer).
+• Use simple Hindi that is used in everyday talking in India - avoid complex Sanskrit words.
+• Write in natural, spoken Hindi style that Indian cricket fans use.
 • Add light human elements — curiosity, mild opinions, nostalgic phrases, or natural imperfections.
 • Avoid robotic sentence flow or perfect grammar; include minor sentence-length variations or natural human pauses.
 • Keep it engaging, readable, and emotionally connected to cricket fans.
@@ -293,17 +300,19 @@ Content:
 ${rawBody || ""}
 
 ✅ Output:
-A 450–700 word news article written in the style of a young cricket journalist, following all the above rules.
+A 600–800 word news article written in the style of a young cricket journalist, following all the above rules.
 
 IMPORTANT:
 - Don't just translate the headlines. Write the headlines using the content body, or use statements from the article, or write amazing headlines using your brain in Hindi
 - Create a UNIQUE, SPECIFIC headline for THIS article - avoid generic titles
 - Include player names, team names, match details, or specific events in the headline
 - Every article should have a DIFFERENT headline based on its unique content
+- Use simple, conversational Hindi that is used in everyday talking in India
+- Avoid heavy Sanskrit words - use the Hindi that cricket fans naturally speak
 - Make it sound like a real Hindi cricket journalist wrote this
 - Add your own creative touch while keeping facts accurate
 - Write with passion and emotion that cricket fans love
-- Target word count: 450-700 words
+- Target word count: 600-800 words (MINIMUM 600 words required)
 
 Write now - pure HTML body content in professional Hindi:
 `.trim();
