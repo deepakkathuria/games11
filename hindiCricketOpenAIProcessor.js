@@ -253,7 +253,25 @@ ${body || ""}
 - Source: "सरफराज को नहीं मिली जगह"
 - Your Title: "क्या नंबर 3 पर बल्लेबाजी बचा सकती है सरफराज का करियर?"
 
-⚠️ MANDATORY: आपका title कम से कम इन 5 में से 1 strategy follow करे और source से COMPLETELY अलग angle हो।
+⚠️ MANDATORY RULES:
+1. आपका title इन 5 में से 1 strategy follow करे
+2. Source से COMPLETELY अलग angle हो
+3. Source headline जो बात कह रहा है, वो बात आपके headline में PRIMARY focus नहीं होनी चाहिए
+4. Content में से एक SECONDARY या DIFFERENT बात ढूंढें और उसे headline बनाएं
+
+Example:
+❌ Wrong: Source कहता है "रोहित का खराब रिकॉर्ड" → You say "रोहित का निराशाजनक रिकॉर्ड" (SAME!)
+✅ Right: Source कहता है "रोहित का खराब रिकॉर्ड" → You say "विराट कोहली पर दबाव बढ़ा" (DIFFERENT!)
+✅ Right: Source कहता है "रोहित का खराब रिकॉर्ड" → You say "एडिलेड की पिच रोहित के लिए चुनौती" (DIFFERENT!)
+
+खोजें: एक नया, fresh perspective जो source ने directly नहीं कहा!
+
+🚫 AVOID REPEATING KEY WORDS FROM SOURCE:
+- अगर source में "खराब रिकॉर्ड" है, तो आपके title में "निराशाजनक रिकॉर्ड" नहीं होना चाहिए (वही बात है!)
+- अगर source में "भारत में फाइनल" है, तो आपके title में फिर से "भारत में फाइनल" नहीं (same!)
+- Key words को avoid करें और completely नई angle की vocabulary use करें
+
+Better: Source की main theme से हटकर content का दूसरा interesting point highlight करें!
 `.trim();
 }
 
@@ -381,7 +399,20 @@ Real Examples:
 ✅ H1 (Angle 1): "हरमनप्रीत की टीम को घर पर खिताब जीतने का मौका"
 ✅ H1 (Angle 2): "नवी मुंबई में 2 नवंबर को बनेगी नई वर्ल्ड चैंपियन"
 
-⚠️ CRITICAL: Pick ONE angle strategy and make your H1 COMPLETELY DIFFERENT from the ignored source above
+⚠️ CRITICAL RULES FOR H1:
+1. Pick ONE of the 5 angle strategies above
+2. Make H1 COMPLETELY DIFFERENT from the ignored source
+3. DON'T repeat the PRIMARY point from source - find a SECONDARY angle
+4. If source says "X का खराब रिकॉर्ड", DON'T say "X का निराशाजनक रिकॉर्ड" - that's SAME!
+5. Instead talk about: consequences, other players, venue challenges, future questions, stats breakdown
+
+Real Example:
+❌ Source: "रोहित का एडिलेड में खराब रिकॉर्ड" → H1: "रोहित का एडिलेड में निराशाजनक रिकॉर्ड" (WRONG - repeating "रिकॉर्ड"!)
+✅ Source: "रोहित का एडिलेड में खराब रिकॉर्ड" → H1: "विराट कोहली और गिल पर भारी दबाव: रोहित की फॉर्म चिंता" (RIGHT - talks about OTHER players!)
+✅ Source: "रोहित का एडिलेड में खराब रिकॉर्ड" → H1: "एडिलेड की पिच और गेंदबाजी: रोहित के लिए सबसे बड़ी चुनौती" (RIGHT - talks about VENUE!)
+✅ Source: "रोहित का एडिलेड में खराब रिकॉर्ड" → H1: "12 मैच में सिर्फ 287 रन: क्या रोहित बदल पाएंगे किस्मत?" (RIGHT - stats + question angle!)
+
+🚫 AVOID source's key words: अगर source "खराब रिकॉर्ड" कहता है, don't use "रिकॉर्ड", "खराब", "निराशाजनक" etc. - use DIFFERENT vocabulary!
 
 ✅ Output:
 A 600–800 word news article written in the style of a young cricket journalist, following all the above rules.
@@ -397,15 +428,26 @@ IMPORTANT - EVERY ARTICLE MUST HAVE A UNIQUE HEADLINE:
 - Make it sound like a real Hindi cricket journalist wrote this
 - Target word count: 600-800 words (MINIMUM 600 words required)
 
-🚨 FINAL CHECK BEFORE WRITING H1:
-1. Did I pick one of the 5 ANGLE strategies? (Player/Venue/Impact/Controversy/Question)
-2. Is my H1 headline COMPLETELY DIFFERENT from the ignored source above?
-3. Does my H1 tell the story from a NEW perspective?
-4. If someone reads BOTH headlines (source + mine), will they feel like different stories?
+🚨 FINAL CHECK BEFORE WRITING H1 - Answer these questions:
 
-If answer is YES to all 4 - proceed. If NO to any - go back and pick a different angle!
+Q1: What is the PRIMARY point source headline is making?
+Q2: Am I repeating that SAME primary point? (If YES - STOP and change!)
+Q3: Did I pick one of the 5 ANGLE strategies?
+Q4: Is my H1 about a SECONDARY/DIFFERENT aspect of the story?
+Q5: If I read source + my H1, do they feel like DIFFERENT stories?
 
-REPEAT: The H1 headline must use a DIFFERENT ANGLE than the source. Not just different words - different PERSPECTIVE!
+Examples:
+Source: "रोहित का खराब रिकॉर्ड"
+- Primary point: Rohit's bad record ❌ DON'T repeat this!
+- Secondary angles: Other players pressure ✅, venue challenges ✅, team impact ✅
+
+Source: "भारत में होगा फाइनल"  
+- Primary point: Final in India ❌ DON'T repeat this!
+- Secondary angles: Player opportunity ✅, Pakistan impact ✅, Sri Lanka loss ✅
+
+If you're repeating the PRIMARY point - REJECT and find a SECONDARY angle!
+
+REPEAT: DON'T say the SAME THING in different words - say a DIFFERENT THING!
 
 Write now - pure HTML body content in professional Hindi:
 `.trim();
@@ -438,7 +480,7 @@ async function processHindiCricketNewsOpenAI(input, options = {}) {
       description: input.description || "",
       body: input.content || "",
     });
-    const recText = await generateWithOpenAI(prePrompt, { temperature: 0.7, max_tokens: 1200 });
+    const recText = await generateWithOpenAI(prePrompt, { temperature: 0.85, max_tokens: 1200 });
     const recs = parseHindiPrePublishTextToJSON(recText, input.title);
     console.log('✅ [Hindi Cricket OpenAI] SEO recommendations generated');
     console.log('📰 [Hindi Cricket OpenAI] Generated Title:', recs.recommendedTitle);
