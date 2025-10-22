@@ -9,6 +9,10 @@ async function generateWithOpenAI(prompt, options = {}) {
     console.log('📊 Temperature:', options.temperature ?? 0.7);
     console.log('📝 Max tokens:', options.max_tokens ?? 2000);
     
+    // MODEL OPTIONS:
+    // "gpt-4o-mini" - Faster, cheaper, but may not follow complex instructions perfectly
+    // "gpt-4" or "gpt-4-turbo" - Better instruction following, more creative, but more expensive
+    // Change below if headlines are still too similar to source
     const response = await axios.post(OPENAI_BASE_URL, {
       model: options.model || "gpt-4o-mini",
       messages: [
@@ -269,7 +273,13 @@ Example:
 🚫 AVOID REPEATING KEY WORDS FROM SOURCE:
 - अगर source में "खराब रिकॉर्ड" है, तो आपके title में "निराशाजनक रिकॉर्ड" नहीं होना चाहिए (वही बात है!)
 - अगर source में "भारत में फाइनल" है, तो आपके title में फिर से "भारत में फाइनल" नहीं (same!)
+- अगर source में "क्या संजू RCB जाएंगे?" है, तो आपके title में "क्या संजू RCB जॉइन करेंगे?" नहीं (same question!)
 - Key words को avoid करें और completely नई angle की vocabulary use करें
+
+🚫 CRITICAL: अगर source QUESTION format में है ("क्या...", "कब...", "क्यों..."), तो आपका title STATEMENT format में होना चाहिए!
+Example:
+❌ Source: "क्या संजू RCB जाएंगे?" → Your Title: "क्या संजू RCB जॉइन करेंगे?" (SAME!)
+✅ Source: "क्या संजू RCB जाएंगे?" → Your Title: "गैब्रियल के साथ तस्वीर ने खोले संजू के RR छोड़ने के संकेत" (STATEMENT!)
 
 Better: Source की main theme से हटकर content का दूसरा interesting point highlight करें!
 `.trim();
@@ -414,6 +424,11 @@ Real Example:
 
 🚫 AVOID source's key words: अगर source "खराब रिकॉर्ड" कहता है, don't use "रिकॉर्ड", "खराब", "निराशाजनक" etc. - use DIFFERENT vocabulary!
 
+🚫 QUESTION FORMAT RULE: अगर source QUESTION में है, तो H1 STATEMENT में बनाएं!
+❌ Source: "क्या संजू RCB जाएंगे?" → H1: "क्या संजू RCB में खेलेंगे?" (WRONG - same question!)
+✅ Source: "क्या संजू RCB जाएंगे?" → H1: "राजस्थान रॉयल्स को झटका: संजू की टीम बदलने की तैयारी" (RIGHT - statement!)
+✅ Source: "क्या संजू RCB जाएंगे?" → H1: "गैब्रियल के साथ वायरल तस्वीर ने बढ़ाई संजू के RR छोड़ने की अटकलें" (RIGHT - statement!)
+
 ✅ Output:
 A 600–800 word news article written in the style of a young cricket journalist, following all the above rules.
 
@@ -446,6 +461,13 @@ Source: "भारत में होगा फाइनल"
 - Secondary angles: Player opportunity ✅, Pakistan impact ✅, Sri Lanka loss ✅
 
 If you're repeating the PRIMARY point - REJECT and find a SECONDARY angle!
+
+🛑 STOP AND CHECK RULE - Before writing H1, ask yourself:
+1. Is source asking a QUESTION? → Then DON'T ask the same question! Make a STATEMENT instead!
+2. Is source about "X will join Y"? → Then DON'T talk about "X joining Y"! Talk about consequences, other players, or venue!
+3. Is source about "bad record"? → Then DON'T mention "record"! Talk about impact, other players, or future!
+4. Am I using ANY of the same key words from source? → STOP! Change them!
+5. Would both headlines feel SIMILAR to a reader? → STOP! Pick completely different angle!
 
 REPEAT: DON'T say the SAME THING in different words - say a DIFFERENT THING!
 
