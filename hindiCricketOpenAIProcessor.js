@@ -180,13 +180,35 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
 - Long-tail: ...
 - Trending: ...
 
+🚨🚨🚨 अत्यंत महत्वपूर्ण - RECOMMENDED TITLE के लिए 🚨🚨🚨:
+
+❌ गलत तरीका - ये बिल्कुल न करें:
+- नीचे दिए गए मूल शीर्षक को कॉपी करना
+- मूल शीर्षक का सिर्फ अनुवाद करना
+- मूल शीर्षक में सिर्फ छोटे बदलाव करना
+- एक ही तरह का हेडलाइन हर आर्टिकल के लिए बनाना
+
+✅ सही तरीका - यह जरूर करें:
+- नीचे दी गई DESCRIPTION और CONTENT को ध्यान से पढ़ें
+- Content में से सबसे महत्वपूर्ण बात निकालें (खिलाड़ी का नाम, स्कोर, मैच का नतीजा, खास बयान, विवाद, etc.)
+- उस महत्वपूर्ण बात के आधार पर एक बिल्कुल नया और अलग हेडलाइन बनाएं
+- हर आर्टिकल का हेडलाइन उसकी content के हिसाब से UNIQUE और SPECIFIC होना चाहिए
+- हेडलाइन से ही पता चलना चाहिए कि आर्टिकल किस बारे में है
+
+📝 उदाहरण:
+
+अगर मूल शीर्षक है: "India vs Pakistan: Latest cricket update"
+तो RECOMMENDED TITLE हो सकता है:
+- "रोहित शर्मा का शतक, भारत ने पाकिस्तान को 7 विकेट से हराया"
+- "बुमराह के 5 विकेट ने पाकिस्तान को 180 पर रोका"
+- "कोहली का धमाकेदार अर्धशतक, भारत को मिली 5 विकेट से जीत"
+
 क्रिकेट समाचार के लिए उन्नत SEO नियम:
 - केवल इनपुट से तथ्यों का उपयोग करें (कोई आविष्कृत स्कोर/उद्धरण/दिनांक/स्थान नहीं)
 - सरल और बोलचाल की हिंदी का उपयोग करें - जो भारत में रोजमर्रा की बातचीत में इस्तेमाल होती है
 - भारी संस्कृत शब्दों से बचें - क्रिकेट फैंस द्वारा बोली जाने वाली प्राकृतिक हिंदी का उपयोग करें
 - शीर्षक को आकर्षक और क्रिकेट-विशिष्ट बनाएं (टीम नाम, मैच प्रकार, मुख्य परिणाम शामिल करें)
-- हर आर्टिकल के लिए UNIQUE और SPECIFIC हेडलाइन बनाएं - generic titles का उपयोग न करें
-- हेडलाइन में खिलाड़ी का नाम, टीम का नाम, या मुख्य घटना जरूर शामिल करें
+- हेडलाइन में खिलाड़ी का नाम, टीम का नाम, स्कोर, या मुख्य घटना जरूर शामिल करें
 - मेटा विवरण मुख्य क्रिकेट कहानी को उजागर करना चाहिए और जिज्ञासा पैदा करना चाहिए
 - आउटलाइन उन्नत क्रिकेट पत्रकारिता संरचना का पालन करना चाहिए:
   * H2: ब्रेकिंग न्यूज सारांश (40-60 शब्द)
@@ -200,16 +222,13 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
 - हिंदी आउटपुट - सरल, बोलचाल की हिंदी का उपयोग करें
 - आकर्षक और व्यापक बनें
 
-महत्वपूर्ण: 
-- RECOMMENDED TITLE हर आर्टिकल के लिए अलग और विशिष्ट होना चाहिए। नीचे दिए गए content के आधार पर एक यूनिक हेडलाइन बनाएं।
-- सरल हिंदी का उपयोग करें जो भारत में रोजमर्रा की बातचीत में इस्तेमाल होती है
-- आर्टिकल 600-800 शब्दों का होना चाहिए
-
-इनपुट
-शीर्षक: ${title || ""}
-विवरण: ${description || ""}
-सामग्री:
+इनपुट (ध्यान से पढ़ें और एक बिल्कुल नया UNIQUE headline बनाएं):
+मूल शीर्षक (इसे कॉपी मत करें): ${title || ""}
+विवरण (इसमें से मुख्य बात निकालें): ${description || ""}
+सामग्री (इसमें से specific details लें):
 ${body || ""}
+
+⚠️ याद रखें: RECOMMENDED TITLE ऊपर दिए गए "मूल शीर्षक" से बिल्कुल अलग होना चाहिए। Description और Content को पढ़कर एक नया creative headline बनाएं जो इस specific article के बारे में हो।
 `.trim();
 }
 
@@ -243,11 +262,18 @@ Article Language - Hindi
 • Keep it engaging, readable, and emotionally connected to cricket fans.
 
 ✍️ Structure:
-1. Headline: 
-   • Create a UNIQUE headline specific to THIS article
-   • Include player names, team names, or specific events from the content
+1. Headline (H1): 
+   🚨 CRITICAL - DO NOT COPY THE SOURCE HEADLINE 🚨
+   • You MUST create a COMPLETELY NEW and DIFFERENT headline
+   • The source headline below is just for reference - DO NOT use it as-is
+   • Read the full content and create a fresh headline based on what the article is actually about
+   • Include SPECIFIC details: player names, scores, match results, or key events from the content
+   • Make it UNIQUE to THIS article - every article needs a different headline
    • DO NOT use generic headlines like "क्रिकेट अपडेट" or "क्रिकेट समाचार"
-   • Make it short, strong, and clear (avoid clickbait)
+   • Examples of good unique headlines:
+     - "मोहसिन नकवी का बड़ा बयान: एशिया कप ट्रॉफी के लिए भारत को करना होगा यह काम"
+     - "सूर्यकुमार यादव की कप्तानी में भारत ने जीता एशिया कप, लेकिन ट्रॉफी अभी भी दूर"
+     - "एशिया कप विवाद: बीसीसीआई और एसीसी के बीच ट्रॉफी को लेकर बढ़ा तनाव"
 2. Intro paragraph: Hook the reader with context and tone.
 3. Sub-headings (H2) to break sections (use storytelling flow).
 4. Body paragraphs:
@@ -277,7 +303,8 @@ ${recOutline || ""}
 HTML Format:
 - Return HTML BODY ONLY (no <html>, <head>, <body> tags)
 - Use: <h1>, <h2>, <h3>, <p>, <ul>, <li>, <blockquote>, <strong>, <em>
-- Start with <h1>${recTitle || ""}</h1>
+- Start with <h1>${recTitle || ""}</h1> (यह हेडलाइन नीचे दी गई content के अनुसार यूनिक होनी चाहिए)
+- DO NOT copy the English source headline directly - create a NEW unique Hindi headline
 - Use exact H2 and H3 headings from the outline above
 - Write paragraphs with natural flow and varied length
 - Use <strong> for player names and important stats
@@ -291,28 +318,45 @@ Tertiary: ${recTertiary || ""}
 Long-tail: ${recLongtail || ""}
 Trending: ${recTrending || ""}
 
-🔍 Input (Don't just translate the headlines. Write the headlines from using the content body content, or use the statement from the article or Write amazing headlines using your brain in Hindi):
+🔍 Input (READ THIS CONTENT CAREFULLY and create a UNIQUE, SPECIFIC headline based on THIS article only):
 
-Source Content:
-Title: ${rawTitle || ""}
-Description: ${rawDescription || ""}
-Content:
+⚠️⚠️⚠️ SOURCE HEADLINE (DO NOT COPY THIS - CREATE A NEW ONE): ${rawTitle || ""}
+
+Source Description: ${rawDescription || ""}
+Full Article Content:
 ${rawBody || ""}
+
+🚨 CRITICAL WARNING 🚨:
+1. The "SOURCE HEADLINE" above is from Google News - DO NOT COPY IT
+2. DO NOT translate it directly either
+3. You MUST read the Description and Content above and create a BRAND NEW headline
+4. Your headline must be DIFFERENT from the source headline
+5. Include SPECIFIC details from the content: player names, team names, scores, match results, key statements, controversies
+6. Make it UNIQUE - every article needs a DIFFERENT headline
+7. DO NOT use generic titles like "क्रिकेट अपडेट" or "क्रिकेट समाचार"
+
+Example: If source is "Asia Cup 2025 trophy controversy" 
+Your NEW headline could be: "मोहसिन नकवी ने रखी शर्त: एशिया कप ट्रॉफी के लिए भारत को दुबई आना होगा"
 
 ✅ Output:
 A 600–800 word news article written in the style of a young cricket journalist, following all the above rules.
 
-IMPORTANT:
-- Don't just translate the headlines. Write the headlines using the content body, or use statements from the article, or write amazing headlines using your brain in Hindi
-- Create a UNIQUE, SPECIFIC headline for THIS article - avoid generic titles
-- Include player names, team names, match details, or specific events in the headline
-- Every article should have a DIFFERENT headline based on its unique content
+IMPORTANT - EVERY ARTICLE MUST HAVE A UNIQUE HEADLINE:
+- STOP! READ the source content above CAREFULLY before writing the headline
+- Create a BRAND NEW, UNIQUE, SPECIFIC headline for THIS article ONLY
+- DO NOT use generic titles like "क्रिकेट अपडेट", "मैच समाचार", "क्रिकेट न्यूज़"
+- Include SPECIFIC DETAILS from the content: player names, team names, scores, match type, or key events
+- Every article is DIFFERENT - so every headline MUST BE DIFFERENT
+- Don't just translate the English headline - create a NEW creative Hindi headline based on the content
+- Example: Instead of "क्रिकेट अपडेट", write "विराट कोहली का शतक, भारत ने ऑस्ट्रेलिया को 6 विकेट से हराया"
 - Use simple, conversational Hindi that is used in everyday talking in India
 - Avoid heavy Sanskrit words - use the Hindi that cricket fans naturally speak
 - Make it sound like a real Hindi cricket journalist wrote this
 - Add your own creative touch while keeping facts accurate
 - Write with passion and emotion that cricket fans love
 - Target word count: 600-800 words (MINIMUM 600 words required)
+
+REPEAT: The headline for THIS article must be COMPLETELY DIFFERENT from any other article. Make it SPECIFIC to THIS content only.
 
 Write now - pure HTML body content in professional Hindi:
 `.trim();
