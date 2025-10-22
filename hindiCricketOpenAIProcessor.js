@@ -222,13 +222,23 @@ function buildHindiCricketPrePublishPrompt({ title, description, body }) {
 - हिंदी आउटपुट - सरल, बोलचाल की हिंदी का उपयोग करें
 - आकर्षक और व्यापक बनें
 
-इनपुट (ध्यान से पढ़ें और एक बिल्कुल नया UNIQUE headline बनाएं):
-मूल शीर्षक (इसे कॉपी मत करें): ${title || ""}
-विवरण (इसमें से मुख्य बात निकालें): ${description || ""}
-सामग्री (इसमें से specific details लें):
+इनपुट:
+
+📋 विवरण (पढ़ें): ${description || ""}
+📄 पूरी सामग्री (यहाँ से headline बनाएं):
 ${body || ""}
 
-⚠️ याद रखें: RECOMMENDED TITLE ऊपर दिए गए "मूल शीर्षक" से बिल्कुल अलग होना चाहिए। Description और Content को पढ़कर एक नया creative headline बनाएं जो इस specific article के बारे में हो।
+🚫🚫🚫 महत्वपूर्ण - इस शीर्षक को COMPLETELY IGNORE करें (यह सिर्फ reference है, इसका कोई भी हिस्सा use मत करें):
+"${title || ""}"
+
+✅ कैसे RECOMMENDED TITLE बनाएं:
+1. ऊपर दी गई CONTENT को पूरा पढ़ें
+2. Content में सबसे important और interesting बात खोजें (score, player name, controversy, statement, etc.)
+3. उस बात को एक नए angle से present करें
+4. Source title को देखें भी नहीं - completely नया headline बनाएं
+5. अगर content में "रहाणे से बात" है, तो angle बदलें - जैसे "सरफराज की नंबर 3 पर बल्लेबाजी की strategy" या "इंडिया ए selection में क्या हुआ गलत?"
+
+ध्यान दें: आपका RECOMMENDED TITLE ऊपर दिए गए ignore वाले title से 80% अलग होना चाहिए।
 `.trim();
 }
 
@@ -318,25 +328,27 @@ Tertiary: ${recTertiary || ""}
 Long-tail: ${recLongtail || ""}
 Trending: ${recTrending || ""}
 
-🔍 Input (READ THIS CONTENT CAREFULLY and create a UNIQUE, SPECIFIC headline based on THIS article only):
+🔍 Input - Read CAREFULLY and extract the MAIN news to create headline:
 
-⚠️⚠️⚠️ SOURCE HEADLINE (DO NOT COPY THIS - CREATE A NEW ONE): ${rawTitle || ""}
+📋 Description: ${rawDescription || ""}
 
-Source Description: ${rawDescription || ""}
-Full Article Content:
+📄 Full Article Content (CREATE headline from THIS):
 ${rawBody || ""}
 
-🚨 CRITICAL WARNING 🚨:
-1. The "SOURCE HEADLINE" above is from Google News - DO NOT COPY IT
-2. DO NOT translate it directly either
-3. You MUST read the Description and Content above and create a BRAND NEW headline
-4. Your headline must be DIFFERENT from the source headline
-5. Include SPECIFIC details from the content: player names, team names, scores, match results, key statements, controversies
-6. Make it UNIQUE - every article needs a DIFFERENT headline
-7. DO NOT use generic titles like "क्रिकेट अपडेट" or "क्रिकेट समाचार"
+🚫🚫🚫 IGNORE THIS GOOGLE NEWS HEADLINE (Do NOT use any words from this):
+"${rawTitle || ""}"
 
-Example: If source is "Asia Cup 2025 trophy controversy" 
-Your NEW headline could be: "मोहसिन नकवी ने रखी शर्त: एशिया कप ट्रॉफी के लिए भारत को दुबई आना होगा"
+🎯 HOW TO CREATE YOUR UNIQUE H1 HEADLINE:
+Step 1: Read the full content above
+Step 2: Find the MOST IMPORTANT fact (player performance, score, controversy, statement, decision)
+Step 3: Create a headline from a DIFFERENT ANGLE than the ignored source
+Step 4: Your headline should be 70-80% DIFFERENT from the ignored source
+
+Examples of GOOD transformations:
+❌ Source: "सरफराज खान को क्यों नहीं मिली इंडिया ए टीम में जगह?"
+✅ Your H1: "पाटीदार और गायकवाड़ की धमाकेदार फॉर्म ने सरफराज को किया बाहर"
+✅ Your H1: "इंडिया ए चयन: सरफराज की जगह क्यों चुने गए साई सुदर्शन?"
+✅ Your H1: "नंबर 3 पर बल्लेबाजी ही बचा सकती है सरफराज का करियर"
 
 ✅ Output:
 A 600–800 word news article written in the style of a young cricket journalist, following all the above rules.
@@ -389,7 +401,7 @@ async function processHindiCricketNewsOpenAI(input, options = {}) {
       description: input.description || "",
       body: input.content || "",
     });
-    const recText = await generateWithOpenAI(prePrompt, { temperature: 0.2, max_tokens: 1200 });
+    const recText = await generateWithOpenAI(prePrompt, { temperature: 0.7, max_tokens: 1200 });
     const recs = parseHindiPrePublishTextToJSON(recText, input.title);
     console.log('✅ [Hindi Cricket OpenAI] SEO recommendations generated');
     console.log('📰 [Hindi Cricket OpenAI] Generated Title:', recs.recommendedTitle);

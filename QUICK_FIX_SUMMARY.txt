@@ -1,0 +1,43 @@
+🔧 ENHANCED FIX: Unique Headlines (Version 2.0)
+================================================
+
+❌ PROBLEM YOU SHOWED:
+Google News: सरफराज खान को क्यों नहीं मिली इंडिया ए टीम में जगह?
+Generated:   सरफराज खान को इंडिया ए टीम में जगह न मिलने की असली वजह
+              ☝️ TOO SIMILAR! Just rephrased!
+
+✅ WHAT I FIXED:
+
+1. RESTRUCTURED PROMPT ORDER
+   - Source title now shown LAST (not first)
+   - Labeled as "🚫 IGNORE THIS"
+   - Forces OpenAI to read CONTENT before seeing source title
+
+2. ADDED CONCRETE EXAMPLES
+   ❌ Source: "सरफराज खान को क्यों नहीं मिली जगह?"
+   ✅ Good:   "पाटीदार की धमाकेदार फॉर्म ने सरफराज को किया बाहर"
+   ✅ Good:   "नंबर 3 पर बल्लेबाजी ही बचा सकती है सरफराज का करियर"
+
+3. INCREASED TEMPERATURE
+   Before: 0.2 (too conservative)
+   After:  0.7 (more creative)
+
+4. ADDED "70-80% DIFFERENT" REQUIREMENT
+   OpenAI now knows headlines must be significantly different
+
+📝 FILES CHANGED:
+- hindiCricketOpenAIProcessor.js (Lines 166-242, 331-351, 404)
+
+🧪 HOW TO TEST:
+1. Restart backend server
+2. Generate 2-3 articles
+3. Check meta titles - should be COMPLETELY DIFFERENT angles
+
+✅ EXPECTED RESULT:
+Same news, but DIFFERENT perspectives:
+- "पाटीदार की फॉर्म ने सरफराज को किया बाहर"
+- "इंडिया ए में साई सुदर्शन को क्यों मिली उप-कप्तानी?"
+- "नंबर 3 पर बल्लेबाजी ही बचाएगी सरफराज का करियर"
+
+Each headline = UNIQUE angle! ✨
+
