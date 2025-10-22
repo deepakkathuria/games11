@@ -1,0 +1,75 @@
+🔥 VERSION 3.0 - AGGRESSIVE ANGLE-BASED FIX
+===========================================
+
+❌ PROBLEM (You showed me):
+
+Google News: अब भारत में ही आयोजित होंगे वर्ल्ड कप के दोनों सेमीफाइनल और फाइनल
+Generated:   भारत में होगा वुमेंस क्रिकेट वर्ल्ड कप 2025 का फाइनल
+              ☝️ STILL THE SAME MESSAGE! Just rephrased! 😞
+
+
+✅ NEW SOLUTION - 5 ANGLE STRATEGIES:
+
+Ab OpenAI ko 5 specific angles diye gaye hain. Har article ke liye ek alag angle use karna MANDATORY hai:
+
+📍 ANGLE 1: PLAYER/PERSON FOCUS
+   "हरमनप्रीत कौर को घरेलू मैदान पर खिताब जीतने का मौका"
+
+📍 ANGLE 2: VENUE/LOCATION FOCUS
+   "गुवाहटी के बरसापारा स्टेडियम में पहली बार वर्ल्ड कप सेमीफाइनल"
+
+📍 ANGLE 3: CONSEQUENCE/IMPACT FOCUS
+   "पाकिस्तान की हार से श्रीलंका को झटका: मेजबानी में बदलाव"
+
+📍 ANGLE 4: CONTROVERSY/CONFLICT FOCUS
+   "पाकिस्तान की हार ने बदली मेजबानी: सभी मैच अब भारत में"
+
+📍 ANGLE 5: QUESTION/FUTURE FOCUS
+   "क्या भारतीय टीम घरेलू मैदान पर जीत पाएगी वर्ल्ड कप?"
+
+
+🎯 REAL EXAMPLES FROM YOUR NEWS:
+
+News 1: सरफराज खान Selection
+❌ Source angle: "सरफराज को क्यों नहीं मिली जगह?"
+✅ Angle 1 (Player): "साई सुदर्शन को मिली उप-कप्तानी, सरफराज बाहर"
+✅ Angle 3 (Impact): "पाटीदार के तीन शतकों ने सरफराज को किया बाहर"
+✅ Angle 5 (Future): "नंबर 3 पर बल्लेबाजी ही बचा सकती है सरफराज का करियर"
+
+News 2: Women's World Cup Venue
+❌ Source angle: "भारत में होंगे सेमीफाइनल और फाइनल"
+✅ Angle 1 (Player): "हरमनप्रीत की टीम को घर पर खिताब जीतने का मौका"
+✅ Angle 2 (Venue): "नवी मुंबई में 2 नवंबर को बनेगी नई चैंपियन"
+✅ Angle 4 (Controversy): "पाकिस्तान की हार से श्रीलंका को मिला झटका"
+
+
+✅ WHAT CHANGED IN CODE:
+
+1. Added 5 specific angle strategies with examples
+2. Made it MANDATORY to pick one angle
+3. Added "FINAL CHECK" with 4 questions before generating
+4. Showed multiple variations of same news with different angles
+5. Emphasized: "Not just different WORDS - different PERSPECTIVE!"
+
+
+🧪 TEST NOW:
+
+1. Restart backend
+2. Generate 3-4 articles  
+3. Each should use a DIFFERENT angle from the 5 strategies
+4. Headlines should feel like DIFFERENT stories
+
+Expected Results:
+- Article about same news using Player angle
+- Article about same news using Venue angle  
+- Article about same news using Impact angle
+- All COMPLETELY DIFFERENT from source!
+
+
+📝 KEY DIFFERENCE:
+
+VERSION 2.0: "Create different headline" (vague)
+VERSION 3.0: "Use one of these 5 SPECIFIC angles" (precise!)
+
+This forces OpenAI to think strategically, not just rephrase!
+

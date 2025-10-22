@@ -231,14 +231,29 @@ ${body || ""}
 🚫🚫🚫 महत्वपूर्ण - इस शीर्षक को COMPLETELY IGNORE करें (यह सिर्फ reference है, इसका कोई भी हिस्सा use मत करें):
 "${title || ""}"
 
-✅ कैसे RECOMMENDED TITLE बनाएं:
-1. ऊपर दी गई CONTENT को पूरा पढ़ें
-2. Content में सबसे important और interesting बात खोजें (score, player name, controversy, statement, etc.)
-3. उस बात को एक नए angle से present करें
-4. Source title को देखें भी नहीं - completely नया headline बनाएं
-5. अगर content में "रहाणे से बात" है, तो angle बदलें - जैसे "सरफराज की नंबर 3 पर बल्लेबाजी की strategy" या "इंडिया ए selection में क्या हुआ गलत?"
+✅ कैसे RECOMMENDED TITLE बनाएं - 5 ANGLE STRATEGIES:
 
-ध्यान दें: आपका RECOMMENDED TITLE ऊपर दिए गए ignore वाले title से 80% अलग होना चाहिए।
+📍 Strategy 1: PLAYER/PERSON FOCUS
+- Source: "भारत में होगा फाइनल"
+- Your Title: "हरमनप्रीत कौर को घरेलू मैदान पर खिताब जीतने का मौका"
+
+📍 Strategy 2: VENUE/LOCATION FOCUS  
+- Source: "भारत में होगा फाइनल"
+- Your Title: "गुवाहटी और नवी मुंबई में होंगे वर्ल्ड कप के बड़े मुकाबले"
+
+📍 Strategy 3: CONSEQUENCE/IMPACT FOCUS
+- Source: "सरफराज को नहीं मिली जगह"
+- Your Title: "पाटीदार की धमाकेदार फॉर्म ने सरफराज को किया बाहर"
+
+📍 Strategy 4: CONTROVERSY/CONFLICT FOCUS
+- Source: "भारत में होगा फाइनल"  
+- Your Title: "श्रीलंका को झटका: सभी नॉकआउट मैच अब भारत में"
+
+📍 Strategy 5: QUESTION/CURIOSITY FOCUS
+- Source: "सरफराज को नहीं मिली जगह"
+- Your Title: "क्या नंबर 3 पर बल्लेबाजी बचा सकती है सरफराज का करियर?"
+
+⚠️ MANDATORY: आपका title कम से कम इन 5 में से 1 strategy follow करे और source से COMPLETELY अलग angle हो।
 `.trim();
 }
 
@@ -338,17 +353,35 @@ ${rawBody || ""}
 🚫🚫🚫 IGNORE THIS GOOGLE NEWS HEADLINE (Do NOT use any words from this):
 "${rawTitle || ""}"
 
-🎯 HOW TO CREATE YOUR UNIQUE H1 HEADLINE:
-Step 1: Read the full content above
-Step 2: Find the MOST IMPORTANT fact (player performance, score, controversy, statement, decision)
-Step 3: Create a headline from a DIFFERENT ANGLE than the ignored source
-Step 4: Your headline should be 70-80% DIFFERENT from the ignored source
+🎯 HOW TO CREATE YOUR UNIQUE H1 HEADLINE - USE ONE OF THESE 5 ANGLES:
 
-Examples of GOOD transformations:
+📍 ANGLE 1: PLAYER/PERSON FOCUS (किसी खिलाड़ी या व्यक्ति पर focus)
+Example: "हरमनप्रीत कौर को घरेलू मैदान पर खिताब जीतने का सुनहरा मौका"
+
+📍 ANGLE 2: VENUE/LOCATION FOCUS (जगह/स्थान पर focus)
+Example: "गुवाहटी के बरसापारा स्टेडियम में पहली बार वर्ल्ड कप सेमीफाइनल"
+
+📍 ANGLE 3: CONSEQUENCE/IMPACT FOCUS (परिणाम/प्रभाव पर focus)
+Example: "पाटीदार के तीन शतकों ने सरफराज की इंडिया ए में जगह खत्म की"
+
+📍 ANGLE 4: CONTROVERSY/CONFLICT FOCUS (विवाद/टकराव पर focus)
+Example: "पाकिस्तान की हार से श्रीलंका को मिला झटका: सभी मैच अब भारत में"
+
+📍 ANGLE 5: QUESTION/FUTURE FOCUS (सवाल/भविष्य पर focus)
+Example: "क्या भारतीय टीम घरेलू मैदान पर जीत पाएगी वर्ल्ड कप?"
+
+Real Examples:
 ❌ Source: "सरफराज खान को क्यों नहीं मिली इंडिया ए टीम में जगह?"
-✅ Your H1: "पाटीदार और गायकवाड़ की धमाकेदार फॉर्म ने सरफराज को किया बाहर"
-✅ Your H1: "इंडिया ए चयन: सरफराज की जगह क्यों चुने गए साई सुदर्शन?"
-✅ Your H1: "नंबर 3 पर बल्लेबाजी ही बचा सकती है सरफराज का करियर"
+✅ H1 (Angle 3): "पाटीदार की धमाकेदार फॉर्म ने सरफराज को किया बाहर"
+✅ H1 (Angle 2): "बेंगलुरु सेंटर में स्वास्थ्य लाभ ले रहे सरफराज चूके चयन से"
+✅ H1 (Angle 5): "नंबर 3 पर बल्लेबाजी ही बचा सकती है सरफराज का करियर"
+
+❌ Source: "अब भारत में ही आयोजित होंगे वर्ल्ड कप के सेमीफाइनल और फाइनल"
+✅ H1 (Angle 4): "पाकिस्तान की हार ने बदली मेजबानी: सभी नॉकआउट मैच भारत में"
+✅ H1 (Angle 1): "हरमनप्रीत की टीम को घर पर खिताब जीतने का मौका"
+✅ H1 (Angle 2): "नवी मुंबई में 2 नवंबर को बनेगी नई वर्ल्ड चैंपियन"
+
+⚠️ CRITICAL: Pick ONE angle strategy and make your H1 COMPLETELY DIFFERENT from the ignored source above
 
 ✅ Output:
 A 600–800 word news article written in the style of a young cricket journalist, following all the above rules.
@@ -359,16 +392,20 @@ IMPORTANT - EVERY ARTICLE MUST HAVE A UNIQUE HEADLINE:
 - DO NOT use generic titles like "क्रिकेट अपडेट", "मैच समाचार", "क्रिकेट न्यूज़"
 - Include SPECIFIC DETAILS from the content: player names, team names, scores, match type, or key events
 - Every article is DIFFERENT - so every headline MUST BE DIFFERENT
-- Don't just translate the English headline - create a NEW creative Hindi headline based on the content
-- Example: Instead of "क्रिकेट अपडेट", write "विराट कोहली का शतक, भारत ने ऑस्ट्रेलिया को 6 विकेट से हराया"
 - Use simple, conversational Hindi that is used in everyday talking in India
 - Avoid heavy Sanskrit words - use the Hindi that cricket fans naturally speak
 - Make it sound like a real Hindi cricket journalist wrote this
-- Add your own creative touch while keeping facts accurate
-- Write with passion and emotion that cricket fans love
 - Target word count: 600-800 words (MINIMUM 600 words required)
 
-REPEAT: The headline for THIS article must be COMPLETELY DIFFERENT from any other article. Make it SPECIFIC to THIS content only.
+🚨 FINAL CHECK BEFORE WRITING H1:
+1. Did I pick one of the 5 ANGLE strategies? (Player/Venue/Impact/Controversy/Question)
+2. Is my H1 headline COMPLETELY DIFFERENT from the ignored source above?
+3. Does my H1 tell the story from a NEW perspective?
+4. If someone reads BOTH headlines (source + mine), will they feel like different stories?
+
+If answer is YES to all 4 - proceed. If NO to any - go back and pick a different angle!
+
+REPEAT: The H1 headline must use a DIFFERENT ANGLE than the source. Not just different words - different PERSPECTIVE!
 
 Write now - pure HTML body content in professional Hindi:
 `.trim();
