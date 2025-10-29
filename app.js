@@ -180,9 +180,181 @@ const {
   buildHindiCricketHtmlDocument
 } = require('./hindiCricketOpenAIProcessor');
 
+// Automobile News Scheduler
+const AutomobileNewsScheduler = require('./automobileNewsScheduler');
+const automobileScheduler = new AutomobileNewsScheduler();
 
 
-pakistanNewsScheduler.startScheduler(10); // Every 30 minutes
+
+
+pakistanNewsScheduler.startScheduler(30); // Every 10 minutes
+
+// Start Automobile News Scheduler
+automobileScheduler.startScheduler(10); // Every 30 minutes
+
+
+
+
+// Manual fetch automobile news
+app.post('/api/automobile-openai/manual-fetch-news', async (req, res) => {
+  try {
+    console.log('🚗 Fetching automobile news...');
+    await automobileScheduler.fetchAndStoreNews();
+    res.json({ 
+      success: true, 
+      message: 'Automobile news fetched successfully!'
+    });
+  } catch (error) {
+    console.error('Automobile manual fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get stored automobile news
+app.get('/api/automobile-openai/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM automobile_news_openai 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const [countRows] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM automobile_news_openai WHERE is_valid = true'
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching stored automobile news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed automobile news
+app.get('/api/automobile-openai/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM automobile_news_openai 
+       WHERE is_valid = true AND openai_processed = true 
+       ORDER BY processed_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const [countRows] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM automobile_news_openai WHERE is_valid = true AND openai_processed = true'
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching processed automobile news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate automobile article
+app.post('/api/automobile-openai/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM automobile_news_openai WHERE id = ? AND is_valid = true',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Article not found' });
+    }
+
+    const article = rows[0];
+
+    // Process with OpenAI (using same processor as Hindi cricket)
+    const result = await processHindiCricketNewsOpenAI(
+      {
+        title: article.title,
+        description: article.description,
+        content: article.content
+      },
+      {
+        language: "en",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      await pollDBPool.query(
+        `UPDATE automobile_news_openai 
+         SET openai_processed = true, 
+             processed_at = NOW(), 
+             processed_at_iso = ?,
+             openai_ready_article = ?, 
+             openai_final_title = ?, 
+             openai_final_meta = ?, 
+             openai_final_slug = ?,
+             openai_recommendations = ?
+         WHERE id = ?`,
+        [
+          new Date().toISOString(),
+          result.readyToPublishArticle,
+          result.recommendations.recommendedTitle,
+          result.recommendations.recommendedMeta,
+          result.recommendations.recommendedSlug,
+          JSON.stringify(result.recommendations),
+          id
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Automobile article generated successfully!'
+      });
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('Automobile article generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Start automobile scheduler
+app.post('/api/automobile-openai/start-scheduler', async (req, res) => {
+  try {
+    await automobileScheduler.startScheduler(30); // 30 minutes interval
+    res.json({ success: true, message: 'Automobile scheduler started successfully!' });
+  } catch (error) {
+    console.error('Error starting automobile scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Stop automobile scheduler
+app.post('/api/automobile-openai/stop-scheduler', async (req, res) => {
+  try {
+    automobileScheduler.stopScheduler();
+    res.json({ success: true, message: 'Automobile scheduler stopped successfully!' });
+  } catch (error) {
+    console.error('Error stopping automobile scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 
 
