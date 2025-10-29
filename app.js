@@ -182,6 +182,7 @@ const {
 
 // Automobile News Scheduler
 const AutomobileNewsScheduler = require('./automobileNewsScheduler');
+const { processAutomobileNewsOpenAI } = require('./automobileOpenAIProcessor');
 const automobileScheduler = new AutomobileNewsScheduler();
 
 
@@ -283,7 +284,7 @@ app.post('/api/automobile-openai/articles/:id/generate', async (req, res) => {
     const article = rows[0];
 
     // Process with OpenAI (using same processor as Hindi cricket)
-    const result = await processHindiCricketNewsOpenAI(
+    const result = await processAutomobileNewsOpenAI(
       {
         title: article.title,
         description: article.description,
