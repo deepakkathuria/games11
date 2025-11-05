@@ -2822,6 +2822,48 @@ app.get('/api/cricket-deepseek/scheduler-status', async (req, res) => {
 });
 
 // ===========================================
+// CRICKET NEWS COMPARISON API (Both OpenAI & DeepSeek)
+// ===========================================
+
+// Get compared cricket news (articles processed by both OpenAI and DeepSeek)
+app.get('/api/cricket-compare/compared-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE openai_processed = true AND deepseek_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE openai_processed = true AND deepseek_processed = true
+       ORDER BY openai_processed_at DESC, deepseek_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      openai_processed_at_iso: toIsoZ(n.openai_processed_at),
+      deepseek_processed_at_iso: toIsoZ(n.deepseek_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting compared cricket news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
 // CRICKET NEWS OPENAI APIs (Separate from existing)
 // ===========================================
 
