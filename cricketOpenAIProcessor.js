@@ -424,7 +424,7 @@ async function processCricketNewsOpenAI(input, options = {}) {
   const startTime = Date.now();
   
   try {
-    console.log('🏏 [OpenAI Only] Processing:', input.title);
+    console.log('🏏 [OpenAI Only - English Cricket News] Processing:', input.title);
     
     if (!input.title || input.title.length < 10) {
       throw new Error('Title too short');
@@ -436,34 +436,38 @@ async function processCricketNewsOpenAI(input, options = {}) {
       throw new Error('Content too short');
     }
 
-    // Simple Hindi conversion prompt
+    // English cricket article rewrite prompt for OpenAI
     const userPrompt = `
 ORIGINAL CRICKET NEWS (English):
 Title: ${input.title}
 Description: ${input.description}
 Content: ${input.content}
 
-TASK: Convert this to a natural, conversational Hindi article.
+CRITICAL: You MUST write ONLY in English. Do NOT use Hindi, Urdu, or any other language. Write 100% in English.
+
+TASK: Rewrite this cricket news article into a comprehensive, engaging English article.
 
 STYLE:
-- Write like a passionate cricket fan telling a friend
-- Use emotional expressions: "यार", "अरे", "वाह", "भाई"
-- Keep cricket terms in English (century, wicket, runs, over)
-- Short paragraphs, varied sentence length
-- Casual, human tone - NOT formal journalism
-- Add reactions and commentary
+- Write like a professional cricket journalist
+- Natural, conversational English tone
+- Engaging and informative
+- Use active voice, short paragraphs
+- Include key facts, stats, and quotes
+- Add context and analysis where relevant
+- LANGUAGE: Write ONLY in English. Every word, sentence, and paragraph must be in English.
 
 FORMAT:
-- HTML only (no <html>, <head>, <body>)
-- <h1> for main title (Hindi)
-- <h2> for 3-4 subheadings
+- HTML only (no <html>, <head>, <body> tags)
+- <h1> for main title
+- <h2> for 3-5 subheadings (unique and content-specific)
 - <p> for paragraphs
-- <strong> for player names and stats
+- <strong> for player names and important stats
 - <blockquote> for important quotes
+- <ul> and <li> for lists if needed
 
-Write now - pure HTML body content:`;
+Write now - pure HTML body content in ENGLISH ONLY:`;
 
-    const systemPrompt = `तुम एक भारतीय क्रिकेट पत्रकार हो जो देर रात match report लिख रहे हो। Passionate हो, थके हुए हो, fast type कर रहे हो। Natural Hindi में लिखो with emotions.`;
+    const systemPrompt = `You are an expert cricket journalist writing for a leading sports media brand. You MUST write ONLY in English - never in Hindi, Urdu, or any other language. Write engaging, comprehensive cricket content in English with deep knowledge of the game, players, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling. Every single word must be in English.`;
 
     const articleHTML = await callOpenAI(systemPrompt, userPrompt, {
       temperature: 0.97,
@@ -489,7 +493,118 @@ Write now - pure HTML body content:`;
   }
 }
 
+/* ---------- DEEPSEEK PROCESSOR (English Cricket News) ---------- */
+
+async function callDeepSeek(systemPrompt, userPrompt, options = {}) {
+  try {
+    console.log('🤖 DeepSeek API call started...');
+    console.log('📊 Temperature:', options.temperature ?? 0.7);
+    
+    const response = await withTimeout(
+      axios.post(DEEPSEEK_BASE_URL, {
+        model: options.model || "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.max_tokens ?? 5000,
+        top_p: options.top_p ?? 0.9,
+        frequency_penalty: options.frequency_penalty ?? 0.3,
+        presence_penalty: options.presence_penalty ?? 0.3,
+      }, {
+        headers: {
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      120000
+    );
+    
+    const content = response.data?.choices?.[0]?.message?.content || "";
+    console.log('✅ DeepSeek API call completed, content length:', content.length);
+    return content;
+  } catch (error) {
+    console.error('❌ DeepSeek API error:', error.message);
+    throw error;
+  }
+}
+
+async function processCricketNewsDeepSeek(input, options = {}) {
+  const startTime = Date.now();
+  
+  try {
+    console.log('🏏 [DeepSeek Only - English Cricket News] Processing:', input.title);
+    
+    if (!input.title || input.title.length < 10) {
+      throw new Error('Title too short');
+    }
+    if (!input.description || input.description.length < 20) {
+      throw new Error('Description too short');
+    }
+    if (!input.content || input.content.length < 300) {
+      throw new Error('Content too short');
+    }
+
+    // English cricket article rewrite prompt for DeepSeek
+    const userPrompt = `
+ORIGINAL CRICKET NEWS (English):
+Title: ${input.title}
+Description: ${input.description}
+Content: ${input.content}
+
+CRITICAL: You MUST write ONLY in English. Do NOT use Hindi, Urdu, or any other language. Write 100% in English.
+
+TASK: Rewrite this cricket news article into a comprehensive, engaging English article.
+
+STYLE:
+- Write like a professional cricket journalist
+- Natural, conversational English tone
+- Engaging and informative
+- Use active voice, short paragraphs
+- Include key facts, stats, and quotes
+- Add context and analysis where relevant
+- LANGUAGE: Write ONLY in English. Every word, sentence, and paragraph must be in English.
+
+FORMAT:
+- HTML only (no <html>, <head>, <body> tags)
+- <h1> for main title
+- <h2> for 3-5 subheadings (unique and content-specific)
+- <p> for paragraphs
+- <strong> for player names and important stats
+- <blockquote> for important quotes
+- <ul> and <li> for lists if needed
+
+Write now - pure HTML body content in ENGLISH ONLY:`;
+
+    const systemPrompt = `You are an expert cricket journalist writing for a leading sports media brand. You MUST write ONLY in English - never in Hindi, Urdu, or any other language. Write engaging, comprehensive cricket content in English with deep knowledge of the game, players, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling. Every single word must be in English.`;
+
+    const articleHTML = await callDeepSeek(systemPrompt, userPrompt, {
+      temperature: 0.7,
+      max_tokens: 5000,
+      top_p: 0.9,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.3
+    });
+
+    return {
+      success: true,
+      readyToPublishArticle: articleHTML,
+      processingTime: Date.now() - startTime
+    };
+
+  } catch (error) {
+    console.error('❌ Processing error:', error);
+    return {
+      success: false,
+      error: error.message,
+      processingTime: Date.now() - startTime
+    };
+  }
+}
+
 module.exports = {
-  processCricketNewsOpenAI,          // Simple: OpenAI only (current)
+  processCricketNewsOpenAI,          // OpenAI: English cricket news
+  processCricketNewsDeepSeek,        // DeepSeek: English cricket news
   processCricketNewsWithDeepSeek,    // Advanced: DeepSeek + OpenAI
 };

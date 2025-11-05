@@ -167,7 +167,8 @@ const pakistanNewsScheduler = new PakistanNewsScheduler();
 // Pakistan Manual Input Processor
 const { processPakistanManualInput } = require('./pakistanManualInputProcessor');
 const { 
-  processCricketNewsOpenAI, 
+  processCricketNewsOpenAI,
+  processCricketNewsDeepSeek, 
   generateCricketHeadline, 
   generateCricketMetaDescription,
   buildCricketHtmlDocument
@@ -1165,7 +1166,7 @@ app.get('/api/hindi-all/processed-news', async (req, res) => {
     );
 
     res.json({
-      success: true,
+       success: true,
       news: rows,
       totalCount,
       page: Math.floor(offset / limit) + 1,
@@ -2660,6 +2661,264 @@ app.get('/api/cricket-openai/scheduler-status', async (req, res) => {
   }
 });
 
+// ===========================================
+// CRICKET NEWS DEEPSEEK APIs (Separate from OpenAI)
+// ===========================================
+
+// Get stored cricket news for DeepSeek processing (same cricket_news table)
+app.get('/api/cricket-deepseek/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE is_valid = true
+       ORDER BY fetched_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored cricket news for DeepSeek:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed cricket news for DeepSeek
+app.get('/api/cricket-deepseek/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE deepseek_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE deepseek_processed = true
+       ORDER BY deepseek_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.deepseek_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed cricket news for DeepSeek:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process cricket news article with DeepSeek
+app.post('/api/cricket-deepseek/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with DeepSeek
+    const result = await processCricketNewsDeepSeek({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Simple slug generation from original title
+      const cricketTitle = article.title;
+      const cricketMeta = article.description.substring(0, 160);
+      const cricketSlug = article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      
+      // HTML is already complete from DeepSeek
+      const finalHtml = result.readyToPublishArticle;
+
+      await pollDBPool.query(
+        `UPDATE cricket_news
+           SET deepseek_processed = 1,
+               deepseek_processed_at = NOW(),
+               deepseek_ready_article = ?,
+               deepseek_final_title = ?,
+               deepseek_final_meta  = ?,
+               deepseek_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, cricketTitle, cricketMeta, cricketSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: cricketTitle,
+          meta: cricketMeta,
+          slug: cricketSlug,
+          html: finalHtml,
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate cricket DeepSeek article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch cricket news for DeepSeek (same as OpenAI, uses same scheduler)
+app.post('/api/cricket-deepseek/manual-fetch-news', async (req, res) => {
+  try {
+    await newsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Cricket news fetched and stored successfully for DeepSeek processing' });
+  } catch (error) {
+    console.error('Error manually fetching cricket news for DeepSeek:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get cricket news scheduler status for DeepSeek
+app.get('/api/cricket-deepseek/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: newsScheduler.isRunning,
+      message: 'Cricket news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
+// CRICKET NEWS OPENAI APIs (Separate from existing)
+// ===========================================
+
+// Get processed cricket news for OpenAI (separate from existing)
+app.get('/api/cricket-openai-new/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricket_news WHERE openai_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM cricket_news
+       WHERE openai_processed = true
+       ORDER BY openai_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.openai_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed cricket news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process cricket news article with OpenAI (separate button)
+app.post('/api/cricket-openai-new/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with OpenAI
+    const result = await processCricketNewsOpenAI({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Simple slug generation from original title
+      const cricketTitle = article.title;
+      const cricketMeta = article.description.substring(0, 160);
+      const cricketSlug = article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      
+      // HTML is already complete from OpenAI
+      const finalHtml = result.readyToPublishArticle;
+
+      await pollDBPool.query(
+        `UPDATE cricket_news
+           SET openai_processed = 1,
+               openai_processed_at = NOW(),
+               openai_ready_article = ?,
+               openai_final_title = ?,
+               openai_final_meta  = ?,
+               openai_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, cricketTitle, cricketMeta, cricketSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: cricketTitle,
+          meta: cricketMeta,
+          slug: cricketSlug,
+          html: finalHtml,
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate cricket OpenAI article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
 
 
 
