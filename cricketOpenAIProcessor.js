@@ -425,6 +425,7 @@ async function processCricketNewsOpenAI(input, options = {}) {
   
   try {
     console.log('🏏 [OpenAI Only - English Cricket News] Processing:', input.title);
+    console.log('🌐 LANGUAGE: ENGLISH ONLY - Hindi output is STRICTLY FORBIDDEN');
     
     if (!input.title || input.title.length < 10) {
       throw new Error('Title too short');
@@ -443,7 +444,16 @@ Title: ${input.title}
 Description: ${input.description}
 Content: ${input.content}
 
-CRITICAL: You MUST write ONLY in English. Do NOT use Hindi, Urdu, or any other language. Write 100% in English.
+═══════════════════════════════════════════════════════════════
+⚠️ CRITICAL LANGUAGE REQUIREMENT ⚠️
+═══════════════════════════════════════════════════════════════
+You MUST write ONLY in English. 
+- Do NOT use Hindi (हिन्दी), Urdu, or any other language
+- Do NOT use words like: यार, भाई, अरे, वाह, क्या, तो, चलो, दोस्त
+- Do NOT use Devanagari script or any non-English characters
+- Write 100% in English language only
+- Every single word must be in English
+═══════════════════════════════════════════════════════════════
 
 TASK: Rewrite this cricket news article into a comprehensive, engaging English article.
 
@@ -465,9 +475,19 @@ FORMAT:
 - <blockquote> for important quotes
 - <ul> and <li> for lists if needed
 
+⚠️ FINAL REMINDER: Write in ENGLISH ONLY - NO Hindi, NO Devanagari script, NO mixed languages.
 Write now - pure HTML body content in ENGLISH ONLY:`;
 
-    const systemPrompt = `You are an expert cricket journalist writing for a leading sports media brand. You MUST write ONLY in English - never in Hindi, Urdu, or any other language. Write engaging, comprehensive cricket content in English with deep knowledge of the game, players, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling. Every single word must be in English.`;
+    const systemPrompt = `You are an expert cricket journalist writing for a leading English sports media brand. 
+
+CRITICAL LANGUAGE RULE: You MUST write ONLY in English - never in Hindi, Urdu, or any other language. 
+- Do NOT use Hindi words like यार, भाई, अरे, वाह
+- Do NOT use Devanagari script or any non-English characters
+- Every single word, sentence, and paragraph must be in English
+
+Write engaging, comprehensive cricket content in English with deep knowledge of the game, players, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling. 
+
+LANGUAGE ENFORCEMENT: If you see any Hindi or non-English text in the input, ignore it and write your response 100% in English only.`;
 
     const articleHTML = await callOpenAI(systemPrompt, userPrompt, {
       temperature: 0.97,
@@ -535,6 +555,7 @@ async function processCricketNewsDeepSeek(input, options = {}) {
   
   try {
     console.log('🏏 [DeepSeek Only - English Cricket News] Processing:', input.title);
+    console.log('🌐 LANGUAGE: ENGLISH ONLY - Hindi output is STRICTLY FORBIDDEN');
     
     if (!input.title || input.title.length < 10) {
       throw new Error('Title too short');
@@ -553,7 +574,16 @@ Title: ${input.title}
 Description: ${input.description}
 Content: ${input.content}
 
-CRITICAL: You MUST write ONLY in English. Do NOT use Hindi, Urdu, or any other language. Write 100% in English.
+═══════════════════════════════════════════════════════════════
+⚠️ CRITICAL LANGUAGE REQUIREMENT ⚠️
+═══════════════════════════════════════════════════════════════
+You MUST write ONLY in English. 
+- Do NOT use Hindi (हिन्दी), Urdu, or any other language
+- Do NOT use words like: यार, भाई, अरे, वाह, क्या, तो, चलो, दोस्त
+- Do NOT use Devanagari script or any non-English characters
+- Write 100% in English language only
+- Every single word must be in English
+═══════════════════════════════════════════════════════════════
 
 TASK: Rewrite this cricket news article into a comprehensive, engaging English article.
 
@@ -575,9 +605,19 @@ FORMAT:
 - <blockquote> for important quotes
 - <ul> and <li> for lists if needed
 
+⚠️ FINAL REMINDER: Write in ENGLISH ONLY - NO Hindi, NO Devanagari script, NO mixed languages.
 Write now - pure HTML body content in ENGLISH ONLY:`;
 
-    const systemPrompt = `You are an expert cricket journalist writing for a leading sports media brand. You MUST write ONLY in English - never in Hindi, Urdu, or any other language. Write engaging, comprehensive cricket content in English with deep knowledge of the game, players, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling. Every single word must be in English.`;
+    const systemPrompt = `You are an expert cricket journalist writing for a leading English sports media brand. 
+
+CRITICAL LANGUAGE RULE: You MUST write ONLY in English - never in Hindi, Urdu, or any other language. 
+- Do NOT use Hindi words like यार, भाई, अरे, वाह
+- Do NOT use Devanagari script or any non-English characters
+- Every single word, sentence, and paragraph must be in English
+
+Write engaging, comprehensive cricket content in English with deep knowledge of the game, players, and cricket culture. Always provide detailed, accurate cricket analysis and compelling storytelling. 
+
+LANGUAGE ENFORCEMENT: If you see any Hindi or non-English text in the input, ignore it and write your response 100% in English only.`;
 
     const articleHTML = await callDeepSeek(systemPrompt, userPrompt, {
       temperature: 0.7,
