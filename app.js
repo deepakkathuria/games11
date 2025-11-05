@@ -2825,6 +2825,98 @@ app.get('/api/cricket-deepseek/scheduler-status', async (req, res) => {
 // CRICKET NEWS COMPARISON API (Both OpenAI & DeepSeek)
 // ===========================================
 
+// Auto-migrate: Add DeepSeek columns if they don't exist
+app.post('/api/cricket-deepseek/migrate-columns', async (req, res) => {
+  try {
+    console.log('🔄 Checking for DeepSeek columns in cricket_news table...');
+    
+    // Check if columns exist
+    const [columns] = await pollDBPool.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_NAME = 'cricket_news' 
+       AND COLUMN_NAME LIKE '%deepseek%'`
+    );
+    
+    const existingColumns = columns.map(c => c.COLUMN_NAME);
+    const requiredColumns = [
+      'deepseek_processed',
+      'deepseek_processed_at',
+      'deepseek_ready_article',
+      'deepseek_final_title',
+      'deepseek_final_meta',
+      'deepseek_final_slug'
+    ];
+    
+    const missingColumns = requiredColumns.filter(col => !existingColumns.includes(col));
+    
+    if (missingColumns.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All DeepSeek columns already exist',
+        existingColumns
+      });
+    }
+    
+    console.log('📝 Adding missing columns:', missingColumns);
+    
+    // Add missing columns
+    const migrations = [];
+    
+    if (missingColumns.includes('deepseek_processed')) {
+      await pollDBPool.query('ALTER TABLE cricket_news ADD COLUMN deepseek_processed BOOLEAN DEFAULT FALSE');
+      migrations.push('deepseek_processed');
+    }
+    
+    if (missingColumns.includes('deepseek_processed_at')) {
+      await pollDBPool.query('ALTER TABLE cricket_news ADD COLUMN deepseek_processed_at TIMESTAMP NULL');
+      migrations.push('deepseek_processed_at');
+    }
+    
+    if (missingColumns.includes('deepseek_ready_article')) {
+      await pollDBPool.query('ALTER TABLE cricket_news ADD COLUMN deepseek_ready_article LONGTEXT NULL');
+      migrations.push('deepseek_ready_article');
+    }
+    
+    if (missingColumns.includes('deepseek_final_title')) {
+      await pollDBPool.query('ALTER TABLE cricket_news ADD COLUMN deepseek_final_title VARCHAR(500) NULL');
+      migrations.push('deepseek_final_title');
+    }
+    
+    if (missingColumns.includes('deepseek_final_meta')) {
+      await pollDBPool.query('ALTER TABLE cricket_news ADD COLUMN deepseek_final_meta TEXT NULL');
+      migrations.push('deepseek_final_meta');
+    }
+    
+    if (missingColumns.includes('deepseek_final_slug')) {
+      await pollDBPool.query('ALTER TABLE cricket_news ADD COLUMN deepseek_final_slug VARCHAR(500) NULL');
+      migrations.push('deepseek_final_slug');
+    }
+    
+    // Add indexes
+    try {
+      await pollDBPool.query('CREATE INDEX idx_cricket_news_deepseek_processed ON cricket_news(deepseek_processed)');
+    } catch (e) {
+      if (!e.message.includes('Duplicate key')) console.log('Index already exists or error:', e.message);
+    }
+    
+    try {
+      await pollDBPool.query('CREATE INDEX idx_cricket_news_deepseek_processed_at ON cricket_news(deepseek_processed_at)');
+    } catch (e) {
+      if (!e.message.includes('Duplicate key')) console.log('Index already exists or error:', e.message);
+    }
+    
+    res.json({
+      success: true,
+      message: `Successfully added ${migrations.length} DeepSeek columns`,
+      addedColumns: migrations,
+      existingColumns: existingColumns.concat(migrations)
+    });
+  } catch (error) {
+    console.error('Error migrating DeepSeek columns:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get compared cricket news (articles processed by both OpenAI and DeepSeek)
 app.get('/api/cricket-compare/compared-news', async (req, res) => {
   try {

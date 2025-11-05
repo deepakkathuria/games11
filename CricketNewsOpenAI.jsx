@@ -143,6 +143,18 @@ export default function CricketNewsOpenAI() {
   useEffect(() => {
     console.log("🏏 Cricket News OpenAI & DeepSeek Component mounted");
     console.log("🕐 Current system time:", new Date().toLocaleString("en-IN"));
+    
+    // Auto-migrate DeepSeek columns if they don't exist
+    const migrateColumns = async () => {
+      try {
+        await axios.post(`${API}/api/cricket-deepseek/migrate-columns`);
+        console.log("✅ DeepSeek columns migration check completed");
+      } catch (e) {
+        console.error("Migration check error:", e.response?.data?.error || e.message);
+      }
+    };
+    
+    migrateColumns();
     fetchStored(1);
     fetchProcessedOpenAI(1);
     fetchProcessedDeepSeek(1);
