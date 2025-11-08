@@ -181,6 +181,13 @@ const {
   buildHindiCricketHtmlDocument
 } = require('./hindiCricketOpenAIProcessor');
 
+const {
+  processHindiCricketNewsDeepSeek,
+  generateHindiCricketHeadlineDeepSeek,
+  generateHindiCricketMetaDescriptionDeepSeek,
+  buildHindiCricketHtmlDocument: buildHindiCricketHtmlDocumentDeepSeek
+} = require('./hindiCricketDeepSeekProcessor');
+
 // Automobile News Scheduler
 const AutomobileNewsScheduler = require('./automobileNewsScheduler');
 const { processAutomobileNewsOpenAI } = require('./automobileOpenAIProcessor');
@@ -1425,6 +1432,300 @@ app.post('/api/hindi-cricket-openai/manual-fetch-news', async (req, res) => {
     res.json({ success: true, message: 'Hindi cricket news fetched and stored successfully for OpenAI processing' });
   } catch (error) {
     console.error('Error manually fetching Hindi cricket news for OpenAI:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
+// HINDI CRICKET NEWS DEEPSEEK APIs
+// ===========================================
+
+// Get stored Hindi cricket news for DeepSeek processing (same hindi_cricket_news table)
+app.get('/api/hindi-cricket-deepseek/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE is_valid = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE is_valid = true
+       ORDER BY fetched_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting stored Hindi cricket news for DeepSeek:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed Hindi cricket news for DeepSeek
+app.get('/api/hindi-cricket-deepseek/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE deepseek_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE deepseek_processed = true
+       ORDER BY deepseek_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      processed_at_iso: toIsoZ(n.deepseek_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting processed Hindi cricket news for DeepSeek:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Process Hindi cricket news article with DeepSeek
+app.post('/api/hindi-cricket-deepseek/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Process with DeepSeek
+    const result = await processHindiCricketNewsDeepSeek({
+      title: article.title,
+      description: article.description,
+      content: article.content
+    });
+
+    if (result.success) {
+      // Simple slug generation from original title
+      const hindiTitle = article.title;
+      const hindiMeta = article.description.substring(0, 160);
+      const hindiSlug = article.title.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, '-').replace(/^-+|-+$/g, '');
+      
+      // HTML is already complete from DeepSeek
+      const finalHtml = result.readyToPublishArticle;
+
+      await pollDBPool.query(
+        `UPDATE hindi_cricket_news
+           SET deepseek_processed = 1,
+               deepseek_processed_at = NOW(),
+               deepseek_ready_article = ?,
+               deepseek_final_title = ?,
+               deepseek_final_meta  = ?,
+               deepseek_final_slug  = ?
+         WHERE id = ?`,
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        final: {
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
+          html: finalHtml,
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("generate Hindi cricket DeepSeek article error", err);
+    return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Manual fetch Hindi cricket news for DeepSeek (same as OpenAI, uses same scheduler)
+app.post('/api/hindi-cricket-deepseek/manual-fetch-news', async (req, res) => {
+  try {
+    await hindiNewsScheduler.fetchAndStoreNews();
+    res.json({ success: true, message: 'Hindi cricket news fetched and stored successfully for DeepSeek processing' });
+  } catch (error) {
+    console.error('Error manually fetching Hindi cricket news for DeepSeek:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get Hindi cricket news scheduler status for DeepSeek
+app.get('/api/hindi-cricket-deepseek/scheduler-status', async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      isRunning: hindiNewsScheduler.isRunning,
+      message: 'Hindi cricket news scheduler is running and fetching news every 30 minutes'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
+// HINDI CRICKET NEWS COMPARISON API (Both OpenAI & DeepSeek)
+// ===========================================
+
+// Auto-migrate: Add DeepSeek columns if they don't exist
+app.post('/api/hindi-cricket-deepseek/migrate-columns', async (req, res) => {
+  try {
+    console.log('🔄 Checking for DeepSeek columns in hindi_cricket_news table...');
+    
+    // Check if columns exist
+    const [columns] = await pollDBPool.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_NAME = 'hindi_cricket_news' 
+       AND COLUMN_NAME LIKE '%deepseek%'`
+    );
+    
+    const existingColumns = columns.map(c => c.COLUMN_NAME);
+    const requiredColumns = [
+      'deepseek_processed',
+      'deepseek_processed_at',
+      'deepseek_ready_article',
+      'deepseek_final_title',
+      'deepseek_final_meta',
+      'deepseek_final_slug'
+    ];
+    
+    const missingColumns = requiredColumns.filter(col => !existingColumns.includes(col));
+    
+    if (missingColumns.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All DeepSeek columns already exist',
+        existingColumns
+      });
+    }
+    
+    console.log('📝 Adding missing columns:', missingColumns);
+    
+    // Add missing columns
+    const migrations = [];
+    
+    if (missingColumns.includes('deepseek_processed')) {
+      await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN deepseek_processed BOOLEAN DEFAULT FALSE');
+      migrations.push('deepseek_processed');
+    }
+    
+    if (missingColumns.includes('deepseek_processed_at')) {
+      await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN deepseek_processed_at TIMESTAMP NULL');
+      migrations.push('deepseek_processed_at');
+    }
+    
+    if (missingColumns.includes('deepseek_ready_article')) {
+      await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN deepseek_ready_article LONGTEXT NULL');
+      migrations.push('deepseek_ready_article');
+    }
+    
+    if (missingColumns.includes('deepseek_final_title')) {
+      await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN deepseek_final_title VARCHAR(500) NULL');
+      migrations.push('deepseek_final_title');
+    }
+    
+    if (missingColumns.includes('deepseek_final_meta')) {
+      await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN deepseek_final_meta TEXT NULL');
+      migrations.push('deepseek_final_meta');
+    }
+    
+    if (missingColumns.includes('deepseek_final_slug')) {
+      await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN deepseek_final_slug VARCHAR(500) NULL');
+      migrations.push('deepseek_final_slug');
+    }
+    
+    // Add indexes
+    try {
+      await pollDBPool.query('CREATE INDEX idx_hindi_cricket_news_deepseek_processed ON hindi_cricket_news(deepseek_processed)');
+    } catch (e) {
+      if (!e.message.includes('Duplicate key')) console.log('Index already exists or error:', e.message);
+    }
+    
+    try {
+      await pollDBPool.query('CREATE INDEX idx_hindi_cricket_news_deepseek_processed_at ON hindi_cricket_news(deepseek_processed_at)');
+    } catch (e) {
+      if (!e.message.includes('Duplicate key')) console.log('Index already exists or error:', e.message);
+    }
+    
+    res.json({
+      success: true,
+      message: `Successfully added ${migrations.length} DeepSeek columns`,
+      addedColumns: migrations,
+      existingColumns: existingColumns.concat(migrations)
+    });
+  } catch (error) {
+    console.error('Error migrating DeepSeek columns:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get compared Hindi cricket news (articles processed by both OpenAI and DeepSeek)
+app.get('/api/hindi-cricket-compare/compared-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE openai_processed = true AND deepseek_processed = true'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE openai_processed = true AND deepseek_processed = true
+       ORDER BY openai_processed_at DESC, deepseek_processed_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ(n.published_at),
+      openai_processed_at_iso: toIsoZ(n.openai_processed_at),
+      deepseek_processed_at_iso: toIsoZ(n.deepseek_processed_at),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting compared Hindi cricket news:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
