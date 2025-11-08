@@ -3052,21 +3052,28 @@ app.post('/api/cricket-deepseek/articles/:id/generate', async (req, res) => {
     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
     const article = rows[0];
 
-    // Process with DeepSeek
-    const result = await processCricketNewsDeepSeek({
+    // Process with DeepSeek (Hindi)
+    const result = await processHindiCricketNewsDeepSeek({
       title: article.title,
       description: article.description,
       content: article.content
     });
 
     if (result.success) {
-      // Simple slug generation from original title
-      const cricketTitle = article.title;
-      const cricketMeta = article.description.substring(0, 160);
-      const cricketSlug = article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      
-      // HTML is already complete from DeepSeek
-      const finalHtml = result.readyToPublishArticle;
+      // Generate Hindi title/meta using DeepSeek helpers
+      const hindiTitle = await generateHindiCricketHeadlineDeepSeek(article.title);
+      const hindiMeta = await generateHindiCricketMetaDescriptionDeepSeek(article.description);
+      const hindiSlug = (hindiTitle || article.title)
+        .toLowerCase()
+        .replace(/[^a-z0-9\u0900-\u097F]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      // Wrap article HTML in full document
+      const finalHtml = buildHindiCricketHtmlDocumentDeepSeek({
+        title: hindiTitle,
+        metaDescription: hindiMeta,
+        bodyHtml: result.readyToPublishArticle,
+      });
 
       await pollDBPool.query(
         `UPDATE cricket_news
@@ -3077,16 +3084,21 @@ app.post('/api/cricket-deepseek/articles/:id/generate', async (req, res) => {
                deepseek_final_meta  = ?,
                deepseek_final_slug  = ?
          WHERE id = ?`,
-        [finalHtml, cricketTitle, cricketMeta, cricketSlug, id]
+        [finalHtml, hindiTitle, hindiMeta, hindiSlug, id]
       );
 
       return res.json({
         success: true,
         final: {
-          title: cricketTitle,
-          meta: cricketMeta,
-          slug: cricketSlug,
+          title: hindiTitle,
+          meta: hindiMeta,
+          slug: hindiSlug,
           html: finalHtml,
+        },
+        metadata: {
+          processingTime: result.processingTime,
+          model: 'DeepSeek',
+          language: 'Hindi'
         }
       });
     } else {
