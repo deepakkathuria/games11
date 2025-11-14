@@ -8360,7 +8360,137 @@ app.post("/auth/google-login", async (req, res) => {
 
 
 
+// ----------------------------------------------------wishlist routes---------------------------------------------------
 
+// **Get User Wishlist**
+app.get("/wishlist", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized access" });
+    }
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const query = `
+      SELECT w.*, p.name, p.price, p.images, p.item_id as product_id
+      FROM wishlist w
+      INNER JOIN products p ON w.product_id = p.item_id
+      WHERE w.user_id = ?
+    `;
+
+    const [rows] = await userDBPool.query(query, [userId]);
+
+    const formattedItems = rows.map((item) => {
+      let images = [];
+      try {
+        images = typeof item.images === "string" ? JSON.parse(item.images) : item.images;
+      } catch (e) {
+        images = [];
+      }
+
+      return {
+        id: item.wishlist_id,
+        product_id: item.product_id,
+        name: item.name,
+        price: item.price,
+        image: images.length > 0 ? images[0] : null,
+      };
+    });
+
+    res.status(200).json({ items: formattedItems });
+  } catch (error) {
+    console.error("Error fetching wishlist:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// **Add Item to Wishlist**
+app.post("/wishlist/add", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized access" });
+    }
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const { product_id } = req.body;
+
+    if (!product_id) {
+      return res.status(400).json({ error: "Product ID is required" });
+    }
+
+    // Check if item already exists in wishlist
+    const checkQuery = "SELECT * FROM wishlist WHERE user_id = ? AND product_id = ?";
+    const [existing] = await userDBPool.query(checkQuery, [userId, product_id]);
+
+    if (existing.length > 0) {
+      return res.status(400).json({ error: "Item already in wishlist" });
+    }
+
+    // Insert into wishlist
+    const insertQuery = "INSERT INTO wishlist (user_id, product_id) VALUES (?, ?)";
+    await userDBPool.query(insertQuery, [userId, product_id]);
+
+    res.status(201).json({ message: "Item added to wishlist successfully" });
+  } catch (error) {
+    console.error("Error adding to wishlist:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// **Remove Item from Wishlist**
+app.delete("/wishlist/remove/:product_id", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized access" });
+    }
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const { product_id } = req.params;
+
+    const query = "DELETE FROM wishlist WHERE user_id = ? AND product_id = ?";
+    const [result] = await userDBPool.query(query, [userId, product_id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Item not found in wishlist" });
+    }
+
+    res.status(200).json({ message: "Item removed from wishlist successfully" });
+  } catch (error) {
+    console.error("Error removing from wishlist:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// **Clear Wishlist**
+app.delete("/wishlist/clear", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized access" });
+    }
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    const query = "DELETE FROM wishlist WHERE user_id = ?";
+    await userDBPool.query(query, [userId]);
+
+    res.status(200).json({ message: "Wishlist cleared successfully" });
+  } catch (error) {
+    console.error("Error clearing wishlist:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// ----------------------------------------------------wishlist routes---------------------------------------------------
 
 
 
