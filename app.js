@@ -7276,47 +7276,107 @@ app.get("/cart", async (req, res) => {
   }
 });
 
+// app.post("/cart/add", async (req, res) => {
+//   try {
+//     const { items } = req.body;
+//     if (!items || items.length === 0) {
+//       return res.status(400).json({ error: "No items provided." });
+//     }
+
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) return res.status(401).json({ error: "Unauthorized access." });
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     for (const item of items) {
+//       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
+//       const [existingItem] = await userDBPool.query(checkQuery, [
+//         userId,
+//         item.id,
+//       ]);
+
+//       if (existingItem.length < 1) {
+//         // ✅ Fixed: Now inserts as `active`
+//         const insertQuery = `INSERT INTO Cart (user_id, id, quantity, name, price, image, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`;
+//         await userDBPool.query(insertQuery, [
+//           userId,
+//           item.id,
+//           item.quantity,
+//           item.name,
+//           item.price,
+//           item.image,
+//         ]);
+//       } else {
+//         // ✅ Fixed: Now updates quantity and marks as `active`
+//         const updateQuery = `UPDATE Cart SET quantity = ?, status = 'active' WHERE id = ? AND user_id = ?`;
+//         await userDBPool.query(updateQuery, [item.quantity, item.id, userId]);
+//       }
+//     }
+
+//     res
+//       .status(200)
+//       .json({ message: "Cart updated successfully", cartItems: items });
+//   } catch (error) {
+//     console.error("Error adding items to cart:", error);
+//     res.status(500).json({ error: "Failed to add items to cart" });
+//   }
+// });
+
 app.post("/cart/add", async (req, res) => {
   try {
     const { items } = req.body;
+
     if (!items || items.length === 0) {
       return res.status(400).json({ error: "No items provided." });
     }
 
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Unauthorized access." });
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized access." });
+    }
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
+    const MAX_PER_PRODUCT = 1; // 🔒 hard cap: one piece per product
+    let limited = false;
+
     for (const item of items) {
       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
-      const [existingItem] = await userDBPool.query(checkQuery, [
-        userId,
-        item.id,
-      ]);
+      const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
+
+      const requestedQty = Number(item.quantity || item.qty || 1);
+      const finalQty = Math.min(requestedQty, MAX_PER_PRODUCT);
+      if (requestedQty > MAX_PER_PRODUCT) limited = true;
 
       if (existingItem.length < 1) {
-        // ✅ Fixed: Now inserts as `active`
-        const insertQuery = `INSERT INTO Cart (user_id, id, quantity, name, price, image, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`;
+        const insertQuery = `
+          INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
+          VALUES (?, ?, ?, ?, ?, ?, 'active')
+        `;
         await userDBPool.query(insertQuery, [
           userId,
           item.id,
-          item.quantity,
+          finalQty,
           item.name,
           item.price,
           item.image,
         ]);
       } else {
-        // ✅ Fixed: Now updates quantity and marks as `active`
-        const updateQuery = `UPDATE Cart SET quantity = ?, status = 'active' WHERE id = ? AND user_id = ?`;
-        await userDBPool.query(updateQuery, [item.quantity, item.id, userId]);
+        const updateQuery = `
+          UPDATE Cart SET quantity = ?, status = 'active'
+          WHERE id = ? AND user_id = ?
+        `;
+        await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
       }
     }
 
-    res
-      .status(200)
-      .json({ message: "Cart updated successfully", cartItems: items });
+    return res.status(200).json({
+      message: limited
+        ? "Cart updated. Each piece is limited to 1 per customer. For more, please contact us on Instagram or WhatsApp."
+        : "Cart updated successfully",
+    });
   } catch (error) {
     console.error("Error adding items to cart:", error);
     res.status(500).json({ error: "Failed to add items to cart" });
