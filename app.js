@@ -7276,10 +7276,10 @@ app.get("/cart", async (req, res) => {
   }
 });
 
+
 app.post("/cart/add", async (req, res) => {
   try {
     const { items } = req.body;
-
     if (!items || items.length === 0) {
       return res.status(400).json({ error: "No items provided." });
     }
@@ -7303,49 +7303,19 @@ app.post("/cart/add", async (req, res) => {
         return res.status(404).json({ error: `Product ${item.id} not found` });
       }
 
-      const stockQuantity = productRows[0].stock_quantity || 1; // Default to 1 if null
+      const stockQuantity = productRows[0].stock_quantity || 1;
       const requestedQty = Number(item.quantity || item.qty || 1);
 
       // ✅ Check current cart quantity
       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
       const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
 
-      const currentCartQty = existingItem.length > 0 ? (existingItem[0].quantity || 0) : 0;
-      const newTotalQty = currentCartQty + requestedQty;
+      // ✅ SET quantity to requestedQty (not ADD to existing)
+      // ✅ But limit to stockQuantity if requestedQty exceeds stock
+      const finalQty = Math.min(requestedQty, stockQuantity);
 
-      // ✅ If adding would exceed stock, limit to available stock
-      if (newTotalQty > stockQuantity) {
-        const finalQty = stockQuantity;
-        
-        if (existingItem.length < 1) {
-          const insertQuery = `
-            INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'active')
-          `;
-          await userDBPool.query(insertQuery, [
-            userId,
-            item.id,
-            finalQty,
-            item.name,
-            item.price,
-            item.image,
-          ]);
-        } else {
-          const updateQuery = `
-            UPDATE Cart SET quantity = ?, status = 'active'
-            WHERE id = ? AND user_id = ?
-          `;
-          await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
-        }
-
-        return res.status(200).json({
-          message: "OUT OF STOCK - Maximum available quantity added",
-          limited: true,
-        });
-      }
-
-      // ✅ Normal add/update
       if (existingItem.length < 1) {
+        // ✅ New item - insert
         const insertQuery = `
           INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
           VALUES (?, ?, ?, ?, ?, ?, 'active')
@@ -7353,17 +7323,26 @@ app.post("/cart/add", async (req, res) => {
         await userDBPool.query(insertQuery, [
           userId,
           item.id,
-          requestedQty,
+          finalQty,
           item.name,
           item.price,
           item.image,
         ]);
       } else {
+        // ✅ Existing item - SET quantity (not ADD)
         const updateQuery = `
           UPDATE Cart SET quantity = ?, status = 'active'
           WHERE id = ? AND user_id = ?
         `;
-        await userDBPool.query(updateQuery, [newTotalQty, item.id, userId]);
+        await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
+      }
+
+      // ✅ If requested quantity exceeds stock, return warning
+      if (requestedQty > stockQuantity) {
+        return res.status(200).json({
+          message: "OUT OF STOCK - Maximum available quantity added",
+          limited: true,
+        });
       }
     }
 
@@ -7375,6 +7354,106 @@ app.post("/cart/add", async (req, res) => {
     res.status(500).json({ error: "Failed to add items to cart" });
   }
 });
+
+// app.post("/cart/add", async (req, res) => {
+//   try {
+//     const { items } = req.body;
+
+//     if (!items || items.length === 0) {
+//       return res.status(400).json({ error: "No items provided." });
+//     }
+
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) {
+//       return res.status(401).json({ error: "Unauthorized access." });
+//     }
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     for (const item of items) {
+//       // ✅ Fetch product stock_quantity from products table
+//       const [productRows] = await userDBPool.query(
+//         "SELECT stock_quantity FROM products WHERE item_id = ?",
+//         [item.id]
+//       );
+
+//       if (productRows.length === 0) {
+//         return res.status(404).json({ error: `Product ${item.id} not found` });
+//       }
+
+//       const stockQuantity = productRows[0].stock_quantity || 1; // Default to 1 if null
+//       const requestedQty = Number(item.quantity || item.qty || 1);
+
+//       // ✅ Check current cart quantity
+//       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
+//       const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
+
+//       const currentCartQty = existingItem.length > 0 ? (existingItem[0].quantity || 0) : 0;
+//       const newTotalQty = currentCartQty + requestedQty;
+
+//       // ✅ If adding would exceed stock, limit to available stock
+//       if (newTotalQty > stockQuantity) {
+//         const finalQty = stockQuantity;
+        
+//         if (existingItem.length < 1) {
+//           const insertQuery = `
+//             INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
+//             VALUES (?, ?, ?, ?, ?, ?, 'active')
+//           `;
+//           await userDBPool.query(insertQuery, [
+//             userId,
+//             item.id,
+//             finalQty,
+//             item.name,
+//             item.price,
+//             item.image,
+//           ]);
+//         } else {
+//           const updateQuery = `
+//             UPDATE Cart SET quantity = ?, status = 'active'
+//             WHERE id = ? AND user_id = ?
+//           `;
+//           await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
+//         }
+
+//         return res.status(200).json({
+//           message: "OUT OF STOCK - Maximum available quantity added",
+//           limited: true,
+//         });
+//       }
+
+//       // ✅ Normal add/update
+//       if (existingItem.length < 1) {
+//         const insertQuery = `
+//           INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
+//           VALUES (?, ?, ?, ?, ?, ?, 'active')
+//         `;
+//         await userDBPool.query(insertQuery, [
+//           userId,
+//           item.id,
+//           requestedQty,
+//           item.name,
+//           item.price,
+//           item.image,
+//         ]);
+//       } else {
+//         const updateQuery = `
+//           UPDATE Cart SET quantity = ?, status = 'active'
+//           WHERE id = ? AND user_id = ?
+//         `;
+//         await userDBPool.query(updateQuery, [newTotalQty, item.id, userId]);
+//       }
+//     }
+
+//     return res.status(200).json({
+//       message: "Cart updated successfully",
+//     });
+//   } catch (error) {
+//     console.error("Error adding items to cart:", error);
+//     res.status(500).json({ error: "Failed to add items to cart" });
+//   }
+// });
 
 // app.post("/cart/add", async (req, res) => {
 //   try {
@@ -8691,6 +8770,51 @@ app.post("/auth/google-login", async (req, res) => {
 // ----------------------------------------------------wishlist routes---------------------------------------------------
 
 // **Get User Wishlist**
+// app.get("/wishlist", async (req, res) => {
+//   try {
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) {
+//       return res.status(401).json({ error: "Unauthorized access" });
+//     }
+
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
+
+//     const query = `
+//       SELECT w.*, p.name, p.price, p.images, p.item_id as product_id
+//       FROM wishlist w
+//       INNER JOIN products p ON w.product_id = p.item_id
+//       WHERE w.user_id = ?
+//     `;
+
+//     const [rows] = await userDBPool.query(query, [userId]);
+
+//     const formattedItems = rows.map((item) => {
+//       let images = [];
+//       try {
+//         images = typeof item.images === "string" ? JSON.parse(item.images) : item.images;
+//       } catch (e) {
+//         images = [];
+//       }
+
+//       return {
+//         id: item.wishlist_id,
+//         product_id: item.product_id,
+//         name: item.name,
+//         price: item.price,
+//         image: images.length > 0 ? images[0] : null,
+//       };
+//     });
+
+//     res.status(200).json({ items: formattedItems });
+//   } catch (error) {
+//     console.error("Error fetching wishlist:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
+// **Get User Wishlist**
 app.get("/wishlist", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -8702,7 +8826,7 @@ app.get("/wishlist", async (req, res) => {
     const userId = decoded.id;
 
     const query = `
-      SELECT w.*, p.name, p.price, p.images, p.item_id as product_id
+      SELECT w.*, p.name, p.price, p.images, p.item_id as product_id, p.stock_quantity
       FROM wishlist w
       INNER JOIN products p ON w.product_id = p.item_id
       WHERE w.user_id = ?
@@ -8724,6 +8848,7 @@ app.get("/wishlist", async (req, res) => {
         name: item.name,
         price: item.price,
         image: images.length > 0 ? images[0] : null,
+        stock_quantity: item.stock_quantity || 1, // ✅ Include stock_quantity
       };
     });
 
