@@ -7276,6 +7276,106 @@ app.get("/cart", async (req, res) => {
   }
 });
 
+app.post("/cart/add", async (req, res) => {
+  try {
+    const { items } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "No items provided." });
+    }
+
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized access." });
+    }
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const userId = decoded.id;
+
+    for (const item of items) {
+      // ✅ Fetch product stock_quantity from products table
+      const [productRows] = await userDBPool.query(
+        "SELECT stock_quantity FROM products WHERE item_id = ?",
+        [item.id]
+      );
+
+      if (productRows.length === 0) {
+        return res.status(404).json({ error: `Product ${item.id} not found` });
+      }
+
+      const stockQuantity = productRows[0].stock_quantity || 1; // Default to 1 if null
+      const requestedQty = Number(item.quantity || item.qty || 1);
+
+      // ✅ Check current cart quantity
+      const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
+      const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
+
+      const currentCartQty = existingItem.length > 0 ? (existingItem[0].quantity || 0) : 0;
+      const newTotalQty = currentCartQty + requestedQty;
+
+      // ✅ If adding would exceed stock, limit to available stock
+      if (newTotalQty > stockQuantity) {
+        const finalQty = stockQuantity;
+        
+        if (existingItem.length < 1) {
+          const insertQuery = `
+            INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'active')
+          `;
+          await userDBPool.query(insertQuery, [
+            userId,
+            item.id,
+            finalQty,
+            item.name,
+            item.price,
+            item.image,
+          ]);
+        } else {
+          const updateQuery = `
+            UPDATE Cart SET quantity = ?, status = 'active'
+            WHERE id = ? AND user_id = ?
+          `;
+          await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
+        }
+
+        return res.status(200).json({
+          message: "OUT OF STOCK - Maximum available quantity added",
+          limited: true,
+        });
+      }
+
+      // ✅ Normal add/update
+      if (existingItem.length < 1) {
+        const insertQuery = `
+          INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
+          VALUES (?, ?, ?, ?, ?, ?, 'active')
+        `;
+        await userDBPool.query(insertQuery, [
+          userId,
+          item.id,
+          requestedQty,
+          item.name,
+          item.price,
+          item.image,
+        ]);
+      } else {
+        const updateQuery = `
+          UPDATE Cart SET quantity = ?, status = 'active'
+          WHERE id = ? AND user_id = ?
+        `;
+        await userDBPool.query(updateQuery, [newTotalQty, item.id, userId]);
+      }
+    }
+
+    return res.status(200).json({
+      message: "Cart updated successfully",
+    });
+  } catch (error) {
+    console.error("Error adding items to cart:", error);
+    res.status(500).json({ error: "Failed to add items to cart" });
+  }
+});
+
 // app.post("/cart/add", async (req, res) => {
 //   try {
 //     const { items } = req.body;
@@ -7323,65 +7423,65 @@ app.get("/cart", async (req, res) => {
 //   }
 // });
 
-app.post("/cart/add", async (req, res) => {
-  try {
-    const { items } = req.body;
+// app.post("/cart/add", async (req, res) => {
+//   try {
+//     const { items } = req.body;
 
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: "No items provided." });
-    }
+//     if (!items || items.length === 0) {
+//       return res.status(400).json({ error: "No items provided." });
+//     }
 
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized access." });
-    }
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) {
+//       return res.status(401).json({ error: "Unauthorized access." });
+//     }
 
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    const userId = decoded.id;
+//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+//     const userId = decoded.id;
 
-    const MAX_PER_PRODUCT = 1; // 🔒 hard cap: one piece per product
-    let limited = false;
+//     const MAX_PER_PRODUCT = 1; // 🔒 hard cap: one piece per product
+//     let limited = false;
 
-    for (const item of items) {
-      const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
-      const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
+//     for (const item of items) {
+//       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
+//       const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
 
-      const requestedQty = Number(item.quantity || item.qty || 1);
-      const finalQty = Math.min(requestedQty, MAX_PER_PRODUCT);
-      if (requestedQty > MAX_PER_PRODUCT) limited = true;
+//       const requestedQty = Number(item.quantity || item.qty || 1);
+//       const finalQty = Math.min(requestedQty, MAX_PER_PRODUCT);
+//       if (requestedQty > MAX_PER_PRODUCT) limited = true;
 
-      if (existingItem.length < 1) {
-        const insertQuery = `
-          INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
-          VALUES (?, ?, ?, ?, ?, ?, 'active')
-        `;
-        await userDBPool.query(insertQuery, [
-          userId,
-          item.id,
-          finalQty,
-          item.name,
-          item.price,
-          item.image,
-        ]);
-      } else {
-        const updateQuery = `
-          UPDATE Cart SET quantity = ?, status = 'active'
-          WHERE id = ? AND user_id = ?
-        `;
-        await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
-      }
-    }
+//       if (existingItem.length < 1) {
+//         const insertQuery = `
+//           INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
+//           VALUES (?, ?, ?, ?, ?, ?, 'active')
+//         `;
+//         await userDBPool.query(insertQuery, [
+//           userId,
+//           item.id,
+//           finalQty,
+//           item.name,
+//           item.price,
+//           item.image,
+//         ]);
+//       } else {
+//         const updateQuery = `
+//           UPDATE Cart SET quantity = ?, status = 'active'
+//           WHERE id = ? AND user_id = ?
+//         `;
+//         await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
+//       }
+//     }
 
-    return res.status(200).json({
-      message: limited
-        ? "Cart updated. Each piece is limited to 1 per customer. For more, please contact us on Instagram or WhatsApp."
-        : "Cart updated successfully",
-    });
-  } catch (error) {
-    console.error("Error adding items to cart:", error);
-    res.status(500).json({ error: "Failed to add items to cart" });
-  }
-});
+//     return res.status(200).json({
+//       message: limited
+//         ? "Cart updated. Each piece is limited to 1 per customer. For more, please contact us on Instagram or WhatsApp."
+//         : "Cart updated successfully",
+//     });
+//   } catch (error) {
+//     console.error("Error adding items to cart:", error);
+//     res.status(500).json({ error: "Failed to add items to cart" });
+//   }
+// });
 
 app.delete("/cart/remove/:product_id", async (req, res) => {
   try {
