@@ -5115,6 +5115,44 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   }
 });
 
+// Get service account email for GSC access
+app.get("/api/gsc/service-account-email", async (req, res) => {
+  try {
+    const envCredentials = process.env.GSC_CREDENTIALS_BASE64;
+    if (!envCredentials) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "GSC_CREDENTIALS_BASE64 not found in environment" 
+      });
+    }
+
+    const decoded = Buffer.from(envCredentials, 'base64').toString('utf-8');
+    const credentials = JSON.parse(decoded);
+    const serviceAccountEmail = credentials.client_email;
+
+    res.json({
+      success: true,
+      serviceAccountEmail,
+      instructions: [
+        "1. Copy the service account email above",
+        "2. Go to Google Search Console: https://search.google.com/search-console",
+        "3. Select property: https://cricketaddictor.com",
+        "4. Click 'Settings' (gear icon) in left sidebar",
+        "5. Click 'Users and permissions'",
+        "6. Click 'Add user' button",
+        "7. Paste the service account email",
+        "8. Select permission: 'Full' or 'Restricted' (Full recommended)",
+        "9. Click 'Add'",
+        "10. Wait 5-10 minutes for permissions to propagate",
+        "11. Then try running the automation again"
+      ]
+    });
+  } catch (err) {
+    console.error("❌ Error getting service account email:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Manual trigger endpoint to update GSC AI reports
 app.post("/api/gsc-ai-reports/update", async (req, res) => {
   try {
