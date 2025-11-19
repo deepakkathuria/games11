@@ -264,6 +264,26 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   }
 });
 
+// Manual trigger endpoint to update GSC AI reports
+app.post("/api/gsc-ai-reports/update", async (req, res) => {
+  try {
+    console.log("🚀 Manual GSC AI update triggered...");
+    res.json({ 
+      success: true, 
+      message: "GSC AI update started. Check server logs for progress.",
+      note: "This may take several minutes. Data will be updated automatically."
+    });
+    
+    // Run in background (don't wait for it)
+    runGscDeepSeekAutomation().catch(err => {
+      console.error("❌ Manual GSC AI update failed:", err);
+    });
+  } catch (err) {
+    console.error("❌ Manual trigger error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to trigger update" });
+  }
+});
+
 
 
 
