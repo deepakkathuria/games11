@@ -5077,6 +5077,15 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = 80;
   const offset = (page - 1) * limit;
+  
+  // Sorting parameters
+  const sortBy = req.query.sortBy || 'created_at';
+  const sortOrder = req.query.sortOrder || 'desc';
+  
+  // Validate sortBy field
+  const allowedSortFields = ['impressions', 'clicks', 'ctr', 'position', 'created_at'];
+  const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+  const validSortOrder = sortOrder.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   try {
     const [rows] = await pollDBPool.query(
@@ -5092,10 +5101,7 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
         created_at, 
         article_published_at
       FROM gsc_ai_recommendations 
-      ORDER BY 
-        article_published_at IS NULL,  -- ✅ Puts published articles first
-        article_published_at DESC,     -- ✅ Sorts them by most recent publish date
-        created_at DESC                -- ✅ Tie-breaker for older entries
+      ORDER BY ${validSortBy} ${validSortOrder}
       LIMIT ? OFFSET ?
     `,
       [limit, offset]
@@ -5108,7 +5114,14 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limit);
 
-    res.json({ success: true, data: rows, page, totalPages });
+    res.json({ 
+      success: true, 
+      data: rows, 
+      page, 
+      totalPages,
+      sortBy: validSortBy,
+      sortOrder: validSortOrder.toLowerCase()
+    });
   } catch (err) {
     console.error("❌ GSC AI Report Fetch Error:", err.message);
     res.status(500).json({ success: false, error: "Failed to load reports" });
