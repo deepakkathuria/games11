@@ -453,14 +453,9 @@ async function runGscDeepSeekAutomation() {
 
     try {
       const [existing] = await pollDBPool.query(
-        `SELECT id FROM gsc_ai_recommendations WHERE url = ? LIMIT 1`,
+        `SELECT id, created_at FROM gsc_ai_recommendations WHERE url = ? LIMIT 1`,
         [url]
       );
-
-      if (existing.length > 0) {
-        console.log(`⏩ (${index}/${candidates.length}) Skipped (already processed): ${url}`);
-        continue;
-      }
 
       const queries = await getSearchConsoleQueries(startDate, endDate, url);
       if (!queries.length) {
@@ -477,21 +472,52 @@ async function runGscDeepSeekAutomation() {
         page.position
       );
 
-      await pollDBPool.query(
-        `INSERT INTO gsc_ai_recommendations 
-        (url, impressions, clicks, ctr, position, gsc_queries, deepseek_output, article_published_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          url,
-          page.impressions,
-          page.clicks,
-          page.ctr,
-          page.position,
-          JSON.stringify(queries),
-          deepseekOutput,
-          publishedDate ? new Date(publishedDate) : null
-        ]
-      );
+      if (existing.length > 0) {
+        // Check if data is older than 7 days, then update
+        const existingDate = new Date(existing[0].created_at);
+        const daysSinceUpdate = (Date.now() - existingDate.getTime()) / (1000 * 60 * 60 * 24);
+        
+        if (daysSinceUpdate < 7) {
+          console.log(`⏩ (${index}/${candidates.length}) Skipped (recently updated ${daysSinceUpdate.toFixed(1)} days ago): ${url}`);
+          continue;
+        }
+
+        // Update existing record
+        await pollDBPool.query(
+          `UPDATE gsc_ai_recommendations 
+          SET impressions = ?, clicks = ?, ctr = ?, position = ?, gsc_queries = ?, deepseek_output = ?, article_published_at = ?, created_at = NOW()
+          WHERE url = ?`,
+          [
+            page.impressions,
+            page.clicks,
+            page.ctr,
+            page.position,
+            JSON.stringify(queries),
+            deepseekOutput,
+            publishedDate ? new Date(publishedDate) : null,
+            url
+          ]
+        );
+        console.log(`🔄 (${index}/${candidates.length}) Updated (was ${daysSinceUpdate.toFixed(1)} days old): ${url}`);
+      } else {
+        // Insert new record
+        await pollDBPool.query(
+          `INSERT INTO gsc_ai_recommendations 
+          (url, impressions, clicks, ctr, position, gsc_queries, deepseek_output, article_published_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            url,
+            page.impressions,
+            page.clicks,
+            page.ctr,
+            page.position,
+            JSON.stringify(queries),
+            deepseekOutput,
+            publishedDate ? new Date(publishedDate) : null
+          ]
+        );
+        console.log(`✅ (${index}/${candidates.length}) New record added: ${url}`);
+      }
 
       processedCount++;
       const elapsed = (Date.now() - startTime) / 1000;
@@ -499,7 +525,6 @@ async function runGscDeepSeekAutomation() {
       const remainingTime = ((candidates.length - index) * avgTime).toFixed(0);
       const progress = ((index / candidates.length) * 100).toFixed(1);
 
-      console.log(`✅ (${index}/${candidates.length}) [${progress}%] Done: ${url}`);
       console.log(`   ⏱️ Estimated time left: ${remainingTime}s\n`);
     } catch (err) {
       console.error(`❌ (${index}/${candidates.length}) Failed for ${url}:`, err.message);
