@@ -344,6 +344,15 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = 80;
   const offset = (page - 1) * limit;
+  
+  // Sorting parameters
+  const sortBy = req.query.sortBy || 'created_at';
+  const sortOrder = req.query.sortOrder || 'desc';
+  
+  // Validate sortBy field
+  const allowedSortFields = ['old_position', 'new_position', 'old_clicks', 'new_clicks', 'old_impressions', 'new_impressions', 'created_at'];
+  const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+  const validSortOrder = sortOrder.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   try {
     const [rows] = await pollDBPool.query(`
@@ -351,10 +360,7 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
              old_impressions, new_impressions, deepseek_output,
              article_published_at, created_at
       FROM gsc_content_refresh_recommendations
-      ORDER BY 
-        article_published_at IS NULL,
-        article_published_at DESC,
-        created_at DESC
+      ORDER BY ${validSortBy} ${validSortOrder}
       LIMIT ? OFFSET ?
     `, [limit, offset]);
 
@@ -365,7 +371,14 @@ app.get("/api/gsc-content-refresh", async (req, res) => {
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limit);
 
-    res.json({ success: true, data: rows, page, totalPages });
+    res.json({ 
+      success: true, 
+      data: rows, 
+      page, 
+      totalPages,
+      sortBy: validSortBy,
+      sortOrder: validSortOrder.toLowerCase()
+    });
   } catch (err) {
     console.error("❌ Content Refresh Fetch Error:", err.message);
     res.status(500).json({ success: false, error: "Failed to load data" });
