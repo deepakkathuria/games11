@@ -341,29 +341,69 @@ async function runGscContentRefreshAutomation() {
     const item = drops[i];
 
     try {
+      // Check if URL already exists
+      const [existing] = await pollDBPool.query(
+        `SELECT id, created_at, new_position FROM gsc_content_refresh_recommendations WHERE url = ? LIMIT 1`,
+        [item.url]
+      );
+
       const keyword = await getSearchConsoleQueries(currentStart, currentEnd, item.url);
       const publishedDate = await getPublishedDate(item.url);
       const ai_output = await runContentRefreshPrompt({ ...item, keyword });
 
-      await pollDBPool.query(
-        `INSERT INTO gsc_content_refresh_recommendations 
-        (url, keyword, old_position, new_position, old_clicks, new_clicks, old_impressions, new_impressions, deepseek_output, article_published_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          item.url,
-          keyword,
-          item.old_position,
-          item.new_position,
-          item.old_clicks,
-          item.new_clicks,
-          item.old_impressions,
-          item.new_impressions,
-          ai_output,
-          publishedDate,
-        ]
-      );
+      if (existing.length > 0) {
+        // Check if data is older than 7 days or if position drop is worse
+        const existingDate = new Date(existing[0].created_at);
+        const daysSinceUpdate = (Date.now() - existingDate.getTime()) / (1000 * 60 * 60 * 24);
+        const existingNewPos = existing[0].new_position;
+        const isWorseDrop = item.new_position > existingNewPos; // Higher position = worse
+        
+        if (daysSinceUpdate < 7 && !isWorseDrop) {
+          console.log(`⏩ ${i + 1}/${drops.length} Skipped (recently updated ${daysSinceUpdate.toFixed(1)} days ago): ${item.url}`);
+          continue;
+        }
 
-      console.log(`✅ ${i + 1}/${drops.length} saved → ${item.url}`);
+        // Update existing record
+        await pollDBPool.query(
+          `UPDATE gsc_content_refresh_recommendations 
+          SET keyword = ?, old_position = ?, new_position = ?, old_clicks = ?, new_clicks = ?, 
+              old_impressions = ?, new_impressions = ?, deepseek_output = ?, article_published_at = ?, created_at = NOW()
+          WHERE url = ?`,
+          [
+            keyword,
+            item.old_position,
+            item.new_position,
+            item.old_clicks,
+            item.new_clicks,
+            item.old_impressions,
+            item.new_impressions,
+            ai_output,
+            publishedDate,
+            item.url,
+          ]
+        );
+        console.log(`🔄 ${i + 1}/${drops.length} Updated (was ${daysSinceUpdate.toFixed(1)} days old): ${item.url}`);
+      } else {
+        // Insert new record
+        await pollDBPool.query(
+          `INSERT INTO gsc_content_refresh_recommendations 
+          (url, keyword, old_position, new_position, old_clicks, new_clicks, old_impressions, new_impressions, deepseek_output, article_published_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            item.url,
+            keyword,
+            item.old_position,
+            item.new_position,
+            item.old_clicks,
+            item.new_clicks,
+            item.old_impressions,
+            item.new_impressions,
+            ai_output,
+            publishedDate,
+          ]
+        );
+        console.log(`✅ ${i + 1}/${drops.length} New record added → ${item.url}`);
+      }
     } catch (err) {
       console.error(`❌ Error on ${item.url}:`, err.message);
     }
