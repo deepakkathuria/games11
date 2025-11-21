@@ -112,22 +112,54 @@ async function runGscRankingWatchdog() {
 
     const drop = current.position - prev.position;
     if (drop >= 3) {
-      const keyword = await getTopKeyword(currentStart, currentEnd, url);
-      const ai_output = await runWatchdogPrompt({
-        url,
-        keyword,
-        lastPos: prev.position,
-        currentPos: current.position,
-      });
+      try {
+        // Check if URL already exists
+        const [existing] = await pollDBPool.query(
+          `SELECT id, created_at, current_position FROM gsc_ranking_watchdog_alerts WHERE url = ? LIMIT 1`,
+          [url]
+        );
 
-      await pollDBPool.query(
-        `INSERT INTO gsc_ranking_watchdog_alerts 
-         (url, keyword, last_week_position, current_position, ai_output) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [url, keyword, prev.position, current.position, ai_output]
-      );
+        const keyword = await getTopKeyword(currentStart, currentEnd, url);
+        const ai_output = await runWatchdogPrompt({
+          url,
+          keyword,
+          lastPos: prev.position,
+          currentPos: current.position,
+        });
 
-      console.log(`📉 Watchdog Alert saved for ${url}`);
+        if (existing.length > 0) {
+          // Check if data is older than 7 days or if position drop is worse
+          const existingDate = new Date(existing[0].created_at);
+          const daysSinceUpdate = (Date.now() - existingDate.getTime()) / (1000 * 60 * 60 * 24);
+          const existingCurrentPos = existing[0].current_position;
+          const isWorseDrop = current.position > existingCurrentPos; // Higher position = worse
+          
+          if (daysSinceUpdate < 7 && !isWorseDrop) {
+            console.log(`⏩ Skipped (recently updated ${daysSinceUpdate.toFixed(1)} days ago): ${url}`);
+            continue;
+          }
+
+          // Update existing record
+          await pollDBPool.query(
+            `UPDATE gsc_ranking_watchdog_alerts 
+             SET keyword = ?, last_week_position = ?, current_position = ?, ai_output = ?, created_at = NOW()
+             WHERE url = ?`,
+            [keyword, prev.position, current.position, ai_output, url]
+          );
+          console.log(`🔄 Watchdog Alert updated (was ${daysSinceUpdate.toFixed(1)} days old): ${url}`);
+        } else {
+          // Insert new record
+          await pollDBPool.query(
+            `INSERT INTO gsc_ranking_watchdog_alerts 
+             (url, keyword, last_week_position, current_position, ai_output) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [url, keyword, prev.position, current.position, ai_output]
+          );
+          console.log(`✅ Watchdog Alert saved for ${url}`);
+        }
+      } catch (err) {
+        console.error(`❌ Error on ${url}:`, err.message);
+      }
     }
   }
 

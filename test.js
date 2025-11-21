@@ -456,11 +456,41 @@ app.get("/api/gsc-trending-keywords", async (req, res) => {
 
 
 app.get("/api/gsc-ranking-watchdog", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 80;
+  const offset = (page - 1) * limit;
+  
+  // Sorting parameters
+  const sortBy = req.query.sortBy || 'created_at';
+  const sortOrder = req.query.sortOrder || 'desc';
+  
+  // Validate sortBy field
+  const allowedSortFields = ['last_week_position', 'current_position', 'created_at'];
+  const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+  const validSortOrder = sortOrder.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
   try {
     const [rows] = await pollDBPool.query(`
-      SELECT * FROM gsc_ranking_watchdog_alerts ORDER BY created_at DESC
+      SELECT * FROM gsc_ranking_watchdog_alerts 
+      ORDER BY ${validSortBy} ${validSortOrder}
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const [countResult] = await pollDBPool.query(`
+      SELECT COUNT(*) AS total FROM gsc_ranking_watchdog_alerts
     `);
-    res.json({ success: true, data: rows });
+
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({ 
+      success: true, 
+      data: rows,
+      page,
+      totalPages,
+      sortBy: validSortBy,
+      sortOrder: validSortOrder.toLowerCase()
+    });
   } catch (err) {
     console.error("❌ Failed to fetch watchdog data:", err.message);
     res.status(500).json({ success: false, error: "Failed to load data" });
