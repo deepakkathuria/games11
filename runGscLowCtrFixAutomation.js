@@ -121,18 +121,44 @@ async function runGscLowCtrFixAutomation() {
     const url = page.keys[0];
 
     try {
+      // Check if URL already exists
+      const [existing] = await pollDBPool.query(
+        `SELECT id, created_at FROM gsc_low_ctr_fixes WHERE url = ? LIMIT 1`,
+        [url]
+      );
+
       const keyword = await getTopQuery(startDate, endDate, url);
       const { title, meta } = await getTitleAndMeta(url);
       const output = await runLowCtrPrompt({ keyword, url, title, meta });
 
-      await pollDBPool.query(`
-        INSERT INTO gsc_low_ctr_fixes 
-        (url, keyword, title, meta_description, ctr, position, ai_output) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [url, keyword, title, meta, page.ctr, page.position, output]
-      );
+      if (existing.length > 0) {
+        // Check if data is older than 7 days, then update
+        const existingDate = new Date(existing[0].created_at);
+        const daysSinceUpdate = (Date.now() - existingDate.getTime()) / (1000 * 60 * 60 * 24);
+        
+        if (daysSinceUpdate < 7) {
+          console.log(`⏩ ${i + 1}/${candidates.length} Skipped (recently updated ${daysSinceUpdate.toFixed(1)} days ago): ${url}`);
+          continue;
+        }
 
-      console.log(`✅ ${i + 1}/${candidates.length} saved → ${url}`);
+        // Update existing record
+        await pollDBPool.query(`
+          UPDATE gsc_low_ctr_fixes 
+          SET keyword = ?, title = ?, meta_description = ?, ctr = ?, position = ?, ai_output = ?, created_at = NOW()
+          WHERE url = ?`,
+          [keyword, title, meta, page.ctr, page.position, output, url]
+        );
+        console.log(`🔄 ${i + 1}/${candidates.length} Updated (was ${daysSinceUpdate.toFixed(1)} days old): ${url}`);
+      } else {
+        // Insert new record
+        await pollDBPool.query(`
+          INSERT INTO gsc_low_ctr_fixes 
+          (url, keyword, title, meta_description, ctr, position, ai_output) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [url, keyword, title, meta, page.ctr, page.position, output]
+        );
+        console.log(`✅ ${i + 1}/${candidates.length} New record added → ${url}`);
+      }
     } catch (err) {
       console.error(`❌ Error on ${url}:`, err.message);
     }
