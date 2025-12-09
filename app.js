@@ -7982,12 +7982,92 @@ app.get("/products/trending", async (req, res) => {
   }
 });
 
+// app.get("/products", async (req, res) => {
+//   const page = parseInt(req.query.page) || 1;
+//   const limit = parseInt(req.query.limit) || 16;
+//   const offset = (page - 1) * limit;
+//   const category = req.query.category;
+//   const subcategory = req.query.subcategory;
+
+//   try {
+//     let countQuery = "SELECT COUNT(*) AS count FROM products";
+//     let dataQuery = "SELECT * FROM products";
+//     const queryParams = [];
+//     const conditions = [];
+
+//     if (category) {
+//       conditions.push("category = ?");
+//       queryParams.push(category);
+//     }
+
+//     if (subcategory) {
+//       conditions.push("subcategory = ?");
+//       queryParams.push(subcategory);
+//     }
+
+//     if (conditions.length > 0) {
+//       const whereClause = " WHERE " + conditions.join(" AND ");
+//       countQuery += whereClause;
+//       dataQuery += whereClause;
+//     }
+
+//     dataQuery += " ORDER BY item_id DESC LIMIT ? OFFSET ?";
+//     queryParams.push(limit, offset);
+
+//     const [countResult] = await userDBPool.query(
+//       countQuery,
+//       queryParams.slice(0, -2)
+//     );
+//     const totalCount = countResult[0].count;
+//     const totalPages = Math.ceil(totalCount / limit);
+
+//     const [rows] = await userDBPool.query(dataQuery, queryParams);
+
+//     const formattedRows = rows.map((product) => {
+//       let parsedImages = [];
+
+//       try {
+//         parsedImages =
+//           typeof product.images === "string"
+//             ? JSON.parse(product.images)
+//             : product.images;
+//       } catch (e) {
+//         parsedImages = [];
+//       }
+
+//       return {
+//         ...product,
+//         images: parsedImages,
+//         avg_rating: null,
+//       };
+//     });
+
+//     res.status(200).json({
+//       status: 200,
+//       currentPage: page,
+//       totalPages,
+//       rows: formattedRows,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error fetching filtered products:", error);
+//     res.status(500).json({ status: 500, error: "Database error" });
+//   }
+// });
+
+
+
+
+
+
+
+
 app.get("/products", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 16;
   const offset = (page - 1) * limit;
   const category = req.query.category;
   const subcategory = req.query.subcategory;
+  const material = req.query.material; // ✅ NEW: Material filter
 
   try {
     let countQuery = "SELECT COUNT(*) AS count FROM products";
@@ -8005,6 +8085,12 @@ app.get("/products", async (req, res) => {
       queryParams.push(subcategory);
     }
 
+    // ✅ NEW: Add material filter
+    if (material) {
+      conditions.push("LOWER(TRIM(material)) = ?");
+      queryParams.push(material.trim().toLowerCase());
+    }
+
     if (conditions.length > 0) {
       const whereClause = " WHERE " + conditions.join(" AND ");
       countQuery += whereClause;
@@ -8018,6 +8104,7 @@ app.get("/products", async (req, res) => {
       countQuery,
       queryParams.slice(0, -2)
     );
+
     const totalCount = countResult[0].count;
     const totalPages = Math.ceil(totalCount / limit);
 
@@ -8025,7 +8112,6 @@ app.get("/products", async (req, res) => {
 
     const formattedRows = rows.map((product) => {
       let parsedImages = [];
-
       try {
         parsedImages =
           typeof product.images === "string"
@@ -8053,6 +8139,18 @@ app.get("/products", async (req, res) => {
     res.status(500).json({ status: 500, error: "Database error" });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 app.get("/product/:id", async (req, res) => {
   try {
@@ -8111,30 +8209,104 @@ app.get("/category/:category", async (req, res) => {
 
 // ------------------------------------admin-----------------------------------------------
 
+// app.get("/admin/products", async (req, res) => {
+//   try {
+//     let { page, limit, category, subcategory, is_trendy, is_unique } =
+//       req.query;
+
+//     page = parseInt(page) || 1;
+//     limit = parseInt(limit) || 15;
+//     const offset = (page - 1) * limit;
+
+//     // ✅ Dynamic filters
+//     const filters = [];
+//     const values = [];
+
+//  if (category) {
+//   category = category.trim().toLowerCase();
+//   filters.push("LOWER(TRIM(category)) = ?");
+//   values.push(category);
+// }
+
+// if (subcategory) {
+//   subcategory = subcategory.trim().toLowerCase();
+//   filters.push("LOWER(TRIM(subcategory)) = ?");
+//   values.push(subcategory);
+// }
+
+//     if (is_trendy !== undefined) {
+//       filters.push("is_trendy = ?");
+//       values.push(is_trendy === "true" ? 1 : 0);
+//     }
+
+//     if (is_unique !== undefined) {
+//       filters.push("is_unique = ?");
+//       values.push(is_unique === "true" ? 1 : 0);
+//     }
+
+//     const whereClause =
+//       filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+
+//     const query = `SELECT * FROM products ${whereClause} LIMIT ? OFFSET ?`;
+//     const countQuery = `SELECT COUNT(*) AS total FROM products ${whereClause}`;
+
+//     // Add pagination values
+//     const paginatedValues = [...values, limit, offset];
+
+//     // Run queries
+//     const [rows] = await userDBPool.query(query, paginatedValues);
+//     const [[totalCount]] = await userDBPool.query(countQuery, values);
+
+//     if (rows.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ message: "No products found", total: 0, products: [] });
+//     }
+
+//     res.status(200).json({
+//       total: totalCount.total,
+//       page,
+//       limit,
+//       totalPages: Math.ceil(totalCount.total / limit),
+//       products: rows,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error fetching products:", error);
+//     res.status(500).json({ error: "Database error" });
+//   }
+// });
+
+
+
 app.get("/admin/products", async (req, res) => {
   try {
-    let { page, limit, category, subcategory, is_trendy, is_unique } =
-      req.query;
+    let { page, limit, category, subcategory, is_trendy, is_unique, material } = req.query; // ✅ NEW: Add material
 
     page = parseInt(page) || 1;
     limit = parseInt(limit) || 15;
     const offset = (page - 1) * limit;
 
-    // ✅ Dynamic filters
     const filters = [];
     const values = [];
 
- if (category) {
-  category = category.trim().toLowerCase();
-  filters.push("LOWER(TRIM(category)) = ?");
-  values.push(category);
-}
+    if (category) {
+      category = category.trim().toLowerCase();
+      filters.push("LOWER(TRIM(category)) = ?");
+      values.push(category);
+    }
 
-if (subcategory) {
-  subcategory = subcategory.trim().toLowerCase();
-  filters.push("LOWER(TRIM(subcategory)) = ?");
-  values.push(subcategory);
-}
+    if (subcategory) {
+      subcategory = subcategory.trim().toLowerCase();
+      filters.push("LOWER(TRIM(subcategory)) = ?");
+      values.push(subcategory);
+    }
+
+    // ✅ NEW: Add material filter
+    if (material) {
+      material = material.trim().toLowerCase();
+      filters.push("LOWER(TRIM(material)) = ?");
+      values.push(material);
+    }
 
     if (is_trendy !== undefined) {
       filters.push("is_trendy = ?");
@@ -8146,23 +8318,17 @@ if (subcategory) {
       values.push(is_unique === "true" ? 1 : 0);
     }
 
-    const whereClause =
-      filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
-
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
     const query = `SELECT * FROM products ${whereClause} LIMIT ? OFFSET ?`;
     const countQuery = `SELECT COUNT(*) AS total FROM products ${whereClause}`;
 
-    // Add pagination values
     const paginatedValues = [...values, limit, offset];
 
-    // Run queries
     const [rows] = await userDBPool.query(query, paginatedValues);
     const [[totalCount]] = await userDBPool.query(countQuery, values);
 
     if (rows.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No products found", total: 0, products: [] });
+      return res.status(404).json({ message: "No products found", total: 0, products: [] });
     }
 
     res.status(200).json({
@@ -8177,6 +8343,16 @@ if (subcategory) {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
+
+
+
+
+
+
+
+
 
 /**
  * ✅ Get Product by ID
@@ -8286,6 +8462,7 @@ app.post("/admin/products", async (req, res) => {
       slug,
       category,
       subcategory,
+      material, // ✅ NEW: Add material
       is_trendy = false,
       is_unique = false,
       new: isNew,
@@ -8302,24 +8479,20 @@ app.post("/admin/products", async (req, res) => {
     } = req.body;
 
     if (!name || !price || !category) {
-      return res
-        .status(400)
-        .json({ error: "Name, Price, and Category are required" });
+      return res.status(400).json({ error: "Name, Price, and Category are required" });
     }
 
-    const uploadedImages = Array.isArray(images)
-      ? images
-      : JSON.parse(images || "[]");
+    const uploadedImages = Array.isArray(images) ? images : JSON.parse(images || "[]");
 
     await userDBPool.query(
       `
         INSERT INTO products (
-          name, price, stock_quantity, slug, category, subcategory,
+          name, price, stock_quantity, slug, category, subcategory, material,
           is_trendy, is_unique, new, features, description,
           images, includes, gallery, category_image,
           cart_image, short_name, first_image, sold_out
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         name,
@@ -8328,6 +8501,7 @@ app.post("/admin/products", async (req, res) => {
         slug || null,
         category?.trim().toLowerCase(),
         subcategory?.trim().toLowerCase() || null,
+        material?.trim().toLowerCase() || null, // ✅ NEW: Add material
         is_trendy ? 1 : 0,
         is_unique ? 1 : 0,
         isNew ? 1 : 0,
@@ -8467,6 +8641,7 @@ app.put("/admin/product/:productId", async (req, res) => {
       slug,
       category,
       subcategory,
+      material, // ✅ NEW: Add material
       is_trendy = false,
       is_unique = false,
       new: isNew,
@@ -8483,30 +8658,28 @@ app.put("/admin/product/:productId", async (req, res) => {
     } = req.body;
 
     if (!name || !price || !category) {
-      return res
-        .status(400)
-        .json({ error: "❌ Name, Price, and Category are required" });
+      return res.status(400).json({ error: "❌ Name, Price, and Category are required" });
     }
 
     const [existing] = await userDBPool.query(
       "SELECT images FROM products WHERE item_id = ?",
       [productId]
     );
+
     if (existing.length === 0) {
       return res.status(404).json({ error: "❌ Product not found" });
     }
 
     let updatedImages;
     if (Array.isArray(images)) updatedImages = images;
-    else if (typeof images === "string" && images.trim())
-      updatedImages = JSON.parse(images);
+    else if (typeof images === "string" && images.trim()) updatedImages = JSON.parse(images);
     else updatedImages = JSON.parse(existing[0].images || "[]");
 
     await userDBPool.query(
       `
         UPDATE products SET
           name = ?, price = ?, stock_quantity = ?, slug = ?,
-          category = ?, subcategory = ?, is_trendy = ?, is_unique = ?,
+          category = ?, subcategory = ?, material = ?, is_trendy = ?, is_unique = ?,
           new = ?, features = ?, description = ?,
           images = ?, includes = ?, gallery = ?,
           category_image = ?, cart_image = ?, short_name = ?, first_image = ?, sold_out = ?
@@ -8519,6 +8692,7 @@ app.put("/admin/product/:productId", async (req, res) => {
         slug || null,
         category?.trim().toLowerCase(),
         subcategory?.trim().toLowerCase() || null,
+        material?.trim().toLowerCase() || null, // ✅ NEW: Add material
         is_trendy ? 1 : 0,
         is_unique ? 1 : 0,
         isNew ? 1 : 0,
@@ -8542,7 +8716,6 @@ app.put("/admin/product/:productId", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
-
 
 
 
