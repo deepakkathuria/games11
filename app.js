@@ -193,6 +193,11 @@ const AutomobileNewsScheduler = require('./automobileNewsScheduler');
 const { processAutomobileNewsOpenAI } = require('./automobileOpenAIProcessor');
 const automobileScheduler = new AutomobileNewsScheduler();
 
+// Car News Scheduler
+const CarNewsScheduler = require('./carNewsScheduler');
+const { processCarNewsOpenAI } = require('./carOpenAIProcessor');
+const carScheduler = new CarNewsScheduler();
+
 
 
 
@@ -200,6 +205,9 @@ pakistanNewsScheduler.startScheduler(30); // Every 10 minutes
 
 // Start Automobile News Scheduler
 automobileScheduler.startScheduler(10); // Every 30 minutes
+
+// Start Car News Scheduler
+carScheduler.startScheduler(10); // Every 10 minutes
 
 
 
@@ -361,6 +369,169 @@ app.post('/api/automobile-openai/stop-scheduler', async (req, res) => {
     res.json({ success: true, message: 'Automobile scheduler stopped successfully!' });
   } catch (error) {
     console.error('Error stopping automobile scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========== CAR NEWS APIs ==========
+
+// Manual fetch car news
+app.post('/api/car-openai/manual-fetch-news', async (req, res) => {
+  try {
+    console.log('🚗 Fetching car news...');
+    await carScheduler.fetchAndStoreNews();
+    res.json({ 
+      success: true, 
+      message: 'Car news fetched successfully!'
+    });
+  } catch (error) {
+    console.error('Car manual fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get stored car news
+app.get('/api/car-openai/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM car_news_openai 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const [countRows] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM car_news_openai WHERE is_valid = true'
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching stored car news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed car news
+app.get('/api/car-openai/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM car_news_openai 
+       WHERE is_valid = true AND openai_processed = true 
+       ORDER BY processed_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const [countRows] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM car_news_openai WHERE is_valid = true AND openai_processed = true'
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching processed car news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate car article
+app.post('/api/car-openai/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM car_news_openai WHERE id = ? AND is_valid = true',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Article not found' });
+    }
+
+    const article = rows[0];
+
+    // Process with OpenAI
+    const result = await processCarNewsOpenAI(
+      {
+        title: article.title,
+        description: article.description,
+        content: article.content
+      },
+      {
+        language: "en",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      await pollDBPool.query(
+        `UPDATE car_news_openai 
+         SET openai_processed = true, 
+             processed_at = NOW(), 
+             processed_at_iso = ?,
+             openai_ready_article = ?, 
+             openai_final_title = ?, 
+             openai_final_meta = ?, 
+             openai_final_slug = ?,
+             openai_recommendations = ?
+         WHERE id = ?`,
+        [
+          new Date().toISOString(),
+          result.readyToPublishArticle,
+          result.recommendations.recommendedTitle,
+          result.recommendations.recommendedMeta,
+          result.recommendations.recommendedSlug,
+          JSON.stringify(result.recommendations),
+          id
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Car article generated successfully!'
+      });
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('Car article generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Start car scheduler
+app.post('/api/car-openai/start-scheduler', async (req, res) => {
+  try {
+    await carScheduler.startScheduler(30); // 30 minutes interval
+    res.json({ success: true, message: 'Car scheduler started successfully!' });
+  } catch (error) {
+    console.error('Error starting car scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Stop car scheduler
+app.post('/api/car-openai/stop-scheduler', async (req, res) => {
+  try {
+    carScheduler.stopScheduler();
+    res.json({ success: true, message: 'Car scheduler stopped successfully!' });
+  } catch (error) {
+    console.error('Error stopping car scheduler:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -5326,8 +5497,25 @@ app.get("/api/gsc-ranking-watchdog", async (req, res) => {
       SELECT COUNT(*) AS total FROM gsc_ranking_watchdog_alerts
     `);
 
+    // Get data age info
+    const [ageResult] = await pollDBPool.query(`
+      SELECT 
+        MIN(created_at) AS oldest_date,
+        MAX(created_at) AS newest_date,
+        COUNT(*) AS total_records
+      FROM gsc_ranking_watchdog_alerts
+    `);
+
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limit);
+
+    // Calculate days since oldest and newest
+    const now = new Date();
+    const oldestDate = ageResult[0].oldest_date ? new Date(ageResult[0].oldest_date) : null;
+    const newestDate = ageResult[0].newest_date ? new Date(ageResult[0].newest_date) : null;
+    
+    const daysSinceOldest = oldestDate ? Math.floor((now - oldestDate) / (1000 * 60 * 60 * 24)) : null;
+    const daysSinceNewest = newestDate ? Math.floor((now - newestDate) / (1000 * 60 * 60 * 24)) : null;
 
     res.json({ 
       success: true, 
@@ -5335,11 +5523,37 @@ app.get("/api/gsc-ranking-watchdog", async (req, res) => {
       page,
       totalPages,
       sortBy: validSortBy,
-      sortOrder: validSortOrder.toLowerCase()
+      sortOrder: validSortOrder.toLowerCase(),
+      dataAge: {
+        oldestDate: oldestDate ? oldestDate.toISOString() : null,
+        newestDate: newestDate ? newestDate.toISOString() : null,
+        daysSinceOldest,
+        daysSinceNewest,
+        totalRecords: ageResult[0].total_records || 0
+      }
     });
   } catch (err) {
     console.error("❌ Failed to fetch watchdog data:", err.message);
     res.status(500).json({ success: false, error: "Failed to load data" });
+  }
+});
+
+// Manual trigger for Ranking Watchdog
+app.post("/api/gsc-ranking-watchdog/update", async (req, res) => {
+  try {
+    console.log("🚀 Manual Ranking Watchdog update triggered...");
+    res.json({ 
+      success: true, 
+      message: "Ranking Watchdog update started. Check server logs for progress.",
+      note: "This may take several minutes. Data will be updated automatically."
+    });
+    
+    runGscRankingWatchdog().catch(err => {
+      console.error("❌ Manual Ranking Watchdog update failed:", err);
+    });
+  } catch (err) {
+    console.error("❌ Manual trigger error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to trigger update" });
   }
 });
 

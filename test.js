@@ -480,8 +480,25 @@ app.get("/api/gsc-ranking-watchdog", async (req, res) => {
       SELECT COUNT(*) AS total FROM gsc_ranking_watchdog_alerts
     `);
 
+    // Get data age info
+    const [ageResult] = await pollDBPool.query(`
+      SELECT 
+        MIN(created_at) AS oldest_date,
+        MAX(created_at) AS newest_date,
+        COUNT(*) AS total_records
+      FROM gsc_ranking_watchdog_alerts
+    `);
+
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limit);
+
+    // Calculate days since oldest and newest
+    const now = new Date();
+    const oldestDate = ageResult[0].oldest_date ? new Date(ageResult[0].oldest_date) : null;
+    const newestDate = ageResult[0].newest_date ? new Date(ageResult[0].newest_date) : null;
+    
+    const daysSinceOldest = oldestDate ? Math.floor((now - oldestDate) / (1000 * 60 * 60 * 24)) : null;
+    const daysSinceNewest = newestDate ? Math.floor((now - newestDate) / (1000 * 60 * 60 * 24)) : null;
 
     res.json({ 
       success: true, 
@@ -489,11 +506,37 @@ app.get("/api/gsc-ranking-watchdog", async (req, res) => {
       page,
       totalPages,
       sortBy: validSortBy,
-      sortOrder: validSortOrder.toLowerCase()
+      sortOrder: validSortOrder.toLowerCase(),
+      dataAge: {
+        oldestDate: oldestDate ? oldestDate.toISOString() : null,
+        newestDate: newestDate ? newestDate.toISOString() : null,
+        daysSinceOldest,
+        daysSinceNewest,
+        totalRecords: ageResult[0].total_records || 0
+      }
     });
   } catch (err) {
     console.error("❌ Failed to fetch watchdog data:", err.message);
     res.status(500).json({ success: false, error: "Failed to load data" });
+  }
+});
+
+// Manual trigger for Ranking Watchdog
+app.post("/api/gsc-ranking-watchdog/update", async (req, res) => {
+  try {
+    console.log("🚀 Manual Ranking Watchdog update triggered...");
+    res.json({ 
+      success: true, 
+      message: "Ranking Watchdog update started. Check server logs for progress.",
+      note: "This may take several minutes. Data will be updated automatically."
+    });
+    
+    runGscRankingWatchdog().catch(err => {
+      console.error("❌ Manual Ranking Watchdog update failed:", err);
+    });
+  } catch (err) {
+    console.error("❌ Manual trigger error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to trigger update" });
   }
 });
 
