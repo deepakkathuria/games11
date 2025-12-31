@@ -207,7 +207,7 @@ pakistanNewsScheduler.startScheduler(30); // Every 10 minutes
 automobileScheduler.startScheduler(10); // Every 30 minutes
 
 // Start Car News Scheduler
-carScheduler.startScheduler(10); // Every 10 minutes
+// carScheduler.startScheduler(10); // Every 10 minutes
 
 
 
