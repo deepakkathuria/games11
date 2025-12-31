@@ -91,14 +91,20 @@ class CarNewsScheduler {
 
       // GNews: { totalArticles, articles: [...] }
       if (response.data && response.data.articles) {
-        return response.data.articles.filter(article =>
-          article.content &&
-          article.content.length > 300 &&
-          article.title &&
-          article.title.length > 10 &&
-          !article.title.toLowerCase().includes('betting') &&
-          !article.title.toLowerCase().includes('gambling')
-        );
+        return response.data.articles.filter(article => {
+          // Combine description and content for better filtering
+          const fullText = (article.description || '') + ' ' + (article.content || '');
+          const hasEnoughContent = fullText.length > 200; // Reduced from 300 to 200
+          
+          return (
+            (article.content || article.description) &&
+            hasEnoughContent &&
+            article.title &&
+            article.title.length > 10 &&
+            !article.title.toLowerCase().includes('betting') &&
+            !article.title.toLowerCase().includes('gambling')
+          );
+        });
       }
       return [];
     } catch (error) {
@@ -120,6 +126,10 @@ class CarNewsScheduler {
         );
 
         if (existing.length === 0) {
+          // Combine description and content for full text
+          const fullContent = (article.description || '') + '\n\n' + (article.content || '');
+          const wordCount = fullContent.trim() ? fullContent.split(/\s+/).length : 0;
+          
           // Insert new article
           await pollDBPool.query(
             `INSERT INTO car_news_openai 
@@ -127,13 +137,13 @@ class CarNewsScheduler {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               article.title,
-              article.description,
-              article.content,
+              article.description || '',
+              fullContent.trim() || article.content || '',
               article.source?.name || 'Unknown',
               article.url,
               new Date(article.publishedAt),
               article.publishedAt,
-              article.content ? article.content.split(' ').length : 0,
+              wordCount,
               true
             ]
           );
