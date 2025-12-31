@@ -198,6 +198,11 @@ const CarNewsScheduler = require('./carNewsScheduler');
 const { processCarNewsOpenAI } = require('./carOpenAIProcessor');
 const carScheduler = new CarNewsScheduler();
 
+// Brand Car News Scheduler (Hyundai, Tata, Maruti, Mahindra)
+const BrandCarNewsScheduler = require('./brandCarNewsScheduler');
+const { processCarNewsOpenAI: processBrandCarNewsOpenAI } = require('./carOpenAIProcessor');
+const brandCarScheduler = new BrandCarNewsScheduler();
+
 
 
 
@@ -208,6 +213,9 @@ automobileScheduler.startScheduler(10); // Every 30 minutes
 
 // Start Car News Scheduler
 // carScheduler.startScheduler(10); // Every 10 minutes
+
+// Start Brand Car News Scheduler (Hyundai, Tata, Maruti, Mahindra)
+brandCarScheduler.startScheduler(10); // Every 10 minutes
 
 
 
@@ -532,6 +540,179 @@ app.post('/api/car-openai/stop-scheduler', async (req, res) => {
     res.json({ success: true, message: 'Car scheduler stopped successfully!' });
   } catch (error) {
     console.error('Error stopping car scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========== BRAND CAR NEWS APIs (Hyundai, Tata, Maruti, Mahindra) ==========
+
+// Manual fetch brand car news
+app.post('/api/brand-car-news/manual-fetch-news', async (req, res) => {
+  try {
+    console.log('🚗 Fetching brand car news (Hyundai, Tata, Maruti, Mahindra)...');
+    await brandCarScheduler.fetchAndStoreNews();
+    res.json({ 
+      success: true, 
+      message: 'Brand car news fetched successfully!'
+    });
+  } catch (error) {
+    console.error('Brand car manual fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get stored brand car news
+app.get('/api/brand-car-news/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0, brand } = req.query;
+    
+    const brandName = brand || null;
+    const news = await brandCarScheduler.getStoredNews(parseInt(limit), parseInt(offset), brandName);
+    
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) as total FROM brand_car_news WHERE is_valid = true';
+    const countParams = [];
+    if (brandName) {
+      countQuery += ' AND brand_name = ?';
+      countParams.push(brandName);
+    }
+    const [countRows] = await pollDBPool.query(countQuery, countParams);
+
+    res.json({
+      success: true,
+      news: news,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching stored brand car news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed brand car news
+app.get('/api/brand-car-news/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0, brand } = req.query;
+    
+    let query = `SELECT * FROM brand_car_news 
+                 WHERE is_valid = true AND openai_processed = true`;
+    const params = [];
+    
+    if (brand) {
+      query += ' AND brand_name = ?';
+      params.push(brand);
+    }
+    
+    query += ` ORDER BY processed_at DESC 
+               LIMIT ? OFFSET ?`;
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const [rows] = await pollDBPool.query(query, params);
+    
+    const [countRows] = await pollDBPool.query(
+      brand 
+        ? 'SELECT COUNT(*) as total FROM brand_car_news WHERE is_valid = true AND openai_processed = true AND brand_name = ?'
+        : 'SELECT COUNT(*) as total FROM brand_car_news WHERE is_valid = true AND openai_processed = true',
+      brand ? [brand] : []
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching processed brand car news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate brand car article
+app.post('/api/brand-car-news/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM brand_car_news WHERE id = ? AND is_valid = true',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Article not found' });
+    }
+
+    const article = rows[0];
+
+    // Process with OpenAI
+    const result = await processBrandCarNewsOpenAI(
+      {
+        title: article.title,
+        description: article.description,
+        content: article.content
+      },
+      {
+        language: "en",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      await pollDBPool.query(
+        `UPDATE brand_car_news 
+         SET openai_processed = true, 
+             processed_at = NOW(), 
+             processed_at_iso = ?,
+             openai_ready_article = ?, 
+             openai_final_title = ?, 
+             openai_final_meta = ?, 
+             openai_final_slug = ?,
+             openai_recommendations = ?
+         WHERE id = ?`,
+        [
+          new Date().toISOString(),
+          result.readyToPublishArticle,
+          result.recommendations.recommendedTitle,
+          result.recommendations.recommendedMeta,
+          result.recommendations.recommendedSlug,
+          JSON.stringify(result.recommendations),
+          id
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Brand car article generated successfully!'
+      });
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('Brand car article generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Start brand car scheduler
+app.post('/api/brand-car-news/start-scheduler', async (req, res) => {
+  try {
+    await brandCarScheduler.startScheduler(10); // 10 minutes interval
+    res.json({ success: true, message: 'Brand car scheduler started successfully!' });
+  } catch (error) {
+    console.error('Error starting brand car scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Stop brand car scheduler
+app.post('/api/brand-car-news/stop-scheduler', async (req, res) => {
+  try {
+    brandCarScheduler.stopScheduler();
+    res.json({ success: true, message: 'Brand car scheduler stopped successfully!' });
+  } catch (error) {
+    console.error('Error stopping brand car scheduler:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
