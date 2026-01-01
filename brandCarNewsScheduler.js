@@ -37,12 +37,12 @@ async function getWithRetry(url, opts = {}, tries = 3) {
 const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "a8ee6e2ef2fedf06117bae6d6babcff1";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
-// Brand-specific queries
+// Brand-specific queries (Worldwide - no country filter)
 const BRAND_QUERIES = {
-  'Hyundai': 'Hyundai (launch OR unveil OR debut OR "price announced") AND NOT (crash OR accident OR killed)',
-  'Tata Motors': 'Tata Motors (EV OR launch OR facelift)',
-  'Maruti Suzuki': 'Maruti Suzuki (new model OR price OR launch)',
-  'Mahindra': 'Mahindra (SUV OR electric OR launch)'
+  'Hyundai': 'Hyundai (launch OR debut OR price)',
+  'Tata Motors': 'Tata Motors (launch OR debut OR price)',
+  'Maruti Suzuki': 'Maruti Suzuki (launch OR debut OR price)',
+  'Mahindra': 'Mahindra (launch OR debut OR price)'
 };
 
 class BrandCarNewsScheduler {
@@ -80,14 +80,14 @@ class BrandCarNewsScheduler {
     console.log('Brand car news scheduler stopped');
   }
 
-  // Fetch brand car news from GNews API
+  // Fetch brand car news from GNews API (Worldwide - no country filter)
   async fetchBrandNewsFromAPI(brandName, query) {
     try {
       const url = new URL(GNEWS_BASE_URL);
       url.searchParams.append("q", query);
       url.searchParams.append("lang", "en");
-      url.searchParams.append("country", "in");
-      url.searchParams.append("max", brandName === 'Hyundai' ? "20" : "10");
+      // No country filter - worldwide news
+      url.searchParams.append("max", "10");
       url.searchParams.append("expand", "content");
       url.searchParams.append("apikey", GNEWS_API_KEY);
 
