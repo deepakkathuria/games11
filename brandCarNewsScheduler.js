@@ -42,7 +42,13 @@ const BRAND_QUERIES = {
   'Hyundai': 'Hyundai (launch OR debut OR price)',
   'Tata Motors': 'Tata Motors (launch OR debut OR price)',
   'Maruti Suzuki': 'Maruti Suzuki (launch OR debut OR price)',
-  'Mahindra': 'Mahindra (launch OR debut OR price)'
+  'Mahindra': 'Mahindra (launch OR debut OR price)',
+  'BYD': 'BYD (launch OR debut OR price)',
+  'Tesla': 'Tesla (launch OR debut OR price)',
+  'Toyota': 'Toyota (launch OR debut OR price)',
+  'Honda': 'Honda (launch OR debut OR price)',
+  'Ford': 'Ford (launch OR debut OR price)',
+  'Kia': 'Kia (launch OR debut OR price)'
 };
 
 class BrandCarNewsScheduler {

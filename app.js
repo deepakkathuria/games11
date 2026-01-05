@@ -5453,7 +5453,7 @@ app.get("/api/gsc-ai-reports", async (req, res) => {
         created_at, 
         article_published_at
       FROM gsc_ai_recommendations 
-      ORDER BY ${validSortBy} ${validSortOrder}
+      ORDER BY created_at DESC, ${validSortBy} ${validSortOrder}
       LIMIT ? OFFSET ?
     `,
       [limit, offset]

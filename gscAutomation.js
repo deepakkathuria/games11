@@ -316,29 +316,53 @@ const auth = new google.auth.GoogleAuth({
 });
 
 async function getSearchConsolePages(startDate, endDate) {
-  const authClient = await auth.getClient();
-  const webmasters = google.webmasters({ version: 'v3', auth: authClient });
+  try {
+    const authClient = await auth.getClient();
+    const webmasters = google.webmasters({ version: 'v3', auth: authClient });
 
-  const allRows = [];
-  const pageSize = 500;
-  for (let startRow = 0; startRow < 5000; startRow += pageSize) {
-    const res = await webmasters.searchanalytics.query({
-      siteUrl: SITE_URL,
-      requestBody: {
-        startDate,
-        endDate,
-        dimensions: ['page'],
-        rowLimit: pageSize,
-        startRow,
-      },
-    });
+    // Get service account email for better error message
+    let serviceAccountEmail = 'unknown';
+    try {
+      const credentials = JSON.parse(fs.readFileSync(TEMP_KEY_PATH, 'utf-8'));
+      serviceAccountEmail = credentials.client_email;
+    } catch (e) {}
 
-    if (!res.data.rows || res.data.rows.length === 0) break;
-    allRows.push(...res.data.rows);
-    if (res.data.rows.length < pageSize) break;
+    const allRows = [];
+    const pageSize = 500;
+    for (let startRow = 0; startRow < 5000; startRow += pageSize) {
+      const res = await webmasters.searchanalytics.query({
+        siteUrl: SITE_URL,
+        requestBody: {
+          startDate,
+          endDate,
+          dimensions: ['page'],
+          rowLimit: pageSize,
+          startRow,
+        },
+      });
+
+      if (!res.data.rows || res.data.rows.length === 0) break;
+      allRows.push(...res.data.rows);
+      if (res.data.rows.length < pageSize) break;
+    }
+
+    return allRows;
+  } catch (error) {
+    if (error.code === 403 || error.status === 403) {
+      console.error('\n❌ PERMISSION ERROR: Service account does not have access to Google Search Console\n');
+      console.error('📧 Service Account Email:', serviceAccountEmail || 'Check .env file');
+      console.error('\n📋 To Fix This:\n');
+      console.error('1. Run: node getGscServiceAccountEmail.js');
+      console.error('2. Copy the service account email');
+      console.error('3. Go to: https://search.google.com/search-console');
+      console.error('4. Select property: https://cricketaddictor.com');
+      console.error('5. Settings → Users and permissions → Add user');
+      console.error('6. Paste email and give "Full" permission');
+      console.error('7. Wait 5-10 minutes, then try again\n');
+      throw new Error(`GSC Permission Error: Add ${serviceAccountEmail || 'service account'} to Google Search Console`);
+    }
+    throw error;
   }
-
-  return allRows;
 }
 
 async function getSearchConsoleQueries(startDate, endDate, pageUrl) {
@@ -500,11 +524,11 @@ async function runGscDeepSeekAutomation() {
         );
         console.log(`🔄 (${index}/${candidates.length}) Updated (was ${daysSinceUpdate.toFixed(1)} days old): ${url}`);
       } else {
-        // Insert new record
+        // Insert new record with explicit created_at
         await pollDBPool.query(
           `INSERT INTO gsc_ai_recommendations 
-          (url, impressions, clicks, ctr, position, gsc_queries, deepseek_output, article_published_at) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          (url, impressions, clicks, ctr, position, gsc_queries, deepseek_output, article_published_at, created_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             url,
             page.impressions,
