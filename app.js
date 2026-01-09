@@ -203,6 +203,11 @@ const BrandCarNewsScheduler = require('./brandCarNewsScheduler');
 const { processCarNewsOpenAI: processBrandCarNewsOpenAI } = require('./carOpenAIProcessor');
 const brandCarScheduler = new BrandCarNewsScheduler();
 
+// Sports News Scheduler
+const SportsNewsScheduler = require('./sportsNewsScheduler');
+const { processSportsNewsOpenAI } = require('./sportsOpenAIProcessor');
+const sportsScheduler = new SportsNewsScheduler();
+
 
 
 
@@ -216,6 +221,9 @@ automobileScheduler.startScheduler(10); // Every 30 minutes
 
 // Start Brand Car News Scheduler (Hyundai, Tata, Maruti, Mahindra)
 brandCarScheduler.startScheduler(10); // Every 10 minutes
+
+// Start Sports News Scheduler
+sportsScheduler.startScheduler(10); // Every 10 minutes
 
 
 
@@ -713,6 +721,169 @@ app.post('/api/brand-car-news/stop-scheduler', async (req, res) => {
     res.json({ success: true, message: 'Brand car scheduler stopped successfully!' });
   } catch (error) {
     console.error('Error stopping brand car scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========== SPORTS NEWS APIs ==========
+
+// Manual fetch sports news
+app.post('/api/sports-openai/manual-fetch-news', async (req, res) => {
+  try {
+    console.log('⚽ Fetching sports news...');
+    await sportsScheduler.fetchAndStoreNews();
+    res.json({ 
+      success: true, 
+      message: 'Sports news fetched successfully!'
+    });
+  } catch (error) {
+    console.error('Sports manual fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get stored sports news
+app.get('/api/sports-openai/stored-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM sports_news_openai 
+       WHERE is_valid = true 
+       ORDER BY published_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const [countRows] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM sports_news_openai WHERE is_valid = true'
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching stored sports news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get processed sports news
+app.get('/api/sports-openai/processed-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+    
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM sports_news_openai 
+       WHERE is_valid = true AND openai_processed = true 
+       ORDER BY processed_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const [countRows] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM sports_news_openai WHERE is_valid = true AND openai_processed = true'
+    );
+
+    res.json({
+      success: true,
+      news: rows,
+      totalCount: countRows[0].total
+    });
+  } catch (error) {
+    console.error('Error fetching processed sports news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate sports article
+app.post('/api/sports-openai/articles/:id/generate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM sports_news_openai WHERE id = ? AND is_valid = true',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Article not found' });
+    }
+
+    const article = rows[0];
+
+    // Process with OpenAI
+    const result = await processSportsNewsOpenAI(
+      {
+        title: article.title,
+        description: article.description,
+        content: article.content
+      },
+      {
+        language: "en",
+        includePrePublishingChecks: true,
+        includeHumanLikeRewriting: true,
+        includeGoogleOptimization: true,
+        avoidAIDetection: true
+      }
+    );
+
+    if (result.success) {
+      await pollDBPool.query(
+        `UPDATE sports_news_openai 
+         SET openai_processed = true, 
+             processed_at = NOW(), 
+             processed_at_iso = ?,
+             openai_ready_article = ?, 
+             openai_final_title = ?, 
+             openai_final_meta = ?, 
+             openai_final_slug = ?,
+             openai_recommendations = ?
+         WHERE id = ?`,
+        [
+          new Date().toISOString(),
+          result.readyToPublishArticle,
+          result.recommendations.recommendedTitle,
+          result.recommendations.recommendedMeta,
+          result.recommendations.recommendedSlug,
+          JSON.stringify(result.recommendations),
+          id
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Sports article generated successfully!'
+      });
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('Sports article generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Start sports scheduler
+app.post('/api/sports-openai/start-scheduler', async (req, res) => {
+  try {
+    await sportsScheduler.startScheduler(10); // 10 minutes interval
+    res.json({ success: true, message: 'Sports scheduler started successfully!' });
+  } catch (error) {
+    console.error('Error starting sports scheduler:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Stop sports scheduler
+app.post('/api/sports-openai/stop-scheduler', async (req, res) => {
+  try {
+    sportsScheduler.stopScheduler();
+    res.json({ success: true, message: 'Sports scheduler stopped successfully!' });
+  } catch (error) {
+    console.error('Error stopping sports scheduler:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
