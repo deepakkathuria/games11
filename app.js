@@ -8912,7 +8912,6 @@ app.post("/verify-payment", async (req, res) => {
 
     // const { products, address, total_amount } = orderData;
     const { products, address, total_amount, free_ring_id } = orderData;
-
     // ✅ Insert order
     const [orderRes] = await userDBPool.query(
       `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
@@ -8981,7 +8980,7 @@ app.post("/verify-payment", async (req, res) => {
         orderId,
         free_ring_id,
         1,
-        0 // Free item - price is 0
+        0 // Free item
       ]);
     }
     
@@ -9296,7 +9295,6 @@ app.delete("/wishlist/clear", async (req, res) => {
 
 
 
-
 app.get("/promotion/free-ring/status", async (req, res) => {
   try {
     const currentDate = new Date();
@@ -9311,10 +9309,11 @@ app.get("/promotion/free-ring/status", async (req, res) => {
       });
     }
     
+    // ✅ FIXED: सिर्फ rings - subcategory = 'rings' (earrings और sets नहीं)
     const query = `
       SELECT item_id, name, price, images, category, subcategory, stock_quantity
       FROM products 
-      WHERE (LOWER(category) LIKE '%ring%' OR LOWER(subcategory) LIKE '%ring%' OR LOWER(name) LIKE '%ring%')
+      WHERE LOWER(TRIM(subcategory)) = 'rings'
       AND stock_quantity > 0
       ORDER BY item_id DESC
     `;
