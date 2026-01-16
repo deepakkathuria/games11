@@ -8150,212 +8150,6 @@ app.post("/cart/add", async (req, res) => {
   }
 });
 
-// app.post("/cart/add", async (req, res) => {
-//   try {
-//     const { items } = req.body;
-
-//     if (!items || items.length === 0) {
-//       return res.status(400).json({ error: "No items provided." });
-//     }
-
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) {
-//       return res.status(401).json({ error: "Unauthorized access." });
-//     }
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     for (const item of items) {
-//       // ✅ Fetch product stock_quantity from products table
-//       const [productRows] = await userDBPool.query(
-//         "SELECT stock_quantity FROM products WHERE item_id = ?",
-//         [item.id]
-//       );
-
-//       if (productRows.length === 0) {
-//         return res.status(404).json({ error: `Product ${item.id} not found` });
-//       }
-
-//       const stockQuantity = productRows[0].stock_quantity || 1; // Default to 1 if null
-//       const requestedQty = Number(item.quantity || item.qty || 1);
-
-//       // ✅ Check current cart quantity
-//       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
-//       const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
-
-//       const currentCartQty = existingItem.length > 0 ? (existingItem[0].quantity || 0) : 0;
-//       const newTotalQty = currentCartQty + requestedQty;
-
-//       // ✅ If adding would exceed stock, limit to available stock
-//       if (newTotalQty > stockQuantity) {
-//         const finalQty = stockQuantity;
-        
-//         if (existingItem.length < 1) {
-//           const insertQuery = `
-//             INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
-//             VALUES (?, ?, ?, ?, ?, ?, 'active')
-//           `;
-//           await userDBPool.query(insertQuery, [
-//             userId,
-//             item.id,
-//             finalQty,
-//             item.name,
-//             item.price,
-//             item.image,
-//           ]);
-//         } else {
-//           const updateQuery = `
-//             UPDATE Cart SET quantity = ?, status = 'active'
-//             WHERE id = ? AND user_id = ?
-//           `;
-//           await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
-//         }
-
-//         return res.status(200).json({
-//           message: "OUT OF STOCK - Maximum available quantity added",
-//           limited: true,
-//         });
-//       }
-
-//       // ✅ Normal add/update
-//       if (existingItem.length < 1) {
-//         const insertQuery = `
-//           INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
-//           VALUES (?, ?, ?, ?, ?, ?, 'active')
-//         `;
-//         await userDBPool.query(insertQuery, [
-//           userId,
-//           item.id,
-//           requestedQty,
-//           item.name,
-//           item.price,
-//           item.image,
-//         ]);
-//       } else {
-//         const updateQuery = `
-//           UPDATE Cart SET quantity = ?, status = 'active'
-//           WHERE id = ? AND user_id = ?
-//         `;
-//         await userDBPool.query(updateQuery, [newTotalQty, item.id, userId]);
-//       }
-//     }
-
-//     return res.status(200).json({
-//       message: "Cart updated successfully",
-//     });
-//   } catch (error) {
-//     console.error("Error adding items to cart:", error);
-//     res.status(500).json({ error: "Failed to add items to cart" });
-//   }
-// });
-
-// app.post("/cart/add", async (req, res) => {
-//   try {
-//     const { items } = req.body;
-//     if (!items || items.length === 0) {
-//       return res.status(400).json({ error: "No items provided." });
-//     }
-
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) return res.status(401).json({ error: "Unauthorized access." });
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     for (const item of items) {
-//       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
-//       const [existingItem] = await userDBPool.query(checkQuery, [
-//         userId,
-//         item.id,
-//       ]);
-
-//       if (existingItem.length < 1) {
-//         // ✅ Fixed: Now inserts as `active`
-//         const insertQuery = `INSERT INTO Cart (user_id, id, quantity, name, price, image, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`;
-//         await userDBPool.query(insertQuery, [
-//           userId,
-//           item.id,
-//           item.quantity,
-//           item.name,
-//           item.price,
-//           item.image,
-//         ]);
-//       } else {
-//         // ✅ Fixed: Now updates quantity and marks as `active`
-//         const updateQuery = `UPDATE Cart SET quantity = ?, status = 'active' WHERE id = ? AND user_id = ?`;
-//         await userDBPool.query(updateQuery, [item.quantity, item.id, userId]);
-//       }
-//     }
-
-//     res
-//       .status(200)
-//       .json({ message: "Cart updated successfully", cartItems: items });
-//   } catch (error) {
-//     console.error("Error adding items to cart:", error);
-//     res.status(500).json({ error: "Failed to add items to cart" });
-//   }
-// });
-
-// app.post("/cart/add", async (req, res) => {
-//   try {
-//     const { items } = req.body;
-
-//     if (!items || items.length === 0) {
-//       return res.status(400).json({ error: "No items provided." });
-//     }
-
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) {
-//       return res.status(401).json({ error: "Unauthorized access." });
-//     }
-
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const MAX_PER_PRODUCT = 1; // 🔒 hard cap: one piece per product
-//     let limited = false;
-
-//     for (const item of items) {
-//       const checkQuery = `SELECT * FROM Cart WHERE user_id = ? AND id = ?`;
-//       const [existingItem] = await userDBPool.query(checkQuery, [userId, item.id]);
-
-//       const requestedQty = Number(item.quantity || item.qty || 1);
-//       const finalQty = Math.min(requestedQty, MAX_PER_PRODUCT);
-//       if (requestedQty > MAX_PER_PRODUCT) limited = true;
-
-//       if (existingItem.length < 1) {
-//         const insertQuery = `
-//           INSERT INTO Cart (user_id, id, quantity, name, price, image, status)
-//           VALUES (?, ?, ?, ?, ?, ?, 'active')
-//         `;
-//         await userDBPool.query(insertQuery, [
-//           userId,
-//           item.id,
-//           finalQty,
-//           item.name,
-//           item.price,
-//           item.image,
-//         ]);
-//       } else {
-//         const updateQuery = `
-//           UPDATE Cart SET quantity = ?, status = 'active'
-//           WHERE id = ? AND user_id = ?
-//         `;
-//         await userDBPool.query(updateQuery, [finalQty, item.id, userId]);
-//       }
-//     }
-
-//     return res.status(200).json({
-//       message: limited
-//         ? "Cart updated. Each piece is limited to 1 per customer. For more, please contact us on Instagram or WhatsApp."
-//         : "Cart updated successfully",
-//     });
-//   } catch (error) {
-//     console.error("Error adding items to cart:", error);
-//     res.status(500).json({ error: "Failed to add items to cart" });
-//   }
-// });
 
 app.delete("/cart/remove/:product_id", async (req, res) => {
   try {
@@ -8633,78 +8427,6 @@ app.get("/products/trending", async (req, res) => {
   }
 });
 
-// app.get("/products", async (req, res) => {
-//   const page = parseInt(req.query.page) || 1;
-//   const limit = parseInt(req.query.limit) || 16;
-//   const offset = (page - 1) * limit;
-//   const category = req.query.category;
-//   const subcategory = req.query.subcategory;
-
-//   try {
-//     let countQuery = "SELECT COUNT(*) AS count FROM products";
-//     let dataQuery = "SELECT * FROM products";
-//     const queryParams = [];
-//     const conditions = [];
-
-//     if (category) {
-//       conditions.push("category = ?");
-//       queryParams.push(category);
-//     }
-
-//     if (subcategory) {
-//       conditions.push("subcategory = ?");
-//       queryParams.push(subcategory);
-//     }
-
-//     if (conditions.length > 0) {
-//       const whereClause = " WHERE " + conditions.join(" AND ");
-//       countQuery += whereClause;
-//       dataQuery += whereClause;
-//     }
-
-//     dataQuery += " ORDER BY item_id DESC LIMIT ? OFFSET ?";
-//     queryParams.push(limit, offset);
-
-//     const [countResult] = await userDBPool.query(
-//       countQuery,
-//       queryParams.slice(0, -2)
-//     );
-//     const totalCount = countResult[0].count;
-//     const totalPages = Math.ceil(totalCount / limit);
-
-//     const [rows] = await userDBPool.query(dataQuery, queryParams);
-
-//     const formattedRows = rows.map((product) => {
-//       let parsedImages = [];
-
-//       try {
-//         parsedImages =
-//           typeof product.images === "string"
-//             ? JSON.parse(product.images)
-//             : product.images;
-//       } catch (e) {
-//         parsedImages = [];
-//       }
-
-//       return {
-//         ...product,
-//         images: parsedImages,
-//         avg_rating: null,
-//       };
-//     });
-
-//     res.status(200).json({
-//       status: 200,
-//       currentPage: page,
-//       totalPages,
-//       rows: formattedRows,
-//     });
-//   } catch (error) {
-//     console.error("❌ Error fetching filtered products:", error);
-//     res.status(500).json({ status: 500, error: "Database error" });
-//   }
-// });
-
 
 
 
@@ -8860,72 +8582,6 @@ app.get("/category/:category", async (req, res) => {
 
 // ------------------------------------admin-----------------------------------------------
 
-// app.get("/admin/products", async (req, res) => {
-//   try {
-//     let { page, limit, category, subcategory, is_trendy, is_unique } =
-//       req.query;
-
-//     page = parseInt(page) || 1;
-//     limit = parseInt(limit) || 15;
-//     const offset = (page - 1) * limit;
-
-//     // ✅ Dynamic filters
-//     const filters = [];
-//     const values = [];
-
-//  if (category) {
-//   category = category.trim().toLowerCase();
-//   filters.push("LOWER(TRIM(category)) = ?");
-//   values.push(category);
-// }
-
-// if (subcategory) {
-//   subcategory = subcategory.trim().toLowerCase();
-//   filters.push("LOWER(TRIM(subcategory)) = ?");
-//   values.push(subcategory);
-// }
-
-//     if (is_trendy !== undefined) {
-//       filters.push("is_trendy = ?");
-//       values.push(is_trendy === "true" ? 1 : 0);
-//     }
-
-//     if (is_unique !== undefined) {
-//       filters.push("is_unique = ?");
-//       values.push(is_unique === "true" ? 1 : 0);
-//     }
-
-//     const whereClause =
-//       filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
-
-//     const query = `SELECT * FROM products ${whereClause} LIMIT ? OFFSET ?`;
-//     const countQuery = `SELECT COUNT(*) AS total FROM products ${whereClause}`;
-
-//     // Add pagination values
-//     const paginatedValues = [...values, limit, offset];
-
-//     // Run queries
-//     const [rows] = await userDBPool.query(query, paginatedValues);
-//     const [[totalCount]] = await userDBPool.query(countQuery, values);
-
-//     if (rows.length === 0) {
-//       return res
-//         .status(404)
-//         .json({ message: "No products found", total: 0, products: [] });
-//     }
-
-//     res.status(200).json({
-//       total: totalCount.total,
-//       page,
-//       limit,
-//       totalPages: Math.ceil(totalCount.total / limit),
-//       products: rows,
-//     });
-//   } catch (error) {
-//     console.error("❌ Error fetching products:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 
 
 
@@ -9025,84 +8681,7 @@ app.get("/admin/product/:productId", async (req, res) => {
   }
 });
 
-/**
- * ✅ Create New Product
- */
 
-// app.post("/admin/products", async (req, res) => {
-//   try {
-//     const {
-//       name,
-//       price,
-//       slug,
-//       category,
-//       subcategory,
-//       is_trendy = false,
-//       is_unique = false,
-//       new: isNew,
-//       features,
-//       description,
-//       includes,
-//       gallery,
-//       category_image,
-//       cart_image,
-//       short_name,
-//       first_image,
-//       images,
-//       sold_out = false, // ✅ NEW
-//     } = req.body;
-
-//     if (!name || !price || !category) {
-//       return res
-//         .status(400)
-//         .json({ error: "Name, Price, and Category are required" });
-//     }
-
-//     const uploadedImages = Array.isArray(images)
-//       ? images
-//       : JSON.parse(images || "[]");
-
-//     const query = `
-//       INSERT INTO products (
-//         name, price, slug, category, subcategory, is_trendy, is_unique,
-//         new, features, description, images, includes, gallery,
-//         category_image, cart_image, short_name, first_image, sold_out
-//       )
-//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-//     `;
-
-//     await userDBPool.query(query, [
-//       name,
-//       price,
-//       slug,
-//       // category,
-//       // subcategory || null,
-//       category?.trim().toLowerCase(),
-//       subcategory?.trim().toLowerCase() || null,
-//       is_trendy,
-//       is_unique,
-//       isNew || 0,
-//       features || null,
-//       description || null,
-//       JSON.stringify(uploadedImages),
-//       JSON.stringify(includes) || "[]",
-//       JSON.stringify(gallery) || "[]",
-//       JSON.stringify(category_image) || "[]",
-//       cart_image || null,
-//       short_name || null,
-//       first_image || null,
-//       sold_out, // ✅ NEW
-//     ]);
-
-//     res.status(201).json({
-//       message: "✅ Product created successfully",
-//       images: uploadedImages,
-//     });
-//   } catch (error) {
-//     console.error("❌ Error creating product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });/
 
 app.post("/admin/products", async (req, res) => {
   try {
@@ -9176,111 +8755,7 @@ app.post("/admin/products", async (req, res) => {
   }
 });
 
-// app.put("/admin/product/:productId", async (req, res) => {
-//   try {
-//     const { productId } = req.params;
-//     const {
-//       name,
-//       price,
-//       slug,
-//       category,
-//       subcategory,
-//       is_trendy = false,
-//       is_unique = false,
-//       new: isNew,
-//       features,
-//       description,
-//       includes,
-//       gallery,
-//       category_image,
-//       cart_image,
-//       short_name,
-//       first_image,
-//       images,
-//       sold_out = false, // ✅ NEW
-//     } = req.body;
 
-//     if (!name || !price || !category) {
-//       return res
-//         .status(400)
-//         .json({ error: "❌ Name, Price, and Category are required" });
-//     }
-
-//     const selectQuery = "SELECT images FROM products WHERE item_id = ?";
-//     const [existingProduct] = await userDBPool.query(selectQuery, [productId]);
-
-//     if (existingProduct.length === 0) {
-//       return res.status(404).json({ error: "❌ Product not found" });
-//     }
-
-//     let existingImages = [];
-//     try {
-//       existingImages = JSON.parse(existingProduct[0].images || "[]");
-//     } catch (error) {
-//       console.error("❌ Error parsing existing images from DB:", error);
-//       existingImages = [];
-//     }
-
-//     let updatedImages = [];
-//     try {
-//       if (typeof images === "string") {
-//         if (images.startsWith("[") && images.endsWith("]")) {
-//           updatedImages = JSON.parse(images);
-//         } else {
-//           updatedImages = [images];
-//         }
-//       } else if (Array.isArray(images)) {
-//         updatedImages = images;
-//       }
-//     } catch (error) {
-//       console.error("❌ Error parsing images:", error);
-//       return res.status(400).json({ error: "Invalid images format" });
-//     }
-
-//     if (updatedImages.length === 0) {
-//       updatedImages = existingImages;
-//     }
-
-//     const query = `
-//       UPDATE products SET 
-//         name = ?, price = ?, slug = ?, category = ?, subcategory = ?, is_trendy = ?, is_unique = ?,
-//         new = ?, features = ?, description = ?, 
-//         images = ?, includes = ?, gallery = ?, 
-//         category_image = ?, cart_image = ?, short_name = ?, first_image = ?, sold_out = ?
-//       WHERE item_id = ?
-//     `;
-
-//     await userDBPool.query(query, [
-//       name,
-//       price,
-//       slug,
-//      category?.trim().toLowerCase(),
-//   subcategory?.trim().toLowerCase() || null,
-//       is_trendy,
-//       is_unique,
-//       isNew || 0,
-//       features || null,
-//       description || null,
-//       JSON.stringify(updatedImages),
-//       JSON.stringify(includes) || "[]",
-//       JSON.stringify(gallery) || "[]",
-//       JSON.stringify(category_image) || "[]",
-//       cart_image || null,
-//       short_name || null,
-//       first_image || null,
-//       sold_out, // ✅ NEW
-//       productId,
-//     ]);
-
-//     res.status(200).json({
-//       message: "✅ Product updated successfully",
-//       images: updatedImages,
-//     });
-//   } catch (error) {
-//     console.error("❌ Error updating product:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 
 app.put("/admin/product/:productId", async (req, res) => {
   try {
@@ -9520,8 +8995,8 @@ app.post("/verify-payment", async (req, res) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const userId = decoded.id;
 
-    const { products, address, total_amount } = orderData;
-
+    // const { products, address, total_amount } = orderData;
+    const { products, address, total_amount, free_ring_id } = orderData;
     // ✅ Insert order
     const [orderRes] = await userDBPool.query(
       `INSERT INTO orders (user_id, total_amount, payment_status, payment_method, order_status, transaction_id)
@@ -9561,16 +9036,48 @@ app.post("/verify-payment", async (req, res) => {
     }
 
     // ✅ Insert items
+    // const orderItems = products.map((item) => [
+    //   orderId,
+    //   item.product_id,
+    //   item.quantity,
+    //   item.price,
+    // ]);
+    // await userDBPool.query(
+    //   `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
+    //   [orderItems]
+    // );
+
+
     const orderItems = products.map((item) => [
       orderId,
       item.product_id,
       item.quantity,
       item.price,
     ]);
+    
+    // ✅ Add free ring if promotion is active and total_amount >= 1000
+    const currentDate = new Date();
+    const promotionEndDate = new Date("2026-01-31T23:59:59");
+    const isPromotionActive = currentDate <= promotionEndDate;
+    
+    if (isPromotionActive && total_amount >= 1000 && free_ring_id) {
+      orderItems.push([
+        orderId,
+        free_ring_id,
+        1,
+        0 // Free item
+      ]);
+    }
+    
     await userDBPool.query(
       `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`,
       [orderItems]
     );
+
+
+
+
+
 
     // ✅ Clear cart
     await userDBPool.query(`DELETE FROM Cart WHERE user_id = ?`, [userId]);
@@ -9737,49 +9244,7 @@ app.post("/auth/google-login", async (req, res) => {
 
 // ----------------------------------------------------wishlist routes---------------------------------------------------
 
-// **Get User Wishlist**
-// app.get("/wishlist", async (req, res) => {
-//   try {
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) {
-//       return res.status(401).json({ error: "Unauthorized access" });
-//     }
 
-//     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//     const userId = decoded.id;
-
-//     const query = `
-//       SELECT w.*, p.name, p.price, p.images, p.item_id as product_id
-//       FROM wishlist w
-//       INNER JOIN products p ON w.product_id = p.item_id
-//       WHERE w.user_id = ?
-//     `;
-
-//     const [rows] = await userDBPool.query(query, [userId]);
-
-//     const formattedItems = rows.map((item) => {
-//       let images = [];
-//       try {
-//         images = typeof item.images === "string" ? JSON.parse(item.images) : item.images;
-//       } catch (e) {
-//         images = [];
-//       }
-
-//       return {
-//         id: item.wishlist_id,
-//         product_id: item.product_id,
-//         name: item.name,
-//         price: item.price,
-//         image: images.length > 0 ? images[0] : null,
-//       };
-//     });
-
-//     res.status(200).json({ items: formattedItems });
-//   } catch (error) {
-//     console.error("Error fetching wishlist:", error);
-//     res.status(500).json({ error: "Database error" });
-//   }
-// });
 
 
 // **Get User Wishlist**
@@ -9915,4 +9380,58 @@ app.delete("/wishlist/clear", async (req, res) => {
 
 
 
-
+app.get("/promotion/free-ring/status", async (req, res) => {
+  try {
+    const currentDate = new Date();
+    const promotionEndDate = new Date("2026-01-31T23:59:59");
+    
+    const isActive = currentDate <= promotionEndDate;
+    
+    if (!isActive) {
+      return res.status(200).json({
+        active: false,
+        message: "Promotion has ended"
+      });
+    }
+    
+    // ✅ FIXED: सिर्फ rings - subcategory = 'rings' (earrings और sets नहीं)
+    const query = `
+      SELECT item_id, name, price, images, category, subcategory, stock_quantity
+      FROM products 
+      WHERE LOWER(TRIM(subcategory)) = 'rings'
+      AND stock_quantity > 0
+      ORDER BY item_id DESC
+    `;
+    
+    const [rows] = await userDBPool.query(query);
+    
+    const formattedRings = rows.map((ring) => {
+      let parsedImages = [];
+      try {
+        parsedImages = typeof ring.images === "string" 
+          ? JSON.parse(ring.images) 
+          : ring.images || [];
+      } catch (e) {
+        parsedImages = [];
+      }
+      
+      return {
+        product_id: ring.item_id,
+        name: ring.name,
+        price: ring.price,
+        image: parsedImages[0] || null,
+        category: ring.category,
+        subcategory: ring.subcategory
+      };
+    });
+    
+    res.status(200).json({
+      active: true,
+      rings: formattedRings,
+      endDate: "2026-01-31"
+    });
+  } catch (error) {
+    console.error("Error fetching free ring promotion:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+});
