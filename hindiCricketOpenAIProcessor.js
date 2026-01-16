@@ -723,8 +723,19 @@ async function convertHindiArticleToEnglish(hindiTitle, hindiMeta, hindiHtml) {
   try {
     console.log('🔄 Converting Hindi article to English...');
     
+    // If hindiHtml is not provided or is empty, create HTML from raw content
+    let htmlToConvert = hindiHtml;
+    if (!htmlToConvert || htmlToConvert.trim().length === 0) {
+      // Create a simple HTML structure from title, meta, and content
+      htmlToConvert = `
+        <h1>${hindiTitle || ''}</h1>
+        ${hindiMeta ? `<p><strong>${hindiMeta}</strong></p>` : ''}
+        <div>${hindiMeta || ''}</div>
+      `.trim();
+    }
+    
     // Extract text content from HTML (remove HTML tags for translation)
-    const textContent = hindiHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const textContent = htmlToConvert.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     
     // Convert title
     const titlePrompt = `Translate this Hindi cricket news headline to English. Keep it engaging and SEO-friendly. Return only the English translation, nothing else.
@@ -756,7 +767,7 @@ English Meta:`;
     const articlePrompt = `Translate this complete Hindi cricket news article to English. Maintain the same HTML structure, formatting, and style. Keep all HTML tags intact. Translate only the text content inside the tags. Return the complete HTML document with English content.
 
 Hindi Article HTML:
-${hindiHtml}
+${htmlToConvert}
 
 English Article HTML:`;
     

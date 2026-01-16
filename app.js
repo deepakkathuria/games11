@@ -1961,22 +1961,36 @@ app.post('/api/hindi-cricket-openai/articles/:id/convert-to-english', async (req
     if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
     const article = rows[0];
 
-    // Check if article has been processed with OpenAI
-    if (!article.openai_processed || !article.openai_ready_article) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Article must be processed with OpenAI first before converting to English" 
-      });
-    }
-
     console.log(`🔄 Converting Hindi article ${id} to English...`);
 
-    // Convert Hindi article to English
-    const result = await convertHindiArticleToEnglish(
-      article.openai_final_title || article.title,
-      article.openai_final_meta || article.description,
-      article.openai_ready_article
-    );
+    let result;
+    
+    // If article is processed with OpenAI, use processed content
+    if (article.openai_processed && article.openai_ready_article) {
+      result = await convertHindiArticleToEnglish(
+        article.openai_final_title || article.title,
+        article.openai_final_meta || article.description,
+        article.openai_ready_article
+      );
+    } else {
+      // For stored articles, convert directly from raw content
+      // Create HTML structure from title, description, and content
+      const rawContent = article.content || article.description || '';
+      const paragraphs = rawContent.split(/\n+/).filter(p => p.trim().length > 0);
+      const contentHtml = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
+      
+      const rawHtml = `
+        <h1>${article.title || ''}</h1>
+        ${article.description ? `<p><strong>${article.description}</strong></p>` : ''}
+        ${contentHtml}
+      `.trim();
+      
+      result = await convertHindiArticleToEnglish(
+        article.title,
+        article.description || '',
+        rawHtml
+      );
+    }
 
     if (result.success) {
       // Check if English columns exist, if not add them
