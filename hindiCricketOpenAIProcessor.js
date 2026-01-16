@@ -14,7 +14,7 @@ async function generateWithOpenAI(prompt, options = {}) {
     // "gpt-4" or "gpt-4-turbo" - Better instruction following, more creative, but more expensive
     // Change below if headlines are still too similar to source
     const response = await axios.post(OPENAI_BASE_URL, {
-      model: options.model || "gpt-5.2-pro",
+      model: options.model || "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -682,7 +682,7 @@ async function generateHindiCricketHeadline(title) {
 
   try {
     const response = await generateWithOpenAI(prompt, {
-      model: "gpt-5.2-pro",
+      model: "gpt-4o-mini",
       temperature: 0.8,
       max_tokens: 100
     });
@@ -707,7 +707,7 @@ async function generateHindiCricketMetaDescription(description) {
 
   try {
     const response = await generateWithOpenAI(prompt, {
-      model: "gpt-5.2-pro",
+      model: "gpt-4o-mini",
       temperature: 0.7,
       max_tokens: 200
     });
@@ -734,7 +734,7 @@ Hindi Title: ${hindiTitle}
 English Title:`;
     
     const englishTitle = await generateWithOpenAI(titlePrompt, {
-      model: "gpt-5.2-pro",
+      model: "gpt-4o-mini",
       temperature: 0.7,
       max_tokens: 100
     });
@@ -747,7 +747,7 @@ Hindi Meta: ${hindiMeta}
 English Meta:`;
     
     const englishMeta = await generateWithOpenAI(metaPrompt, {
-      model: "gpt-5.2-pro",
+      model: "gpt-4o-mini",
       temperature: 0.7,
       max_tokens: 200
     });
@@ -761,7 +761,7 @@ ${hindiHtml}
 English Article HTML:`;
     
     const englishHtml = await generateWithOpenAI(articlePrompt, {
-      model: "gpt-5.2-pro",
+      model: "gpt-4o-mini",
       temperature: 0.7,
       max_tokens: 5000
     });
