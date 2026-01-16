@@ -14,7 +14,7 @@ async function generateWithOpenAI(prompt, options = {}) {
     // "gpt-4" or "gpt-4-turbo" - Better instruction following, more creative, but more expensive
     // Change below if headlines are still too similar to source
     const response = await axios.post(OPENAI_BASE_URL, {
-      model: options.model || "gpt-4o-mini",
+      model: options.model || "gpt-5.2-pro",
       messages: [
         {
           role: "system",
@@ -682,7 +682,7 @@ async function generateHindiCricketHeadline(title) {
 
   try {
     const response = await generateWithOpenAI(prompt, {
-      model: "gpt-4o-mini",
+      model: "gpt-5.2-pro",
       temperature: 0.8,
       max_tokens: 100
     });
@@ -707,7 +707,7 @@ async function generateHindiCricketMetaDescription(description) {
 
   try {
     const response = await generateWithOpenAI(prompt, {
-      model: "gpt-4o-mini",
+      model: "gpt-5.2-pro",
       temperature: 0.7,
       max_tokens: 200
     });
@@ -715,6 +715,77 @@ async function generateHindiCricketMetaDescription(description) {
   } catch (error) {
     console.error('Generate Hindi cricket meta description error:', error);
     return description;
+  }
+}
+
+/* ---------- HINDI TO ENGLISH CONVERSION FUNCTION ---------- */
+async function convertHindiArticleToEnglish(hindiTitle, hindiMeta, hindiHtml) {
+  try {
+    console.log('🔄 Converting Hindi article to English...');
+    
+    // Extract text content from HTML (remove HTML tags for translation)
+    const textContent = hindiHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Convert title
+    const titlePrompt = `Translate this Hindi cricket news headline to English. Keep it engaging and SEO-friendly. Return only the English translation, nothing else.
+
+Hindi Title: ${hindiTitle}
+
+English Title:`;
+    
+    const englishTitle = await generateWithOpenAI(titlePrompt, {
+      model: "gpt-5.2-pro",
+      temperature: 0.7,
+      max_tokens: 100
+    });
+    
+    // Convert meta description
+    const metaPrompt = `Translate this Hindi cricket news meta description to English. Keep it 150-160 characters, SEO-friendly, and engaging. Return only the English translation, nothing else.
+
+Hindi Meta: ${hindiMeta}
+
+English Meta:`;
+    
+    const englishMeta = await generateWithOpenAI(metaPrompt, {
+      model: "gpt-5.2-pro",
+      temperature: 0.7,
+      max_tokens: 200
+    });
+    
+    // Convert full article HTML
+    const articlePrompt = `Translate this complete Hindi cricket news article to English. Maintain the same HTML structure, formatting, and style. Keep all HTML tags intact. Translate only the text content inside the tags. Return the complete HTML document with English content.
+
+Hindi Article HTML:
+${hindiHtml}
+
+English Article HTML:`;
+    
+    const englishHtml = await generateWithOpenAI(articlePrompt, {
+      model: "gpt-5.2-pro",
+      temperature: 0.7,
+      max_tokens: 5000
+    });
+    
+    // Generate English slug
+    const englishSlug = englishTitle.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    
+    console.log('✅ Hindi article converted to English successfully');
+    
+    return {
+      success: true,
+      englishTitle: englishTitle.trim(),
+      englishMeta: englishMeta.trim(),
+      englishHtml: englishHtml.trim(),
+      englishSlug: englishSlug
+    };
+  } catch (error) {
+    console.error('❌ Error converting Hindi article to English:', error);
+    return {
+      success: false,
+      error: error.message || 'Conversion failed'
+    };
   }
 }
 
@@ -726,4 +797,5 @@ module.exports = {
   fetchHindiCricketStats,
   generateHindiExpertOpinion,
   generateHindiSocialMediaReactions,
+  convertHindiArticleToEnglish,
 };

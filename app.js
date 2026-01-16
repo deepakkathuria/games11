@@ -178,7 +178,8 @@ const {
   processHindiCricketNewsOpenAI, 
   generateHindiCricketHeadline, 
   generateHindiCricketMetaDescription,
-  buildHindiCricketHtmlDocument
+  buildHindiCricketHtmlDocument,
+  convertHindiArticleToEnglish
 } = require('./hindiCricketOpenAIProcessor');
 
 const {
@@ -1945,6 +1946,90 @@ app.post('/api/hindi-cricket-openai/articles/:id/generate', async (req, res) => 
   } catch (err) {
     console.error("generate Hindi cricket OpenAI article error", err);
     return res.status(500).json({ success:false, error: err.message || "Generate failed" });
+  }
+});
+
+// Convert Hindi article to English
+app.post('/api/hindi-cricket-openai/articles/:id/convert-to-english', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      "SELECT * FROM hindi_cricket_news WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success:false, error:"Article not found" });
+    const article = rows[0];
+
+    // Check if article has been processed with OpenAI
+    if (!article.openai_processed || !article.openai_ready_article) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Article must be processed with OpenAI first before converting to English" 
+      });
+    }
+
+    console.log(`🔄 Converting Hindi article ${id} to English...`);
+
+    // Convert Hindi article to English
+    const result = await convertHindiArticleToEnglish(
+      article.openai_final_title || article.title,
+      article.openai_final_meta || article.description,
+      article.openai_ready_article
+    );
+
+    if (result.success) {
+      // Check if English columns exist, if not add them
+      try {
+        const [columns] = await pollDBPool.query(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+           WHERE TABLE_NAME = 'hindi_cricket_news' 
+           AND COLUMN_NAME = 'english_ready_article'`
+        );
+        
+        if (columns.length === 0) {
+          console.log('📝 Adding English columns to hindi_cricket_news table...');
+          await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN english_ready_article LONGTEXT NULL');
+          await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN english_final_title VARCHAR(500) NULL');
+          await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN english_final_meta TEXT NULL');
+          await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN english_final_slug VARCHAR(500) NULL');
+          await pollDBPool.query('ALTER TABLE hindi_cricket_news ADD COLUMN english_converted_at TIMESTAMP NULL');
+          console.log('✅ English columns added successfully');
+        }
+      } catch (colError) {
+        // Columns might already exist, that's okay
+        if (!colError.message.includes('Duplicate column name')) {
+          console.error('Error checking/adding English columns:', colError);
+        }
+      }
+
+      // Update database with English version
+      await pollDBPool.query(
+        `UPDATE hindi_cricket_news
+           SET english_ready_article = ?,
+               english_final_title = ?,
+               english_final_meta = ?,
+               english_final_slug = ?,
+               english_converted_at = NOW()
+         WHERE id = ?`,
+        [result.englishHtml, result.englishTitle, result.englishMeta, result.englishSlug, id]
+      );
+
+      return res.json({
+        success: true,
+        english: {
+          title: result.englishTitle,
+          meta: result.englishMeta,
+          slug: result.englishSlug,
+          html: result.englishHtml
+        }
+      });
+    } else {
+      return res.status(500).json({ success: false, error: result.error || "Conversion failed" });
+    }
+  } catch (err) {
+    console.error("Convert Hindi to English error", err);
+    return res.status(500).json({ success:false, error: err.message || "Conversion failed" });
   }
 });
 
