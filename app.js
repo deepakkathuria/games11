@@ -1886,6 +1886,44 @@ app.get('/api/hindi-cricket-openai/processed-news', async (req, res) => {
   }
 });
 
+// Get English converted Hindi cricket news
+app.get('/api/hindi-cricket-openai/english-converted-news', async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM hindi_cricket_news WHERE english_ready_article IS NOT NULL AND LENGTH(english_ready_article) > 0'
+    );
+    const totalCount = countResult[0].total;
+
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM hindi_cricket_news
+       WHERE english_ready_article IS NOT NULL AND LENGTH(english_ready_article) > 0
+       ORDER BY english_converted_at DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    const mapped = rows.map(n => ({
+      ...n,
+      published_at_iso: toIsoZ ? toIsoZ(n.published_at) : (n.published_at ? new Date(n.published_at).toISOString() : null),
+      english_converted_at_iso: toIsoZ ? toIsoZ(n.english_converted_at) : (n.english_converted_at ? new Date(n.english_converted_at).toISOString() : null),
+      processed_at_iso: toIsoZ ? toIsoZ(n.openai_processed_at) : (n.openai_processed_at ? new Date(n.openai_processed_at).toISOString() : null),
+    }));
+
+    res.json({
+      success: true,
+      news: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error getting English converted Hindi cricket news:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Process Hindi cricket news article with OpenAI
 app.post('/api/hindi-cricket-openai/articles/:id/generate', async (req, res) => {
   try {
