@@ -35,7 +35,7 @@ async function getWithRetry(url, opts = {}, tries = 3) {
 }
 
 // GNews API Configuration for Sports
-const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "257562a055466967747eb519a36b7b9d";
+const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
 class SportsNewsScheduler {

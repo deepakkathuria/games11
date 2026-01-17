@@ -34,7 +34,7 @@ async function getWithRetry(url, opts = {}, tries = 3) {
 }
 
 // GNews API Configuration
-const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "a8ee6e2ef2fedf06117bae6d6babcff1";
+const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
 // Brand-specific queries (Worldwide - no country filter)
