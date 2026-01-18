@@ -774,7 +774,7 @@ English Article HTML:`;
     const englishHtml = await generateWithOpenAI(articlePrompt, {
       model: "gpt-4-turbo",
       temperature: 0.7,
-      max_tokens: 5000
+      max_tokens: 4096
     });
     
     // Generate English slug
