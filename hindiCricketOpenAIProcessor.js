@@ -745,7 +745,7 @@ Hindi Title: ${hindiTitle}
 English Title:`;
     
     const englishTitle = await generateWithOpenAI(titlePrompt, {
-      model: "gpt-4o-mini",
+      model: "gpt-4-turbo",
       temperature: 0.7,
       max_tokens: 100
     });
@@ -758,7 +758,7 @@ Hindi Meta: ${hindiMeta}
 English Meta:`;
     
     const englishMeta = await generateWithOpenAI(metaPrompt, {
-      model: "gpt-4o-mini",
+      model: "gpt-4-turbo",
       temperature: 0.7,
       max_tokens: 200
     });
@@ -772,7 +772,7 @@ ${htmlToConvert}
 English Article HTML:`;
     
     const englishHtml = await generateWithOpenAI(articlePrompt, {
-      model: "gpt-4o-mini",
+      model: "gpt-4-turbo",
       temperature: 0.7,
       max_tokens: 5000
     });
