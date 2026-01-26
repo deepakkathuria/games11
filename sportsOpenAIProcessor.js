@@ -174,6 +174,200 @@ If all 5 answers are YES, then create the title!
 `;
 }
 
+// PROMPT 0: Raw News Normalization (Fact Extractor)
+function buildFactExtractorPrompt(rawArticle) {
+  return `
+You are a neutral news analyst.
+
+From the article below:
+1. Extract ONLY verifiable facts (no opinions).
+2. List key entities (players, teams, venues, officials).
+3. Identify the event type (injury, selection, record, controversy, result, transfer).
+4. Identify the core news trigger in ONE sentence.
+
+Article:
+${rawArticle}
+
+Provide a structured fact summary that can be used for further analysis.
+`;
+}
+
+// PROMPT 1: Context Block (Why This Matters)
+function buildContextBuilderPrompt(factSummary) {
+  return `
+You are an experienced sports editor.
+
+Using the extracted facts below:
+${factSummary}
+
+Explain WHY this news matters to:
+- The team involved
+- The tournament/season
+- Fans and followers
+
+Focus on context casual readers may NOT know.
+Avoid repeating the original news wording.
+Limit to 120–150 words.
+
+Provide clear, insightful context that adds value beyond the headline.
+`;
+}
+
+// PROMPT 2: Historical Comparison Block
+function buildHistoricalAnalystPrompt(factSummary) {
+  return `
+You are a sports historian and data analyst.
+
+Using the facts below:
+${factSummary}
+
+Provide:
+1. Similar past instances (player/team/venue).
+2. How often this has happened before.
+3. Whether this event is rare, common, or trend-based.
+
+Use comparisons like:
+- First time since...
+- Only X players/teams have...
+- Previous outcomes in similar situations.
+
+Avoid speculation. Base reasoning on history.
+Limit to 120 words.
+`;
+}
+
+// PROMPT 3: Stats + Data with Interpretation
+function buildDataInterpreterPrompt(factSummary) {
+  return `
+You are a data-driven sports analyst.
+
+Based on the event below:
+${factSummary}
+
+Provide relevant statistics BUT explain:
+- What the numbers indicate
+- How they compare to average/baseline
+- Why these numbers matter in this context
+
+Do NOT dump raw stats.
+Every stat must be followed by interpretation.
+Limit to 100–130 words.
+`;
+}
+
+// PROMPT 4: Impact Analysis (What Happens Next)
+function buildImpactForecasterPrompt(factSummary) {
+  return `
+You are a senior sports correspondent.
+
+Using the event details:
+${factSummary}
+
+Explain the possible impact on:
+- Team combination or selection
+- Strategy going forward
+- Tournament standings or qualification
+- Player role or responsibility
+
+Do NOT predict outcomes.
+Explain realistic consequences.
+Limit to 120 words.
+`;
+}
+
+// PROMPT 5: Fantasy / Fan Angle (Optional)
+function buildFantasyFanRelevancePrompt(factSummary) {
+  return `
+You are a fantasy sports expert.
+
+Based on the event:
+${factSummary}
+
+Explain:
+- How this affects fantasy team selection
+- Which roles gain or lose importance
+- What fans should watch out for next
+
+Avoid gambling language.
+Keep it advisory, not promotional.
+Limit to 80–100 words.
+`;
+}
+
+// PROMPT 6: Editorial Synthesis (Master Editor)
+function buildMasterEditorPrompt({ context, historical, stats, impact, fantasy, factSummary, recommendations }) {
+  return `
+You are the chief editor of a leading sports publication.
+
+Using ALL sections below:
+- Context: ${context}
+- Historical comparison: ${historical}
+- Data interpretation: ${stats}
+- Impact analysis: ${impact}
+- Fantasy angle: ${fantasy}
+- Fact Summary: ${factSummary}
+
+Write a complete, original news article in HTML format that:
+- Does NOT resemble the source article
+- Adds analysis and interpretation
+- Flows naturally like human-written journalism
+- Is informative, neutral, and engaging
+- Follows Google News and Discover guidelines
+
+HTML Structure:
+- Start with <h1> using: ${recommendations?.recommendedTitle || "Article Title"}
+- Use <h2> for main sections (5-7 unique, content-specific headings)
+- Use <h3> for subsections if needed
+- Use <p> for paragraphs
+- Use <blockquote> for quotes
+- Use <ul> and <li> for lists
+- Use <strong> for emphasis
+- Use <em> for italics
+
+Structure:
+1. Strong opening (why this matters)
+2. Brief recap of what happened
+3. Context and analysis
+4. Data-backed insight
+5. Bigger picture
+6. Forward-looking close
+
+Tone: Professional, insightful, reader-first.
+Word count: 600–800 words.
+
+Create a comprehensive, engaging HTML article that sports fans will love to read!
+`;
+}
+
+// Quality Check Prompt
+function buildQualityCheckPrompt({ originalArticle, generatedArticle }) {
+  return `
+You are a quality control editor.
+
+Original Source Article:
+${originalArticle}
+
+Generated Article:
+${generatedArticle}
+
+Does this article:
+- Add information not present in the source?
+- Explain "why" and "what next"?
+- Show editorial judgment?
+- Avoid paraphrasing the source structure?
+
+Answer YES/NO for each with brief reasons.
+
+Format:
+1. Adds new information: YES/NO - [reason]
+2. Explains why and what next: YES/NO - [reason]
+3. Shows editorial judgment: YES/NO - [reason]
+4. Avoids source paraphrasing: YES/NO - [reason]
+
+If any answer is NO, the article should be rejected.
+`;
+}
+
 function buildSportsRewriteBodyHtmlPrompt({ title, description, body, recommendations }) {
   return `
 You are an expert sports journalist. Rewrite this sports news article into a comprehensive, engaging HTML article.
@@ -240,12 +434,13 @@ Create a comprehensive, engaging HTML article that sports fans will love to read
 
 async function processSportsNewsOpenAI(articleData, options = {}) {
   try {
-    console.log('⚽ Starting sports news OpenAI processing...');
+    console.log('⚽ Starting sports news OpenAI processing with enhanced 6-step prompt system...');
     
     const { title, description, content } = articleData;
+    const rawArticle = `${title || ""}\n\n${description || ""}\n\n${content || ""}`;
     
-    // Step 1: Get SEO recommendations
-    console.log('📊 Getting SEO recommendations...');
+    // Step 1: Get SEO recommendations (keep existing)
+    console.log('📊 Step 1: Getting SEO recommendations...');
     const prePrompt = buildSportsPrePublishPrompt({
       title,
       description,
@@ -293,26 +488,120 @@ async function processSportsNewsOpenAI(articleData, options = {}) {
     
     console.log('✅ SEO recommendations parsed');
     
-    // Step 2: Generate HTML article
-    console.log('📝 Generating HTML article...');
-    const htmlPrompt = buildSportsRewriteBodyHtmlPrompt({
-      title,
-      description,
-      body: content,
+    // PROMPT 0: Raw News Normalization (Fact Extractor)
+    console.log('🧩 Step 2: Extracting facts from raw news...');
+    const factPrompt = buildFactExtractorPrompt(rawArticle);
+    const factSummary = await generateWithOpenAI(factPrompt, {
+      temperature: 0.3,
+      max_tokens: 500
+    });
+    console.log('✅ Facts extracted');
+    
+    // PROMPT 1: Context Block (Why This Matters)
+    console.log('🧠 Step 3: Building context block...');
+    const contextPrompt = buildContextBuilderPrompt(factSummary);
+    const contextBlock = await generateWithOpenAI(contextPrompt, {
+      temperature: 0.7,
+      max_tokens: 300
+    });
+    console.log('✅ Context block generated');
+    
+    // PROMPT 2: Historical Comparison Block
+    console.log('📜 Step 4: Adding historical comparison...');
+    const historicalPrompt = buildHistoricalAnalystPrompt(factSummary);
+    const historicalBlock = await generateWithOpenAI(historicalPrompt, {
+      temperature: 0.7,
+      max_tokens: 300
+    });
+    console.log('✅ Historical comparison added');
+    
+    // PROMPT 3: Stats + Data with Interpretation
+    console.log('📊 Step 5: Adding stats and data interpretation...');
+    const statsPrompt = buildDataInterpreterPrompt(factSummary);
+    const statsBlock = await generateWithOpenAI(statsPrompt, {
+      temperature: 0.7,
+      max_tokens: 300
+    });
+    console.log('✅ Stats and interpretation added');
+    
+    // PROMPT 4: Impact Analysis
+    console.log('🔮 Step 6: Analyzing impact...');
+    const impactPrompt = buildImpactForecasterPrompt(factSummary);
+    const impactBlock = await generateWithOpenAI(impactPrompt, {
+      temperature: 0.7,
+      max_tokens: 300
+    });
+    console.log('✅ Impact analysis completed');
+    
+    // PROMPT 5: Fantasy / Fan Angle (Optional)
+    console.log('🎯 Step 7: Adding fantasy/fan angle...');
+    const fantasyPrompt = buildFantasyFanRelevancePrompt(factSummary);
+    const fantasyBlock = await generateWithOpenAI(fantasyPrompt, {
+      temperature: 0.7,
+      max_tokens: 250
+    });
+    console.log('✅ Fantasy/fan angle added');
+    
+    // PROMPT 6: Editorial Synthesis (Master Editor)
+    console.log('🧠 Step 8: Synthesizing final article...');
+    const masterEditorPrompt = buildMasterEditorPrompt({
+      context: contextBlock,
+      historical: historicalBlock,
+      stats: statsBlock,
+      impact: impactBlock,
+      fantasy: fantasyBlock,
+      factSummary: factSummary,
       recommendations: parsedRecommendations
     });
     
-    const readyArticle = await generateWithOpenAI(htmlPrompt, {
+    const readyArticle = await generateWithOpenAI(masterEditorPrompt, {
       temperature: 0.85,
-      max_tokens: 3000
+      max_tokens: 4000
+    });
+    console.log('✅ Final article synthesized');
+    
+    // Quality Check
+    console.log('✅ Step 9: Running quality check...');
+    const qualityCheckPrompt = buildQualityCheckPrompt({
+      originalArticle: rawArticle,
+      generatedArticle: readyArticle
     });
     
-    console.log('✅ HTML article generated');
+    const qualityCheck = await generateWithOpenAI(qualityCheckPrompt, {
+      temperature: 0.3,
+      max_tokens: 500
+    });
+    
+    console.log('📋 Quality Check Results:');
+    console.log(qualityCheck);
+    
+    // Check if quality check passed (basic check for "NO" in responses)
+    const qualityCheckLower = qualityCheck.toLowerCase();
+    const hasRejection = qualityCheckLower.includes('no') && 
+                        (qualityCheckLower.includes('adds new information: no') ||
+                         qualityCheckLower.includes('explains why and what next: no') ||
+                         qualityCheckLower.includes('shows editorial judgment: no') ||
+                         qualityCheckLower.includes('avoids source paraphrasing: no'));
+    
+    if (hasRejection) {
+      console.warn('⚠️ Quality check flagged potential issues. Review recommended.');
+    } else {
+      console.log('✅ Quality check passed');
+    }
     
     return {
       success: true,
       readyToPublishArticle: readyArticle,
-      recommendations: parsedRecommendations
+      recommendations: parsedRecommendations,
+      qualityCheck: qualityCheck,
+      valueAddedBlocks: {
+        factSummary,
+        context: contextBlock,
+        historical: historicalBlock,
+        stats: statsBlock,
+        impact: impactBlock,
+        fantasy: fantasyBlock
+      }
     };
     
   } catch (error) {
