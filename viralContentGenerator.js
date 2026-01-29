@@ -222,55 +222,86 @@ CRITICAL REQUIREMENTS:
 }
 
 /**
- * Generate Facebook viral content ideas - CLEAN VERSION
+ * Generate Facebook viral content ideas - HIGH-CTR VERSION
  */
 async function generateFacebookContent(analysis, newsArticle) {
-  const prompt = `Create 3 UNIQUE viral Facebook content ideas based on this cricket news analysis. Make each idea COMPLETELY DIFFERENT and specific to THIS ARTICLE.
+  const prompt = `You are a senior social media growth editor for a large cricket news brand.
+Your goal is to generate Facebook posts that can achieve 10,000+ clicks organically.
 
-NEWS: ${newsArticle.title}
+I will give you ONE article.
+Your task is to:
+
+STEP 1: ANALYZE THE ARTICLE
+- Identify the strongest CLICK TRIGGERS:
+  - Shock / controversy
+  - Fear / uncertainty
+  - Authority action (ban, suspension, ICC decision)
+  - World Cup / big event angle
+  - Emotion (anger, betrayal, disbelief)
+- Identify:
+  - 1 main hook
+  - 3 secondary hooks
+  - 1 debate angle
+
+STEP 2: CREATE FACEBOOK POST COPY
+Generate:
+- 5 HIGH-CTR Facebook link post captions
+Each caption must:
+- Start with a powerful hook in the first 8–12 words
+- Use curiosity, urgency, or controversy
+- Avoid revealing the full answer (force the click)
+- Include a clear CTA
+- End with a comment-bait question
+
+Tone:
+- Fan-first
+- Breaking-news urgency
+- Conversational (not robotic)
+- Slightly dramatic but factual
+
+STEP 3: CREATE IMAGE IDEAS
+Suggest:
+- 3 IMAGE CONCEPTS optimized for Facebook feed
+For each image:
+- Visual idea (what should be shown)
+- Text overlay (max 6–8 words, bold & emotional)
+- Emotion to trigger (shock, anger, curiosity)
+
+STEP 4: IMAGE GENERATION PROMPTS (AI-READY)
+For each image, write:
+- A detailed AI image generation prompt
+- Style: realistic, dramatic sports journalism
+- Aspect ratio: 1:1 and 4:5
+- High contrast, bold lighting, news-style composition
+
+STEP 5: HASHTAGS & POSTING TIPS
+Provide:
+- 5–7 hashtags (high-reach + topical)
+- Best posting time for Facebook
+- First comment strategy to boost reach
+
+IMPORTANT RULES:
+- No emojis overload (max 2 per caption)
+- No clickbait lies
+- Focus on emotional curiosity
+- Assume audience = hardcore + casual cricket fans
+
+Now analyze the article below and execute all steps.
+
+ARTICLE:
+TITLE: ${newsArticle.title}
 DESCRIPTION: ${newsArticle.description}
+CONTENT: ${newsArticle.content ? newsArticle.content.substring(0, 2000) : newsArticle.description}
 
-ANALYSIS: ${JSON.stringify(analysis, null, 2)}
+ANALYSIS DATA: ${JSON.stringify(analysis, null, 2)}
 
-Create 3 SEPARATE Facebook content ideas with CLEAN TEXT FORMAT:
-
-POST 1 - VIDEO POST:
-Hook/Narrative: [Specific hook for THIS news]
-Visual elements: [Specific visuals for THIS news]
-Caption structure: [Specific caption for THIS news]
-Call-to-Action: [Specific CTA for THIS news]
-Best time to post: [Optimal timing]
-Engagement tactics: [Specific tactics for THIS news]
-
-POST 2 - TEXT + IMAGE DEBATE POST:
-Question-style hook: [Specific question for THIS news]
-Emotional angle: [Specific emotional approach for THIS news]
-Image suggestions: [Specific images for THIS news]
-Caption: [Specific caption for THIS news]
-Call-to-Action: [Specific CTA for THIS news]
-Best time to post: [Optimal timing]
-
-POST 3 - AWARENESS CAMPAIGN POST:
-Story structure: [Specific story for THIS news]
-Images needed: [Specific images for THIS news]
-Emotional story caption: [Specific emotional content for THIS news]
-Call-to-Action: [Specific CTA for THIS news]
-Best time to post: [Optimal timing]
-Sharing incentives: [Specific incentives for THIS news]
-
-CRITICAL REQUIREMENTS:
-- NO asterisks anywhere
-- NO hashtags in content
-- NO double asterisks
-- NO formatting characters
-- NO square brackets in content
-- Use clean, plain text only
-- Base everything on THIS SPECIFIC NEWS ARTICLE`;
+Format your response clearly with STEP 1, STEP 2, STEP 3, STEP 4, STEP 5 sections.
+Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
 
   try {
     const response = await generateWithDeepSeek(prompt, {
       temperature: 0.9,
-      max_tokens: 2500
+      max_tokens: 4000
     });
     return cleanText(response);
   } catch (error) {
