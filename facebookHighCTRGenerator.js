@@ -1,36 +1,62 @@
 
 const axios = require('axios');
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
 
 /**
- * Generate content using DeepSeek API
+ * Generate content using OpenAI API
  */
-async function generateWithDeepSeek(prompt, options = {}) {
+async function generateWithOpenAI(prompt, options = {}) {
   try {
-    const response = await axios.post(DEEPSEEK_BASE_URL, {
-      model: "deepseek-chat",
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not set in environment variables');
+    }
+    
+    console.log('🤖 OpenAI API call started...');
+    console.log('📊 Temperature:', options.temperature ?? 0.9);
+    console.log('📝 Max tokens:', options.max_tokens ?? 4000);
+    
+    const response = await axios.post(OPENAI_BASE_URL, {
+      model: options.model || "gpt-4o-mini",
       messages: [
+        {
+          role: "system",
+          content: "You are a senior social media growth editor specializing in cricket and sports content. You create high-CTR Facebook posts that achieve 10,000+ organic clicks through strategic hooks, emotional triggers, and viral content strategies."
+        },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: options.temperature || 0.8,
+      temperature: options.temperature || 0.9,
       max_tokens: options.max_tokens || 4000
     }, {
       headers: {
-        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json'
       },
       timeout: 120000
     });
 
-    return response.data.choices[0].message.content;
+    if (!response.data || !response.data.choices || !response.data.choices[0]) {
+      throw new Error('Invalid response from OpenAI API');
+    }
+
+    const content = response.data.choices[0].message.content;
+    console.log('✅ OpenAI API call completed, content length:', content.length);
+    return content;
   } catch (error) {
-    console.error('DeepSeek API error:', error);
-    throw error;
+    console.error('❌ OpenAI API error:', error.message);
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('Request timeout - content generation took too long. Try again.');
+    }
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+      throw new Error(`OpenAI API error: ${error.response.data?.error?.message || error.message}`);
+    }
+    throw new Error(`OpenAI API error: ${error.message}`);
   }
 }
 
@@ -61,7 +87,20 @@ async function generateHighCTRFacebookContent(newsArticle) {
   const startTime = Date.now();
   
   try {
-    console.log(`🚀 Generating HIGH-CTR Facebook content for: ${newsArticle.title}`);
+    console.log(`🚀 Generating HIGH-CTR Facebook content with OpenAI for: ${newsArticle.title}`);
+    
+    // Validate required fields
+    if (!newsArticle.title) {
+      throw new Error('Article title is required');
+    }
+    
+    if (!newsArticle.description && !newsArticle.content) {
+      throw new Error('Article description or content is required');
+    }
+    
+    // Safely get content
+    const articleContent = newsArticle.content || newsArticle.description || '';
+    const contentPreview = articleContent.length > 2000 ? articleContent.substring(0, 2000) : articleContent;
     
     const prompt = `You are a senior social media growth editor for a large cricket news brand.
 Your goal is to generate Facebook posts that can achieve 10,000+ clicks organically.
@@ -127,21 +166,21 @@ IMPORTANT RULES:
 Now analyze the article below and execute all steps.
 
 ARTICLE:
-TITLE: ${newsArticle.title}
-DESCRIPTION: ${newsArticle.description}
-CONTENT: ${newsArticle.content ? newsArticle.content.substring(0, 2000) : newsArticle.description}
+TITLE: ${newsArticle.title || 'No title'}
+DESCRIPTION: ${newsArticle.description || 'No description'}
+CONTENT: ${contentPreview}
 
 Format your response clearly with STEP 1, STEP 2, STEP 3, STEP 4, STEP 5 sections.
 Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
 
-    const response = await generateWithDeepSeek(prompt, {
+    const response = await generateWithOpenAI(prompt, {
       temperature: 0.9,
       max_tokens: 4000
     });
     
     const cleanedResponse = cleanText(response);
     
-    console.log('✅ HIGH-CTR Facebook content generated');
+    console.log('✅ HIGH-CTR Facebook content generated with OpenAI');
     
     return {
       success: true,
@@ -154,7 +193,7 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
     };
     
   } catch (error) {
-    console.error('HIGH-CTR Facebook content generation error:', error);
+    console.error('HIGH-CTR Facebook content generation error (OpenAI):', error);
     return {
       success: false,
       error: error.message,

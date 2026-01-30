@@ -2900,14 +2900,16 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
         originalArticle: result.originalArticle
       });
     } else {
+      console.error("HIGH-CTR generation failed:", result.error);
       res.status(500).json({
         success: false,
-        error: result.error
+        error: result.error || "Failed to generate HIGH-CTR Facebook content"
       });
     }
 
   } catch (error) {
     console.error("Generate HIGH-CTR Facebook content error:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to generate HIGH-CTR Facebook content"

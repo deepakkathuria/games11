@@ -13,6 +13,8 @@ export default function FacebookHighCTRGenerator() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [busy, setBusy] = useState({});
+  const [processingTime, setProcessingTime] = useState(null);
+  const [error, setError] = useState(null);
 
   // --- SIMPLE FIX for timezone ---
   const fmt = (v) => {
@@ -40,6 +42,7 @@ export default function FacebookHighCTRGenerator() {
   // Fetch stored news from database
   const fetchStoredNews = async (page = 1) => {
     setLoading(true);
+    setError(null);
     try {
       const offset = (page - 1) * PAGE;
       const response = await axios.get(`${API}/api/viral/stored-news`, {
@@ -56,10 +59,12 @@ export default function FacebookHighCTRGenerator() {
         setCurrentPage(page);
         console.log(`✅ Fetched ${response.data.news?.length} stored articles`);
       } else {
+        setError(response.data.error || "Failed to fetch news");
         alert("Error fetching stored news: " + response.data.error);
       }
     } catch (error) {
       console.error("Error fetching stored news:", error);
+      setError(error.message);
       alert("Error fetching stored news: " + error.message);
     } finally {
       setLoading(false);
@@ -69,6 +74,10 @@ export default function FacebookHighCTRGenerator() {
   // Generate HIGH-CTR Facebook content
   const generateContent = async (articleId) => {
     setBusy((m) => ({ ...m, [articleId]: true }));
+    setError(null);
+    setContent(null);
+    setProcessingTime(null);
+    
     try {
       const response = await axios.post(`${API}/api/facebook-high-ctr/generate`, {
         articleId: articleId
@@ -77,13 +86,25 @@ export default function FacebookHighCTRGenerator() {
       if (response.data.success) {
         setContent(response.data.content);
         setSelectedArticle(response.data.originalArticle);
+        setProcessingTime(response.data.processingTime);
         console.log("✅ HIGH-CTR Facebook content generated successfully");
+        
+        // Scroll to content
+        setTimeout(() => {
+          const contentElement = document.getElementById('generated-content');
+          if (contentElement) {
+            contentElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
       } else {
+        setError(response.data.error || "Failed to generate content");
         alert("Error generating content: " + response.data.error);
       }
     } catch (error) {
       console.error("Error generating HIGH-CTR Facebook content:", error);
-      alert("Error generating content: " + error.message);
+      const errorMsg = error.response?.data?.error || error.message || "Failed to generate content";
+      setError(errorMsg);
+      alert("Error generating content: " + errorMsg);
     } finally {
       setBusy((m) => ({ ...m, [articleId]: false }));
     }
@@ -92,13 +113,16 @@ export default function FacebookHighCTRGenerator() {
   // Manual fetch news
   const manualFetch = async () => {
     setLoading(true);
+    setError(null);
     try {
       await axios.post(`${API}/api/manual-fetch-news`);
       await fetchStoredNews(1);
       setCurrentPage(1);
-      alert("News fetched successfully!");
+      alert("✅ News fetched successfully!");
     } catch (e) {
-      alert(e.response?.data?.error || e.message);
+      const errorMsg = e.response?.data?.error || e.message;
+      setError(errorMsg);
+      alert("Error: " + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -106,13 +130,18 @@ export default function FacebookHighCTRGenerator() {
 
   // Copy content to clipboard
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    alert("Content copied to clipboard!");
+    navigator.clipboard.writeText(text).then(() => {
+      alert("✅ Content copied to clipboard!");
+    }).catch(() => {
+      alert("❌ Failed to copy content");
+    });
   };
 
   // Download content as text file
   const downloadContent = () => {
-    const data = `HIGH-CTR FACEBOOK CONTENT\n\n${content}\n\nGenerated at: ${new Date().toLocaleString("en-IN")}\nOriginal Article: ${selectedArticle?.title || "N/A"}`;
+    if (!content) return;
+    
+    const data = `HIGH-CTR FACEBOOK CONTENT\nGenerated with OpenAI\n\n${"=".repeat(50)}\n\n${content}\n\n${"=".repeat(50)}\n\nGenerated at: ${new Date().toLocaleString("en-IN")}\nProcessing Time: ${processingTime ? (processingTime / 1000).toFixed(2) + 's' : 'N/A'}\nOriginal Article: ${selectedArticle?.title || "N/A"}\nSource: ${selectedArticle?.source?.name || "N/A"}`;
     
     const blob = new Blob([data], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -123,33 +152,80 @@ export default function FacebookHighCTRGenerator() {
     URL.revokeObjectURL(url);
   };
 
+  // Parse content into sections
+  const parseContent = (content) => {
+    if (!content) return null;
+    
+    const sections = {
+      step1: '',
+      step2: '',
+      step3: '',
+      step4: '',
+      step5: ''
+    };
+    
+    const step1Match = content.match(/STEP 1[:\s]*ANALYZE[^]*?(?=STEP 2|$)/i);
+    const step2Match = content.match(/STEP 2[:\s]*CREATE[^]*?(?=STEP 3|$)/i);
+    const step3Match = content.match(/STEP 3[:\s]*CREATE[^]*?(?=STEP 4|$)/i);
+    const step4Match = content.match(/STEP 4[:\s]*IMAGE[^]*?(?=STEP 5|$)/i);
+    const step5Match = content.match(/STEP 5[:\s]*HASHTAGS[^]*?$/i);
+    
+    if (step1Match) sections.step1 = step1Match[0].trim();
+    if (step2Match) sections.step2 = step2Match[0].trim();
+    if (step3Match) sections.step3 = step3Match[0].trim();
+    if (step4Match) sections.step4 = step4Match[0].trim();
+    if (step5Match) sections.step5 = step5Match[0].trim();
+    
+    return sections;
+  };
+
   // Load news on component mount
   useEffect(() => {
     fetchStoredNews(1);
   }, []);
 
+  const parsedContent = parseContent(content);
+
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto", fontFamily: "Inter, Arial" }}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <h1>📘 HIGH-CTR Facebook Content Generator</h1>
-        <p>Generate Facebook posts targeting 10,000+ organic clicks</p>
-        <div style={{ fontSize: '12px', color: '#999', marginTop: '10px' }}>
-          Current Time: {new Date().toLocaleString("en-IN")} | API: {API}
+    <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto", fontFamily: "Inter, Arial, sans-serif" }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 32, background: "linear-gradient(135deg, #1877f2 0%, #42a5f5 100%)", padding: 32, borderRadius: 16, color: "white", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+        <h1 style={{ margin: 0, marginBottom: 8, fontSize: 32, fontWeight: 700 }}>📘 HIGH-CTR Facebook Content Generator</h1>
+        <p style={{ margin: 0, fontSize: 16, opacity: 0.95 }}>Generate Facebook posts targeting 10,000+ organic clicks using OpenAI</p>
+        <div style={{ fontSize: '12px', marginTop: '12px', opacity: 0.9 }}>
+          🕒 {new Date().toLocaleString("en-IN")} | 🌐 API: {API} | 🤖 Powered by OpenAI GPT-4o-mini
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div style={{ 
+          background: "#ffebee", 
+          color: "#c62828", 
+          padding: 16, 
+          borderRadius: 8, 
+          marginBottom: 20,
+          border: "1px solid #ef5350"
+        }}>
+          <strong>❌ Error:</strong> {error}
+        </div>
+      )}
+
       {/* Action Buttons */}
-      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 24, flexWrap: "wrap" }}>
         <button 
           disabled={loading} 
           onClick={() => fetchStoredNews(currentPage)}
           style={{
-            padding: "8px 16px",
+            padding: "10px 20px",
             background: loading ? "#95a5a6" : "#007bff",
             color: "white",
             border: "none",
-            borderRadius: 6,
-            cursor: loading ? "not-allowed" : "pointer"
+            borderRadius: 8,
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: "600",
+            fontSize: 14,
+            boxShadow: loading ? "none" : "0 2px 4px rgba(0,0,0,0.1)"
           }}
         >
           {loading ? "⏳ Refreshing..." : "🔄 Refresh"}
@@ -158,12 +234,15 @@ export default function FacebookHighCTRGenerator() {
           disabled={loading} 
           onClick={manualFetch}
           style={{
-            padding: "8px 16px",
+            padding: "10px 20px",
             background: loading ? "#95a5a6" : "#28a745",
             color: "white",
             border: "none",
-            borderRadius: 6,
-            cursor: loading ? "not-allowed" : "pointer"
+            borderRadius: 8,
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: "600",
+            fontSize: 14,
+            boxShadow: loading ? "none" : "0 2px 4px rgba(0,0,0,0.1)"
           }}
         >
           {loading ? "⏳ Fetching..." : "📰 Fetch New News"}
@@ -171,183 +250,332 @@ export default function FacebookHighCTRGenerator() {
       </div>
 
       {/* News Selection Section */}
-      <div>
-        <h2>Latest Stored News (Page {currentPage} of {totalPages})</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {newsArticles.map((article) => {
-            const { date, time } = fmt(getPub(article));
-            const isBusy = !!busy[article.id];
-            return (
-              <div 
-                key={article.id} 
-                style={{ 
-                  border: "1px solid #e5e7eb", 
-                  borderRadius: 10, 
-                  padding: 16, 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  alignItems: "center" 
-                }}
-              >
-                <div style={{ flex: 1, paddingRight: 12 }}>
-                  <div 
-                    style={{ 
-                      fontWeight: 700, 
-                      marginBottom: 6, 
-                      color: "#007bff", 
-                      cursor: "pointer",
-                      textDecoration: "underline"
-                    }}
-                    onClick={() => {
-                      if (article.source_url) {
-                        window.open(article.source_url, '_blank', 'noopener,noreferrer');
-                      } else {
-                        alert('No source URL available');
-                      }
-                    }}
-                  >
-                    {article.title}
-                  </div>
-                  <div style={{ display: "flex", gap: 14, color: "#666", fontSize: 12 }}>
-                    <span>📅 {date}</span>
-                    <span>🕒 {time}</span>
-                    <span>{article.source_name}</span>
-                    {typeof article.word_count === "number" && <span>📝 {article.word_count} words</span>}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedArticle(article);
-                    generateContent(article.id);
-                  }}
-                  disabled={isBusy}
-                  style={{ 
-                    padding: "10px 14px", 
-                    background: isBusy ? "#95a5a6" : "#1877f2", 
-                    color: "#fff", 
-                    border: "none", 
-                    borderRadius: 8,
-                    fontWeight: "bold"
-                  }}
-                >
-                  {isBusy ? "⏳ Generating..." : "📘 Generate HIGH-CTR Content"}
-                </button>
-              </div>
-            );
-          })}
+      <div style={{ background: "#f8f9fa", padding: 24, borderRadius: 12, marginBottom: 32, boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ margin: 0, color: "#333" }}>📰 Latest Stored News</h2>
+          <span style={{ 
+            background: "#1877f2", 
+            color: "white", 
+            padding: "6px 12px", 
+            borderRadius: 20, 
+            fontSize: 14, 
+            fontWeight: 600 
+          }}>
+            Page {currentPage} of {totalPages} ({totalCount} articles)
+          </span>
         </div>
         
-        {/* Pagination */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: 16 }}>
-          <button 
-            disabled={currentPage === 1} 
-            onClick={() => fetchStoredNews(1)}
-            style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #ddd", borderRadius: 4, cursor: "pointer" }}
-          >
-            First
-          </button>
-          <button 
-            disabled={currentPage === 1} 
-            onClick={() => fetchStoredNews(currentPage - 1)}
-            style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #ddd", borderRadius: 4, cursor: "pointer" }}
-          >
-            Prev
-          </button>
-          <span style={{ padding: "6px 12px", background: "#1877f2", color: "white", borderRadius: 4 }}>
-            {currentPage} of {totalPages}
-          </span>
-          <button 
-            disabled={currentPage === totalPages} 
-            onClick={() => fetchStoredNews(currentPage + 1)}
-            style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #ddd", borderRadius: 4, cursor: "pointer" }}
-          >
-            Next
-          </button>
-          <button 
-            disabled={currentPage === totalPages} 
-            onClick={() => fetchStoredNews(totalPages)}
-            style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #ddd", borderRadius: 4, cursor: "pointer" }}
-          >
-            Last
-          </button>
-          <span style={{ marginLeft: 8, color: "#666" }}>
-            Page {currentPage} of {totalPages} ({totalCount})
-          </span>
-        </div>
+        {loading && newsArticles.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+            <div>Loading articles...</div>
+          </div>
+        ) : newsArticles.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>📭</div>
+            <div>No articles found. Click "Fetch New News" to get started.</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {newsArticles.map((article) => {
+                const { date, time } = fmt(getPub(article));
+                const isBusy = !!busy[article.id];
+                return (
+                  <div 
+                    key={article.id} 
+                    style={{ 
+                      background: "white",
+                      border: "2px solid #e5e7eb", 
+                      borderRadius: 12, 
+                      padding: 20, 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center",
+                      transition: "all 0.2s",
+                      boxShadow: selectedArticle?.title === article.title ? "0 4px 12px rgba(24,119,242,0.2)" : "0 2px 4px rgba(0,0,0,0.05)"
+                    }}
+                  >
+                    <div style={{ flex: 1, paddingRight: 16 }}>
+                      <div 
+                        style={{ 
+                          fontWeight: 700, 
+                          marginBottom: 8, 
+                          color: "#1877f2", 
+                          cursor: "pointer",
+                          textDecoration: "none",
+                          fontSize: 16,
+                          lineHeight: 1.4
+                        }}
+                        onClick={() => {
+                          if (article.source_url) {
+                            window.open(article.source_url, '_blank', 'noopener,noreferrer');
+                          } else {
+                            alert('No source URL available');
+                          }
+                        }}
+                        onMouseEnter={(e) => e.target.style.textDecoration = "underline"}
+                        onMouseLeave={(e) => e.target.style.textDecoration = "none"}
+                      >
+                        {article.title}
+                      </div>
+                      <div style={{ display: "flex", gap: 16, color: "#666", fontSize: 13, flexWrap: "wrap" }}>
+                        <span>📅 {date}</span>
+                        <span>🕒 {time}</span>
+                        <span>📰 {article.source_name}</span>
+                        {typeof article.word_count === "number" && <span>📝 {article.word_count} words</span>}
+                      </div>
+                      {article.description && (
+                        <div style={{ marginTop: 8, fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+                          {article.description.substring(0, 150)}...
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedArticle(article);
+                        generateContent(article.id);
+                      }}
+                      disabled={isBusy}
+                      style={{ 
+                        padding: "12px 20px", 
+                        background: isBusy ? "#95a5a6" : "#1877f2", 
+                        color: "#fff", 
+                        border: "none", 
+                        borderRadius: 8,
+                        fontWeight: "bold",
+                        fontSize: 14,
+                        cursor: isBusy ? "not-allowed" : "pointer",
+                        boxShadow: isBusy ? "none" : "0 2px 8px rgba(24,119,242,0.3)",
+                        transition: "all 0.2s",
+                        whiteSpace: "nowrap"
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isBusy) e.target.style.transform = "scale(1.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isBusy) e.target.style.transform = "scale(1)";
+                      }}
+                    >
+                      {isBusy ? "⏳ Generating..." : "📘 Generate HIGH-CTR"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Pagination */}
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, padding: 20, flexWrap: "wrap" }}>
+              <button 
+                disabled={currentPage === 1 || loading} 
+                onClick={() => fetchStoredNews(1)}
+                style={{ 
+                  padding: "8px 16px", 
+                  background: currentPage === 1 ? "#e0e0e0" : "#f3f4f6", 
+                  border: "1px solid #ddd", 
+                  borderRadius: 6, 
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                  fontWeight: 500
+                }}
+              >
+                First
+              </button>
+              <button 
+                disabled={currentPage === 1 || loading} 
+                onClick={() => fetchStoredNews(currentPage - 1)}
+                style={{ 
+                  padding: "8px 16px", 
+                  background: currentPage === 1 ? "#e0e0e0" : "#f3f4f6", 
+                  border: "1px solid #ddd", 
+                  borderRadius: 6, 
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                  fontWeight: 500
+                }}
+              >
+                Prev
+              </button>
+              <span style={{ 
+                padding: "8px 16px", 
+                background: "#1877f2", 
+                color: "white", 
+                borderRadius: 6,
+                fontWeight: 600,
+                minWidth: 120,
+                textAlign: "center"
+              }}>
+                {currentPage} / {totalPages}
+              </span>
+              <button 
+                disabled={currentPage === totalPages || loading} 
+                onClick={() => fetchStoredNews(currentPage + 1)}
+                style={{ 
+                  padding: "8px 16px", 
+                  background: currentPage === totalPages ? "#e0e0e0" : "#f3f4f6", 
+                  border: "1px solid #ddd", 
+                  borderRadius: 6, 
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                  fontWeight: 500
+                }}
+              >
+                Next
+              </button>
+              <button 
+                disabled={currentPage === totalPages || loading} 
+                onClick={() => fetchStoredNews(totalPages)}
+                style={{ 
+                  padding: "8px 16px", 
+                  background: currentPage === totalPages ? "#e0e0e0" : "#f3f4f6", 
+                  border: "1px solid #ddd", 
+                  borderRadius: 6, 
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                  fontWeight: 500
+                }}
+              >
+                Last
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Content Display */}
       {content && (
-        <div style={{ marginTop: 32 }}>
-          <div style={{ background: "#1877f2", color: "white", padding: 16, borderRadius: 12, marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2 style={{ margin: 0 }}>✅ Generated HIGH-CTR Facebook Content</h2>
-              <div style={{ display: "flex", gap: 8 }}>
+        <div id="generated-content" style={{ marginTop: 32 }}>
+          <div style={{ 
+            background: "linear-gradient(135deg, #1877f2 0%, #42a5f5 100%)", 
+            color: "white", 
+            padding: 24, 
+            borderRadius: 12, 
+            marginBottom: 24,
+            boxShadow: "0 4px 12px rgba(24,119,242,0.3)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+              <div>
+                <h2 style={{ margin: 0, marginBottom: 8, fontSize: 24 }}>✅ Generated HIGH-CTR Facebook Content</h2>
+                {selectedArticle && (
+                  <div style={{ fontSize: 14, opacity: 0.95, marginBottom: 4 }}>
+                    📰 {selectedArticle.title}
+                  </div>
+                )}
+                {processingTime && (
+                  <div style={{ fontSize: 12, opacity: 0.9 }}>
+                    ⏱️ Generated in {(processingTime / 1000).toFixed(2)}s
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   onClick={() => copyToClipboard(content)}
                   style={{
-                    padding: "8px 12px",
+                    padding: "10px 20px",
                     background: "white",
                     color: "#1877f2",
                     border: "none",
-                    borderRadius: 6,
+                    borderRadius: 8,
                     cursor: "pointer",
-                    fontWeight: "bold"
+                    fontWeight: "bold",
+                    fontSize: 14,
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
                   }}
                 >
-                  📋 Copy
+                  📋 Copy All
                 </button>
                 <button
                   onClick={downloadContent}
                   style={{
-                    padding: "8px 12px",
+                    padding: "10px 20px",
                     background: "white",
                     color: "#1877f2",
                     border: "none",
-                    borderRadius: 6,
+                    borderRadius: 8,
                     cursor: "pointer",
-                    fontWeight: "bold"
+                    fontWeight: "bold",
+                    fontSize: 14,
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
                   }}
                 >
                   💾 Download
                 </button>
               </div>
             </div>
-            {selectedArticle && (
-              <div style={{ marginTop: 12, fontSize: 14, opacity: 0.9 }}>
-                📰 Original Article: {selectedArticle.title}
-              </div>
-            )}
           </div>
 
+          {/* Content Display with Better Formatting */}
           <div style={{
             background: "#fff",
-            padding: 24,
+            padding: 32,
             borderRadius: 12,
             border: "2px solid #1877f2",
-            whiteSpace: "pre-wrap",
-            fontFamily: "monospace",
-            fontSize: 14,
-            lineHeight: 1.8,
-            maxHeight: 800,
-            overflow: "auto",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
           }}>
-            {content}
+            <div style={{
+              whiteSpace: "pre-wrap",
+              fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+              fontSize: 15,
+              lineHeight: 1.8,
+              color: "#333"
+            }}>
+              {content.split('\n').map((line, idx) => {
+                // Style different sections
+                if (line.match(/^STEP \d+/i)) {
+                  return (
+                    <div key={idx} style={{ 
+                      marginTop: idx > 0 ? 32 : 0, 
+                      marginBottom: 16,
+                      padding: "12px 16px",
+                      background: "#e3f2fd",
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      fontSize: 18,
+                      color: "#1877f2",
+                      borderLeft: "4px solid #1877f2"
+                    }}>
+                      {line}
+                    </div>
+                  );
+                }
+                if (line.match(/^(POST|CAPTION|IMAGE|HASHTAG)/i)) {
+                  return (
+                    <div key={idx} style={{ 
+                      marginTop: 16, 
+                      marginBottom: 8,
+                      fontWeight: 600,
+                      color: "#1976d2",
+                      fontSize: 16
+                    }}>
+                      {line}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={idx} style={{ marginBottom: 8 }}>
+                    {line}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
       {/* Instructions */}
-      <div style={{ background: "#e3f2fd", padding: 20, borderRadius: 12, marginTop: 24 }}>
-        <h3>📋 How to Use</h3>
-        <ol>
-          <li><strong>Select Article:</strong> Browse and click on any cricket news article</li>
-          <li><strong>Generate:</strong> Click "Generate HIGH-CTR Content" button</li>
+      <div style={{ 
+        background: "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)", 
+        padding: 24, 
+        borderRadius: 12, 
+        marginTop: 32,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+      }}>
+        <h3 style={{ margin: 0, marginBottom: 16, color: "#1565c0" }}>📋 How to Use</h3>
+        <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 2, color: "#333" }}>
+          <li><strong>Select Article:</strong> Browse cricket news articles and click on any article</li>
+          <li><strong>Generate:</strong> Click "Generate HIGH-CTR" button to create content</li>
           <li><strong>Review:</strong> Content includes 5 captions, 3 image ideas, AI prompts, hashtags & posting tips</li>
-          <li><strong>Copy/Download:</strong> Use the content for your Facebook posts</li>
+          <li><strong>Copy/Download:</strong> Use the buttons to copy or download the content</li>
         </ol>
-        <p><strong>Note:</strong> This generator uses a specialized prompt targeting 10,000+ organic clicks with high-CTR strategies.</p>
+        <div style={{ marginTop: 16, padding: 12, background: "white", borderRadius: 8 }}>
+          <strong>💡 Note:</strong> This generator uses OpenAI GPT-4o-mini with a specialized prompt targeting 10,000+ organic clicks through high-CTR strategies, emotional triggers, and viral content techniques.
+        </div>
       </div>
     </div>
   );
