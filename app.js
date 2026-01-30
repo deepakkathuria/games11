@@ -151,6 +151,7 @@ allNewsScheduler.startScheduler(30); //
 
 // Add this import at the top
 const { generateViralContent } = require('./viralContentGenerator');
+const { generateHighCTRFacebookContent } = require('./facebookHighCTRGenerator');
 const { fetchHindiAllNews, filterHindiAllNewsArticles, getHindiAllNewsArticleSummary, validateHindiAllNewsArticleForProcessing } = require('./hindiAllNewsFetcher');
 const HindiAllNewsScheduler = require('./hindiAllNewsScheduler');
 const { processHindiAllNewsManualInput, generateHindiAllNewsHeadline, generateHindiAllNewsMetaDescription } = require('./hindiAllManualInputProcessor');
@@ -2843,6 +2844,74 @@ app.get("/api/viral/content/:id", async (req, res) => {
   } catch (error) {
     console.error('Error getting viral content:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate HIGH-CTR Facebook content from stored article (Senior's Prompt)
+app.post("/api/facebook-high-ctr/generate", async (req, res) => {
+  try {
+    const { articleId } = req.body;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: "Article ID is required"
+      });
+    }
+
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM cricket_news WHERE id = ? AND is_valid = true',
+      [articleId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found"
+      });
+    }
+
+    const article = rows[0];
+    
+    // Convert database article to format
+    const newsArticle = {
+      title: article.title,
+      description: article.description,
+      content: article.content,
+      url: article.source_url,
+      publishedAt: article.published_at,
+      source: {
+        name: article.source_name,
+        url: article.source_url
+      }
+    };
+
+    console.log(`🚀 Generating HIGH-CTR Facebook content for: ${article.title}`);
+
+    // Generate HIGH-CTR Facebook content
+    const result = await generateHighCTRFacebookContent(newsArticle);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        content: result.content,
+        processingTime: result.processingTime,
+        originalArticle: result.originalArticle
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error("Generate HIGH-CTR Facebook content error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate HIGH-CTR Facebook content"
+    });
   }
 });
 
