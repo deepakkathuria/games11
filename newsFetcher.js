@@ -144,7 +144,7 @@ const dns = require('dns');
 try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 const agent = new https.Agent({ family: 4, keepAlive: true });
 
-const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "fe7ae24f706a3904399790443a6b2034";
+const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
 /**
@@ -160,12 +160,23 @@ async function fetchCricketNews(options = {}) {
       expand = "content"
     } = options;
 
+    // Get current date and 7 days ago for fresh news
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    const fromDate = sevenDaysAgo.toISOString().split('T')[0];
+    const toDate = today.toISOString().split('T')[0];
+    
+    console.log(`📰 Fetching cricket news from ${fromDate} to ${toDate} using API key: ${GNEWS_API_KEY.substring(0, 8)}...`);
+    
     const url = new URL(GNEWS_BASE_URL);
     url.searchParams.append("q", query);
     url.searchParams.append("lang", lang);
-    // url.searchParams.append("country", country);
     url.searchParams.append("max", String(max));
     url.searchParams.append("expand", expand);
+    url.searchParams.append("from", fromDate);
+    url.searchParams.append("to", toDate);
+    url.searchParams.append("sortby", "publishedAt"); // Sort by latest first
     url.searchParams.append("apikey", GNEWS_API_KEY);
 
     const response = await axios.get(url.toString(), {

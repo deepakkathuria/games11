@@ -15,6 +15,7 @@ export default function FacebookHighCTRGenerator() {
   const [busy, setBusy] = useState({});
   const [processingTime, setProcessingTime] = useState(null);
   const [error, setError] = useState(null);
+  const [provider, setProvider] = useState(null);
 
   // --- SIMPLE FIX for timezone ---
   const fmt = (v) => {
@@ -87,6 +88,7 @@ export default function FacebookHighCTRGenerator() {
         setContent(response.data.content);
         setSelectedArticle(response.data.originalArticle);
         setProcessingTime(response.data.processingTime);
+        setProvider(response.data.provider || 'OpenAI');
         console.log("✅ HIGH-CTR Facebook content generated successfully");
         
         // Scroll to content
@@ -207,7 +209,29 @@ export default function FacebookHighCTRGenerator() {
           marginBottom: 20,
           border: "1px solid #ef5350"
         }}>
-          <strong>❌ Error:</strong> {error}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <strong>❌ Error:</strong> {error}
+              {(error.includes('402') || error.includes('Payment')) && (
+                <div style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
+                  💡 Tip: System will automatically try DeepSeek as fallback if OpenAI fails.
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setError(null)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#c62828",
+                cursor: "pointer",
+                fontSize: 20,
+                padding: "0 8px"
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
 
@@ -460,6 +484,11 @@ export default function FacebookHighCTRGenerator() {
                 {processingTime && (
                   <div style={{ fontSize: 12, opacity: 0.9 }}>
                     ⏱️ Generated in {(processingTime / 1000).toFixed(2)}s
+                  </div>
+                )}
+                {provider && (
+                  <div style={{ fontSize: 12, opacity: 0.9 }}>
+                    🤖 Provider: {provider}
                   </div>
                 )}
               </div>

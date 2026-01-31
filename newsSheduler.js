@@ -41,7 +41,7 @@ async function getWithRetry(url, opts = {}, tries = 3) {
 }
 
 // GNews API Configuration
-const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "fe7ae24f706a3904399790443a6b2034";
+const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
 
 class NewsScheduler {
@@ -82,12 +82,23 @@ class NewsScheduler {
   // Fetch news from GNews API
   async fetchNewsFromAPI() {
     try {
+      // Get current date and 7 days ago for fresh news
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      const fromDate = sevenDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+      const toDate = today.toISOString().split('T')[0];
+      
+      console.log(`📰 Fetching cricket news from ${fromDate} to ${toDate} using API key: ${GNEWS_API_KEY.substring(0, 8)}...`);
+      
       const url = new URL(GNEWS_BASE_URL);
       url.searchParams.append("q", "cricket");
       url.searchParams.append("lang", "en");
-      // url.searchParams.append("country", "in");
       url.searchParams.append("max", "50");
       url.searchParams.append("expand", "content");
+      url.searchParams.append("from", fromDate);
+      url.searchParams.append("to", toDate);
+      url.searchParams.append("sortby", "publishedAt"); // Sort by latest first
       url.searchParams.append("apikey", GNEWS_API_KEY);
 
       const response = await getWithRetry(url.toString(), {
@@ -98,14 +109,28 @@ class NewsScheduler {
 
       // GNews: { totalArticles, articles: [...] }
       if (response.data && response.data.articles) {
-        return response.data.articles.filter(article =>
-          article.content &&
-          article.content.length > 300 &&
-          article.title &&
-          article.title.length > 10 &&
-          !article.title.toLowerCase().includes('betting') &&
-          !article.title.toLowerCase().includes('gambling')
-        );
+        const filtered = response.data.articles.filter(article => {
+          // Check content quality
+          if (!article.content || article.content.length < 300) return false;
+          if (!article.title || article.title.length < 10) return false;
+          if (article.title.toLowerCase().includes('betting')) return false;
+          if (article.title.toLowerCase().includes('gambling')) return false;
+          
+          // Check if article is recent (within last 7 days)
+          if (article.publishedAt) {
+            const articleDate = new Date(article.publishedAt);
+            const daysDiff = (today.getTime() - articleDate.getTime()) / (1000 * 60 * 60 * 24);
+            if (daysDiff > 7) {
+              console.log(`⏭️ Skipping old article: ${article.title.substring(0, 50)} (${Math.floor(daysDiff)} days old)`);
+              return false;
+            }
+          }
+          
+          return true;
+        });
+        
+        console.log(`✅ Filtered ${filtered.length} fresh articles from ${response.data.articles.length} total`);
+        return filtered;
       }
       return [];
     } catch (error) {

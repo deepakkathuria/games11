@@ -2897,6 +2897,7 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
         success: true,
         content: result.content,
         processingTime: result.processingTime,
+        provider: result.provider || 'OpenAI',
         originalArticle: result.originalArticle
       });
     } else {
