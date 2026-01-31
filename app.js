@@ -2958,21 +2958,42 @@ app.get("/api/facebook-high-ctr/stored-content", async (req, res) => {
     const totalCount = countResult[0]?.total || 0;
 
     // Get stored content with pagination
-    const [rows] = await pollDBPool.query(
-      `SELECT * FROM facebook_high_ctr_content 
-       ORDER BY created_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
+    // Try to order by created_at, but fallback to id if column doesn't exist
+    let rows;
+    try {
+      [rows] = await pollDBPool.query(
+        `SELECT * FROM facebook_high_ctr_content 
+         ORDER BY created_at DESC 
+         LIMIT ? OFFSET ?`,
+        [parseInt(limit), parseInt(offset)]
+      );
+    } catch (orderError) {
+      // If created_at doesn't exist, order by id instead
+      console.log('created_at column not found, ordering by id instead');
+      [rows] = await pollDBPool.query(
+        `SELECT * FROM facebook_high_ctr_content 
+         ORDER BY id DESC 
+         LIMIT ? OFFSET ?`,
+        [parseInt(limit), parseInt(offset)]
+      );
+    }
 
-    // Format dates safely
+    // Format dates safely - handle cases where columns might not exist
     const mapped = rows.map(row => {
       try {
-        return {
-          ...row,
-          created_at_iso: row.created_at ? toIsoZ(row.created_at) : null,
-          updated_at_iso: row.updated_at ? toIsoZ(row.updated_at) : null
-        };
+        const result = { ...row };
+        // Only add date fields if they exist in the row
+        if (row.hasOwnProperty('created_at')) {
+          result.created_at_iso = row.created_at ? toIsoZ(row.created_at) : null;
+        } else {
+          result.created_at_iso = null;
+        }
+        if (row.hasOwnProperty('updated_at')) {
+          result.updated_at_iso = row.updated_at ? toIsoZ(row.updated_at) : null;
+        } else {
+          result.updated_at_iso = null;
+        }
+        return result;
       } catch (dateError) {
         console.error('Date formatting error for row:', row.id, dateError);
         return {
