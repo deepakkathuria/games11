@@ -2893,12 +2893,40 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
     const result = await generateHighCTRFacebookContent(newsArticle);
 
     if (result.success) {
+      // Save generated content to database
+      try {
+        const [insertResult] = await pollDBPool.query(
+          `INSERT INTO facebook_high_ctr_content 
+           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            articleId,
+            article.title,
+            article.description || '',
+            article.source_url || '',
+            article.source_name || 'Unknown',
+            result.content,
+            result.processingTime,
+            result.provider || 'OpenAI'
+          ]
+        );
+        console.log(`💾 Saved generated content to database with ID: ${insertResult.insertId}`);
+      } catch (dbError) {
+        console.error('Error saving generated content to database:', dbError);
+        // Continue even if save fails
+      }
+
       res.json({
         success: true,
         content: result.content,
         processingTime: result.processingTime,
         provider: result.provider || 'OpenAI',
-        originalArticle: result.originalArticle
+        originalArticle: {
+          title: article.title,
+          description: article.description,
+          source_url: article.source_url,
+          source_name: article.source_name
+        }
       });
     } else {
       console.error("HIGH-CTR generation failed:", result.error);
@@ -2915,6 +2943,77 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
       success: false,
       error: error.message || "Failed to generate HIGH-CTR Facebook content"
     });
+  }
+});
+
+// Get stored Facebook High-CTR generated content
+app.get("/api/facebook-high-ctr/stored-content", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    // Get total count
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM facebook_high_ctr_content'
+    );
+    const totalCount = countResult[0].total;
+
+    // Get stored content with pagination
+    const [rows] = await pollDBPool.query(
+      `SELECT * FROM facebook_high_ctr_content 
+       ORDER BY created_at DESC 
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    // Format dates
+    const mapped = rows.map(row => ({
+      ...row,
+      created_at_iso: toIsoZ(row.created_at),
+      updated_at_iso: toIsoZ(row.updated_at)
+    }));
+
+    res.json({
+      success: true,
+      content: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error fetching stored Facebook High-CTR content:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get single stored content by ID
+app.get("/api/facebook-high-ctr/stored-content/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM facebook_high_ctr_content WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Content not found"
+      });
+    }
+
+    const content = rows[0];
+    res.json({
+      success: true,
+      content: {
+        ...content,
+        created_at_iso: toIsoZ(content.created_at),
+        updated_at_iso: toIsoZ(content.updated_at)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching stored content by ID:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
