@@ -84,11 +84,15 @@ export default function FacebookHighCTRGenerator() {
   // Fetch stored generated content
   const fetchStoredContent = async (page = 1) => {
     setStoredLoading(true);
+    setError(null);
     try {
       const offset = (page - 1) * PAGE;
       const response = await axios.get(
         `${API}/api/facebook-high-ctr/stored-content?limit=${PAGE}&offset=${offset}&_=${Date.now()}`,
-        { headers: { "Cache-Control": "no-cache" } }
+        { 
+          headers: { "Cache-Control": "no-cache" },
+          timeout: 30000
+        }
       );
 
       if (response.data.success) {
@@ -98,11 +102,15 @@ export default function FacebookHighCTRGenerator() {
         setStoredPage(page);
         console.log(`✅ Fetched ${response.data.content?.length} stored generated content`);
       } else {
-        alert("Error fetching stored content: " + (response.data.error || "Unknown error"));
+        const errorMsg = response.data.error || "Unknown error";
+        setError("Error fetching stored content: " + errorMsg);
+        console.error("Error response:", response.data);
       }
     } catch (error) {
       console.error("Error fetching stored content:", error);
-      alert("Error fetching stored content: " + error.message);
+      const errorMsg = error.response?.data?.error || error.message || "Failed to fetch stored content";
+      setError("Error fetching stored content: " + errorMsg);
+      console.error("Full error:", error.response?.data || error);
     } finally {
       setStoredLoading(false);
     }
@@ -126,11 +134,12 @@ export default function FacebookHighCTRGenerator() {
         setProcessingTime(response.data.processingTime);
         setProvider(response.data.provider || 'OpenAI');
         console.log("✅ HIGH-CTR Facebook content generated successfully");
+        alert("✅ Content generated and saved successfully! Check 'Stored Content' tab to view all saved content.");
         
-        // Refresh stored content list after generation
-        if (activeTab === "stored") {
-          fetchStoredContent(storedPage);
-        }
+        // Always refresh stored content list after generation (for both tabs)
+        setTimeout(() => {
+          fetchStoredContent(1); // Refresh to page 1 to see the latest
+        }, 500);
         
         // Scroll to content
         setTimeout(() => {
@@ -533,6 +542,25 @@ export default function FacebookHighCTRGenerator() {
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => {
+                        setActiveTab("stored");
+                        setTimeout(() => fetchStoredContent(1), 300);
+                      }}
+                      style={{
+                        padding: "10px 20px",
+                        background: "#28a745",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        fontWeight: "bold",
+                        fontSize: 14,
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                      }}
+                    >
+                      💾 View in Stored Tab
+                    </button>
                     <button
                       onClick={() => copyToClipboard(content)}
                       style={{

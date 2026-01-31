@@ -2955,7 +2955,7 @@ app.get("/api/facebook-high-ctr/stored-content", async (req, res) => {
     const [countResult] = await pollDBPool.query(
       'SELECT COUNT(*) as total FROM facebook_high_ctr_content'
     );
-    const totalCount = countResult[0].total;
+    const totalCount = countResult[0]?.total || 0;
 
     // Get stored content with pagination
     const [rows] = await pollDBPool.query(
@@ -2965,23 +2965,39 @@ app.get("/api/facebook-high-ctr/stored-content", async (req, res) => {
       [parseInt(limit), parseInt(offset)]
     );
 
-    // Format dates
-    const mapped = rows.map(row => ({
-      ...row,
-      created_at_iso: toIsoZ(row.created_at),
-      updated_at_iso: toIsoZ(row.updated_at)
-    }));
+    // Format dates safely
+    const mapped = rows.map(row => {
+      try {
+        return {
+          ...row,
+          created_at_iso: row.created_at ? toIsoZ(row.created_at) : null,
+          updated_at_iso: row.updated_at ? toIsoZ(row.updated_at) : null
+        };
+      } catch (dateError) {
+        console.error('Date formatting error for row:', row.id, dateError);
+        return {
+          ...row,
+          created_at_iso: row.created_at ? String(row.created_at) : null,
+          updated_at_iso: row.updated_at ? String(row.updated_at) : null
+        };
+      }
+    });
 
     res.json({
       success: true,
       content: mapped,
       totalCount,
       currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
-      totalPages: Math.ceil(totalCount / parseInt(limit))
+      totalPages: Math.ceil(totalCount / parseInt(limit)) || 1
     });
   } catch (error) {
     console.error('Error fetching stored Facebook High-CTR content:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to fetch stored content',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -3003,14 +3019,25 @@ app.get("/api/facebook-high-ctr/stored-content/:id", async (req, res) => {
     }
 
     const content = rows[0];
-    res.json({
-      success: true,
-      content: {
-        ...content,
-        created_at_iso: toIsoZ(content.created_at),
-        updated_at_iso: toIsoZ(content.updated_at)
-      }
-    });
+    try {
+      res.json({
+        success: true,
+        content: {
+          ...content,
+          created_at_iso: content.created_at ? toIsoZ(content.created_at) : null,
+          updated_at_iso: content.updated_at ? toIsoZ(content.updated_at) : null
+        }
+      });
+    } catch (dateError) {
+      res.json({
+        success: true,
+        content: {
+          ...content,
+          created_at_iso: content.created_at ? String(content.created_at) : null,
+          updated_at_iso: content.updated_at ? String(content.updated_at) : null
+        }
+      });
+    }
   } catch (error) {
     console.error('Error fetching stored content by ID:', error);
     res.status(500).json({ success: false, error: error.message });
