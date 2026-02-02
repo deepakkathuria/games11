@@ -207,8 +207,10 @@ const brandCarScheduler = new BrandCarNewsScheduler();
 
 // Sports News Scheduler
 const SportsNewsScheduler = require('./sportsNewsScheduler');
+const CricketAddictorScheduler = require('./cricketAddictorScheduler');
 const { processSportsNewsOpenAI } = require('./sportsOpenAIProcessor');
 const sportsScheduler = new SportsNewsScheduler();
+const cricketAddictorScheduler = new CricketAddictorScheduler();
 
 
 
@@ -3062,6 +3064,182 @@ app.get("/api/facebook-high-ctr/stored-content/:id", async (req, res) => {
   } catch (error) {
     console.error('Error fetching stored content by ID:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===========================================
+// CRICKET ADDICTOR APIs
+// ===========================================
+
+// Manual fetch CricketAddictor articles
+app.post('/api/cricket-addictor/manual-fetch', async (req, res) => {
+  try {
+    const { limit = 50 } = req.body;
+    console.log('📰 Fetching CricketAddictor articles...');
+    const count = await cricketAddictorScheduler.fetchAndStoreArticles(parseInt(limit));
+    res.json({ 
+      success: true, 
+      message: `Fetched and stored ${count} articles successfully!`
+    });
+  } catch (error) {
+    console.error('CricketAddictor manual fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get stored CricketAddictor articles
+app.get("/api/cricket-addictor/stored-articles", async (req, res) => {
+  try {
+    const { limit = 25, offset = 0 } = req.query;
+
+    const [countResult] = await pollDBPool.query(
+      'SELECT COUNT(*) as total FROM cricketaddictor_articles WHERE is_valid = true'
+    );
+    const totalCount = countResult[0]?.total || 0;
+
+    let rows;
+    try {
+      [rows] = await pollDBPool.query(
+        `SELECT * FROM cricketaddictor_articles 
+         WHERE is_valid = true 
+         ORDER BY published_at DESC, id DESC 
+         LIMIT ? OFFSET ?`,
+        [parseInt(limit), parseInt(offset)]
+      );
+    } catch (orderError) {
+      [rows] = await pollDBPool.query(
+        `SELECT * FROM cricketaddictor_articles 
+         WHERE is_valid = true 
+         ORDER BY id DESC 
+         LIMIT ? OFFSET ?`,
+        [parseInt(limit), parseInt(offset)]
+      );
+    }
+
+    const mapped = rows.map(row => {
+      try {
+        return {
+          ...row,
+          published_at_iso: row.published_at ? toIsoZ(row.published_at) : null
+        };
+      } catch (dateError) {
+        return {
+          ...row,
+          published_at_iso: row.published_at ? String(row.published_at) : null
+        };
+      }
+    });
+
+    res.json({
+      success: true,
+      articles: mapped,
+      totalCount,
+      currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      totalPages: Math.ceil(totalCount / parseInt(limit)) || 1
+    });
+  } catch (error) {
+    console.error('Error fetching stored CricketAddictor articles:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate HIGH-CTR Facebook content from CricketAddictor article
+app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
+  try {
+    const { articleId } = req.body;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: "Article ID is required"
+      });
+    }
+
+    // Get article from database
+    const [rows] = await pollDBPool.query(
+      'SELECT * FROM cricketaddictor_articles WHERE id = ? AND is_valid = true',
+      [articleId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found"
+      });
+    }
+
+    const article = rows[0];
+    
+    // Remove HTML tags for content processing
+    const textContent = article.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Convert database article to format
+    const newsArticle = {
+      title: article.title,
+      description: article.description || textContent.substring(0, 200),
+      content: textContent, // Use text content for AI
+      url: article.url,
+      publishedAt: article.published_at,
+      source: {
+        name: "Cricket Addictor",
+        url: article.url
+      }
+    };
+
+    console.log(`🚀 Generating HIGH-CTR Facebook content for: ${article.title}`);
+
+    // Generate HIGH-CTR Facebook content
+    const result = await generateHighCTRFacebookContent(newsArticle);
+
+    if (result.success) {
+      // Save generated content to database
+      try {
+        const [insertResult] = await pollDBPool.query(
+          `INSERT INTO facebook_high_ctr_content 
+           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            articleId,
+            article.title,
+            article.description || '',
+            article.url, // CricketAddictor URL
+            'Cricket Addictor',
+            result.content,
+            result.processingTime,
+            result.provider || 'OpenAI'
+          ]
+        );
+        console.log(`💾 Saved generated content to database with ID: ${insertResult.insertId}`);
+      } catch (dbError) {
+        console.error('Error saving generated content to database:', dbError);
+      }
+
+      res.json({
+        success: true,
+        content: result.content,
+        processingTime: result.processingTime,
+        provider: result.provider || 'OpenAI',
+        originalArticle: {
+          title: article.title,
+          description: article.description,
+          source_url: article.url,
+          source_name: 'Cricket Addictor'
+        }
+      });
+    } else {
+      console.error("HIGH-CTR generation failed:", result.error);
+      res.status(500).json({
+        success: false,
+        error: result.error || "Failed to generate HIGH-CTR Facebook content"
+      });
+    }
+
+  } catch (error) {
+    console.error("Generate HIGH-CTR Facebook content error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate HIGH-CTR Facebook content"
+    });
   }
 });
 
