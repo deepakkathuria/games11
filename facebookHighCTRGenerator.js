@@ -93,51 +93,115 @@ function extractImagePrompts(content) {
   
   const step4Content = step4Match[0];
   
-  // Try to find prompts - look for numbered items or "Image 1", "Image 2", etc.
+  // Try to find prompts - look for "Image 1 Prompt:", "Image 2 Prompt:", etc.
   const imagePatterns = [
-    /(?:Image|IMAGE)\s*(?:1|2|3|one|two|three)[:\s]*([^\n]+(?:\n[^\n]+)*?)(?=(?:Image|IMAGE)\s*(?:[123]|one|two|three)|STEP|$)/gi,
-    /(?:Prompt|PROMPT)\s*(?:1|2|3|one|two|three)[:\s]*([^\n]+(?:\n[^\n]+)*?)(?=(?:Prompt|PROMPT)\s*(?:[123]|one|two|three)|STEP|$)/gi,
-    /(?:For|FOR)\s*(?:image|IMAGE)\s*(?:1|2|3|one|two|three)[:\s]*([^\n]+(?:\n[^\n]+)*?)(?=(?:For|FOR)\s*(?:image|IMAGE)|STEP|$)/gi
+    // Pattern 1: "Image 1 Prompt:" or "IMAGE 1 PROMPT:"
+    /(?:Image|IMAGE)\s*(?:1|2|3|one|two|three)\s*(?:Prompt|PROMPT)[:\s]*([^\n]+(?:\n(?!Image|IMAGE|STEP|Prompt|PROMPT)[^\n]+)*?)(?=(?:Image|IMAGE)\s*(?:[123]|one|two|three)|STEP|$)/gi,
+    // Pattern 2: "Image 1:" or "IMAGE 1:"
+    /(?:Image|IMAGE)\s*(?:1|2|3|one|two|three)[:\s]+([^\n]+(?:\n(?!Image|IMAGE|STEP|Prompt|PROMPT)[^\n]+)*?)(?=(?:Image|IMAGE)\s*(?:[123]|one|two|three)|STEP|$)/gi,
+    // Pattern 3: "Prompt 1:" or "PROMPT 1:"
+    /(?:Prompt|PROMPT)\s*(?:1|2|3|one|two|three)[:\s]+([^\n]+(?:\n(?!Image|IMAGE|STEP|Prompt|PROMPT)[^\n]+)*?)(?=(?:Prompt|PROMPT)\s*(?:[123]|one|two|three)|STEP|$)/gi,
+    // Pattern 4: "For image 1:" or "FOR IMAGE 1:"
+    /(?:For|FOR)\s*(?:image|IMAGE)\s*(?:1|2|3|one|two|three)[:\s]+([^\n]+(?:\n(?!Image|IMAGE|STEP|Prompt|PROMPT|For|FOR)[^\n]+)*?)(?=(?:For|FOR)\s*(?:image|IMAGE)|STEP|$)/gi
   ];
   
   for (const pattern of imagePatterns) {
     const matches = step4Content.matchAll(pattern);
     for (const match of matches) {
       if (match[1]) {
-        const prompt = match[1].trim();
-        // Clean up the prompt
-        const cleanedPrompt = prompt
+        let prompt = match[1].trim();
+        // Clean up the prompt - remove common prefixes
+        prompt = prompt
           .replace(/^[-•*]\s*/, '')
+          .replace(/^Create\s+/i, '')
+          .replace(/^Visualize\s+/i, '')
+          .replace(/^Capture\s+/i, '')
+          .replace(/^Generate\s+/i, '')
           .replace(/\n+/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
         
-        if (cleanedPrompt.length > 20) { // Minimum prompt length
-          prompts.push(cleanedPrompt);
+        // Remove quotes if present
+        prompt = prompt.replace(/^["']|["']$/g, '');
+        
+        if (prompt.length > 20) { // Minimum prompt length
+          prompts.push(prompt);
         }
       }
     }
   }
   
-  // If no structured prompts found, try to extract any detailed descriptions
+  // If no structured prompts found, try simpler pattern - look for lines after "Prompt:"
+  if (prompts.length === 0) {
+    // Split by lines and look for "Prompt:" followed by text
+    const lines = step4Content.split(/\n/);
+    let currentPrompt = '';
+    let inPrompt = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Check if line contains "Prompt:" or "Image X Prompt:"
+      if (/Prompt[:\s]/i.test(line) || /Image\s*[123]\s*Prompt/i.test(line)) {
+        // Extract text after "Prompt:"
+        const afterPrompt = line.split(/Prompt[:\s]+/i)[1];
+        if (afterPrompt && afterPrompt.length > 20) {
+          prompts.push(afterPrompt.trim());
+        } else {
+          inPrompt = true;
+          currentPrompt = '';
+        }
+      } else if (inPrompt && line.length > 0 && !line.match(/^(Image|STEP|Hashtag)/i)) {
+        // Continue collecting prompt text
+        currentPrompt += (currentPrompt ? ' ' : '') + line;
+        if (currentPrompt.length > 100) {
+          prompts.push(currentPrompt.trim());
+          currentPrompt = '';
+          inPrompt = false;
+        }
+      } else if (inPrompt && line.match(/^(Image|STEP|Hashtag)/i)) {
+        // End of prompt section
+        if (currentPrompt.length > 20) {
+          prompts.push(currentPrompt.trim());
+        }
+        currentPrompt = '';
+        inPrompt = false;
+      }
+    }
+    
+    // Add last prompt if exists
+    if (inPrompt && currentPrompt.length > 20) {
+      prompts.push(currentPrompt.trim());
+    }
+  }
+  
+  // If still no prompts, try to extract any detailed descriptions
   if (prompts.length === 0) {
     // Look for sentences that seem like image prompts (contain visual descriptions)
     const sentences = step4Content.split(/[.\n]/);
-    const visualKeywords = ['image', 'photo', 'picture', 'visual', 'show', 'depict', 'display', 'illustrate', 'cricket', 'player', 'stadium', 'match'];
+    const visualKeywords = ['create', 'visualize', 'capture', 'show', 'depict', 'display', 'illustrate', 'cricket', 'player', 'stadium', 'match', 'dramatic', 'realistic'];
     
     for (const sentence of sentences) {
       const lowerSentence = sentence.toLowerCase();
-      if (visualKeywords.some(keyword => lowerSentence.includes(keyword)) && sentence.length > 30) {
+      if (visualKeywords.some(keyword => lowerSentence.includes(keyword)) && sentence.length > 50) {
         const cleaned = sentence.trim().replace(/^[-•*]\s*/, '');
-        if (cleaned.length > 20 && prompts.length < 3) {
+        if (cleaned.length > 30 && prompts.length < 3) {
           prompts.push(cleaned);
         }
       }
     }
   }
   
+  // Clean up prompts - remove quotes, extra spaces
+  const cleanedPrompts = prompts.map(p => {
+    return p
+      .replace(/^["']|["']$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }).filter(p => p.length > 20);
+  
   // Limit to 3 prompts
-  return prompts.slice(0, 3);
+  return cleanedPrompts.slice(0, 3);
 }
 
 /**
@@ -246,11 +310,26 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
     const imagePrompts = extractImagePrompts(cleanedResponse);
     console.log(`📸 Found ${imagePrompts.length} image prompts to generate`);
     
+    if (imagePrompts.length > 0) {
+      console.log('📝 Extracted prompts:');
+      imagePrompts.forEach((p, i) => {
+        console.log(`  ${i + 1}. ${p.substring(0, 100)}...`);
+      });
+    } else {
+      console.log('⚠️ No image prompts found in STEP 4. Checking content...');
+      const step4Match = cleanedResponse.match(/STEP 4[:\s]*IMAGE[^]*?(?=STEP 5|$)/i);
+      if (step4Match) {
+        console.log('📄 STEP 4 content found (first 200 chars):', step4Match[0].substring(0, 200));
+      } else {
+        console.log('❌ STEP 4 section not found in response');
+      }
+    }
+    
     // Generate images if prompts found
     let generatedImages = [];
     if (imagePrompts.length > 0) {
       try {
-        console.log('🎨 Starting image generation...');
+        console.log('🎨 Starting image generation with DALL-E...');
         const imageResult = await generateMultipleImages(imagePrompts, {
           size: "1024x1024",
           quality: "standard",
@@ -260,13 +339,24 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
         if (imageResult.success && imageResult.images.length > 0) {
           generatedImages = imageResult.images;
           console.log(`✅ Generated ${imageResult.totalGenerated} images successfully`);
+          if (imageResult.errors && imageResult.errors.length > 0) {
+            console.log(`⚠️ ${imageResult.totalFailed} images failed to generate`);
+          }
         } else {
           console.log('⚠️ Image generation failed, but continuing with text content');
+          if (imageResult.errors) {
+            imageResult.errors.forEach(err => {
+              console.error(`  Error for image ${err.index}: ${err.error}`);
+            });
+          }
         }
       } catch (imageError) {
         console.error('⚠️ Image generation error (continuing without images):', imageError.message);
+        console.error('Error stack:', imageError.stack);
         // Continue even if image generation fails
       }
+    } else {
+      console.log('⏭️ Skipping image generation - no prompts extracted');
     }
     
     return {

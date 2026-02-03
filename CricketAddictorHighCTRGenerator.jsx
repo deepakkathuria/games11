@@ -55,14 +55,29 @@ export default function CricketAddictorHighCTRGenerator() {
 
   // Fetch stored articles from database
   const fetchStoredArticles = async (page = 1) => {
+    console.log('📰 ========== FETCH STORED ARTICLES STARTED ==========');
+    console.log('📄 Page:', page);
+    console.log('🌐 API URL:', `${API}/api/cricket-addictor/stored-articles`);
+    
     setLoading(true);
     setError(null);
     try {
       const offset = (page - 1) * PAGE;
-      const response = await axios.get(
-        `${API}/api/cricket-addictor/stored-articles?limit=${PAGE}&offset=${offset}&_=${Date.now()}`,
-        { headers: { "Cache-Control": "no-cache" } }
-      );
+      const url = `${API}/api/cricket-addictor/stored-articles?limit=${PAGE}&offset=${offset}&_=${Date.now()}`;
+      console.log('📡 Making GET request to:', url);
+      
+      const response = await axios.get(url, { 
+        headers: { "Cache-Control": "no-cache" },
+        timeout: 30000
+      });
+
+      console.log('✅ API Response received');
+      console.log('📦 Response data:', {
+        success: response.data.success,
+        articlesCount: response.data.articles?.length || 0,
+        totalCount: response.data.totalCount,
+        totalPages: response.data.totalPages
+      });
 
       if (response.data.success) {
         setArticles(response.data.articles || []);
@@ -71,79 +86,148 @@ export default function CricketAddictorHighCTRGenerator() {
         setCurrentPage(page);
         console.log(`✅ Fetched ${response.data.articles?.length} stored articles`);
       } else {
+        console.error('❌ API returned success: false');
+        console.error('Error:', response.data.error);
         setError(response.data.error || "Failed to fetch articles");
         alert("Error fetching stored articles: " + response.data.error);
       }
     } catch (error) {
-      console.error("Error fetching stored articles:", error);
+      console.error("❌ ========== ERROR FETCHING STORED ARTICLES ==========");
+      console.error("Error type:", error.name);
+      console.error("Error message:", error.message);
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      }
       setError(error.message);
       alert("Error fetching stored articles: " + error.message);
     } finally {
+      console.log('🏁 ========== FETCH STORED ARTICLES FINISHED ==========');
       setLoading(false);
     }
   };
 
   // Fetch stored generated content
   const fetchStoredContent = async (page = 1) => {
+    console.log('📥 ========== FETCH STORED CONTENT STARTED ==========');
+    console.log('📄 Page:', page);
+    console.log('🌐 API URL:', `${API}/api/facebook-high-ctr/stored-content`);
+    
     setStoredLoading(true);
     setError(null);
     try {
       const offset = (page - 1) * PAGE;
-      const response = await axios.get(
-        `${API}/api/facebook-high-ctr/stored-content?limit=${PAGE}&offset=${offset}&_=${Date.now()}`,
-        { 
-          headers: { "Cache-Control": "no-cache" },
-          timeout: 30000
-        }
-      );
+      const url = `${API}/api/facebook-high-ctr/stored-content?limit=${PAGE}&offset=${offset}&_=${Date.now()}`;
+      console.log('📡 Making GET request to:', url);
+      
+      const response = await axios.get(url, { 
+        headers: { "Cache-Control": "no-cache" },
+        timeout: 30000
+      });
+
+      console.log('✅ API Response received');
+      console.log('📦 Response data:', {
+        success: response.data.success,
+        contentCount: response.data.content?.length || 0,
+        totalCount: response.data.totalCount,
+        totalPages: response.data.totalPages
+      });
 
       if (response.data.success) {
-        setStoredContent(response.data.content || []);
+        const content = response.data.content || [];
+        setStoredContent(content);
         setStoredTotalCount(response.data.totalCount || 0);
         setStoredTotalPages(response.data.totalPages || 1);
         setStoredPage(page);
-        console.log(`✅ Fetched ${response.data.content?.length} stored generated content`);
+        
+        console.log(`✅ Fetched ${content.length} stored generated content`);
+        
+        // Check for images in stored content
+        const itemsWithImages = content.filter(item => {
+          try {
+            const images = typeof item.generated_images === 'string' 
+              ? JSON.parse(item.generated_images) 
+              : item.generated_images;
+            return images && images.length > 0;
+          } catch {
+            return false;
+          }
+        });
+        console.log(`🖼️ Items with images: ${itemsWithImages.length}`);
       } else {
         const errorMsg = response.data.error || "Unknown error";
+        console.error('❌ API returned success: false');
+        console.error('Error:', errorMsg);
         setError("Error fetching stored content: " + errorMsg);
       }
     } catch (error) {
-      console.error("Error fetching stored content:", error);
+      console.error("❌ ========== ERROR FETCHING STORED CONTENT ==========");
+      console.error("Error type:", error.name);
+      console.error("Error message:", error.message);
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      }
       const errorMsg = error.response?.data?.error || error.message || "Failed to fetch stored content";
       setError("Error fetching stored content: " + errorMsg);
     } finally {
+      console.log('🏁 ========== FETCH STORED CONTENT FINISHED ==========');
       setStoredLoading(false);
     }
   };
 
   // Manual fetch articles from CricketAddictor API
   const manualFetch = async () => {
+    console.log('📰 ========== MANUAL FETCH ARTICLES STARTED ==========');
+    console.log('🌐 API URL:', `${API}/api/cricket-addictor/manual-fetch`);
+    
     setFetching(true);
     setError(null);
     try {
+      console.log('📡 Making POST request to fetch articles...');
       const response = await axios.post(`${API}/api/cricket-addictor/manual-fetch`, {
         limit: 50
+      }, {
+        timeout: 120000 // 2 minutes timeout
       });
 
+      console.log('✅ API Response received');
+      console.log('📦 Response:', response.data);
+
       if (response.data.success) {
+        console.log('✅ Articles fetched successfully');
         alert("✅ " + response.data.message);
         await fetchStoredArticles(1);
         setCurrentPage(1);
       } else {
+        console.error('❌ API returned success: false');
+        console.error('Error:', response.data.error);
         setError(response.data.error || "Failed to fetch articles");
         alert("Error: " + response.data.error);
       }
     } catch (e) {
+      console.error("❌ ========== ERROR IN MANUAL FETCH ==========");
+      console.error("Error:", e);
+      if (e.response) {
+        console.error("Response status:", e.response.status);
+        console.error("Response data:", e.response.data);
+      }
       const errorMsg = e.response?.data?.error || e.message;
       setError(errorMsg);
       alert("Error: " + errorMsg);
     } finally {
+      console.log('🏁 ========== MANUAL FETCH FINISHED ==========');
       setFetching(false);
     }
   };
 
   // Generate HIGH-CTR Facebook content
   const generateContent = async (articleId) => {
+    console.log('🚀 ========== GENERATE CONTENT STARTED ==========');
+    console.log('📝 Article ID:', articleId);
+    console.log('🌐 API URL:', `${API}/api/cricket-addictor/generate-high-ctr`);
+    console.log('⏰ Start Time:', new Date().toISOString());
+    
     setBusy((m) => ({ ...m, [articleId]: true }));
     setError(null);
     setContent(null);
@@ -151,8 +235,23 @@ export default function CricketAddictorHighCTRGenerator() {
     setGeneratedImages([]);
     
     try {
+      console.log('📡 Making API call to backend...');
+      const requestStartTime = Date.now();
+      
       const response = await axios.post(`${API}/api/cricket-addictor/generate-high-ctr`, {
         articleId: articleId
+      }, {
+        timeout: 180000 // 3 minutes timeout for image generation
+      });
+
+      const requestTime = Date.now() - requestStartTime;
+      console.log(`⏱️ API Response received in ${(requestTime / 1000).toFixed(2)}s`);
+      console.log('📦 Response data:', {
+        success: response.data.success,
+        hasContent: !!response.data.content,
+        hasImages: !!(response.data.images && response.data.images.length > 0),
+        imageCount: response.data.images ? response.data.images.length : 0,
+        processingTime: response.data.processingTime
       });
 
       if (response.data.success) {
@@ -160,11 +259,25 @@ export default function CricketAddictorHighCTRGenerator() {
         setSelectedArticle(response.data.originalArticle);
         setProcessingTime(response.data.processingTime);
         setProvider(response.data.provider || 'OpenAI');
-        setGeneratedImages(response.data.images || []);
+        
+        // Handle images
+        const images = response.data.images || [];
+        setGeneratedImages(images);
+        
         console.log("✅ HIGH-CTR Facebook content generated successfully");
-        if (response.data.images && response.data.images.length > 0) {
-          console.log(`🖼️ ${response.data.images.length} images generated`);
+        console.log(`📝 Content length: ${response.data.content?.length || 0} characters`);
+        console.log(`🖼️ Images received: ${images.length}`);
+        
+        if (images.length > 0) {
+          console.log('🖼️ Image URLs:');
+          images.forEach((img, idx) => {
+            console.log(`  Image ${idx + 1}: ${img.imageUrl}`);
+          });
+        } else {
+          console.warn('⚠️ No images received in response');
+          console.log('📋 Full response keys:', Object.keys(response.data));
         }
+        
         alert("✅ Content generated and saved successfully! Check 'Stored Content' tab to view all saved content.");
         
         // Always refresh stored content list after generation
@@ -180,15 +293,30 @@ export default function CricketAddictorHighCTRGenerator() {
           }
         }, 100);
       } else {
+        console.error('❌ API returned success: false');
+        console.error('Error from API:', response.data.error);
         setError(response.data.error || "Failed to generate content");
         alert("Error generating content: " + response.data.error);
       }
     } catch (error) {
-      console.error("Error generating HIGH-CTR Facebook content:", error);
+      console.error("❌ ========== ERROR IN GENERATE CONTENT ==========");
+      console.error("Error type:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      } else if (error.request) {
+        console.error("No response received from server");
+        console.error("Request config:", error.config);
+      }
+      
       const errorMsg = error.response?.data?.error || error.message || "Failed to generate content";
       setError(errorMsg);
       alert("Error generating content: " + errorMsg);
     } finally {
+      console.log('🏁 ========== GENERATE CONTENT FINISHED ==========');
       setBusy((m) => ({ ...m, [articleId]: false }));
     }
   };
@@ -219,12 +347,27 @@ export default function CricketAddictorHighCTRGenerator() {
 
   // Load articles on component mount
   useEffect(() => {
+    console.log('🎯 ========== COMPONENT MOUNTED/ACTIVE TAB CHANGED ==========');
+    console.log('📱 Active Tab:', activeTab);
+    console.log('🌐 API Base URL:', API);
+    console.log('⏰ Current Time:', new Date().toISOString());
+    
     if (activeTab === "generate") {
+      console.log('📰 Fetching stored articles...');
       fetchStoredArticles(1);
     } else if (activeTab === "stored") {
+      console.log('💾 Fetching stored content...');
       fetchStoredContent(1);
     }
   }, [activeTab]);
+  
+  // Log on initial mount
+  useEffect(() => {
+    console.log('🚀 ========== CRICKET ADDICTOR HIGH-CTR GENERATOR LOADED ==========');
+    console.log('📅 Loaded at:', new Date().toISOString());
+    console.log('🌐 API:', API);
+    console.log('✅ Component ready');
+  }, []);
 
   return (
     <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto", fontFamily: "Inter, Arial, sans-serif" }}>

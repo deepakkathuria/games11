@@ -10,11 +10,19 @@ const DALL_E_API_URL = "https://api.openai.com/v1/images/generations";
 async function generateImageWithDALLE(prompt, options = {}) {
   try {
     if (!OPENAI_API_KEY) {
+      console.error('❌ OPENAI_API_KEY is not set in environment variables');
       throw new Error('OPENAI_API_KEY is not set in environment variables');
     }
 
     console.log('🎨 Generating image with DALL-E...');
-    console.log('📝 Prompt:', prompt.substring(0, 100) + '...');
+    console.log('📝 Prompt length:', prompt.length);
+    console.log('📝 Prompt preview:', prompt.substring(0, 150) + '...');
+    
+    // Validate prompt length (DALL-E 3 has max 4000 characters)
+    if (prompt.length > 4000) {
+      console.warn('⚠️ Prompt too long, truncating to 4000 characters');
+      prompt = prompt.substring(0, 4000);
+    }
 
     const response = await axios.post(DALL_E_API_URL, {
       model: options.model || "dall-e-3",
