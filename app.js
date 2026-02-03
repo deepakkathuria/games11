@@ -2897,10 +2897,18 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
     if (result.success) {
       // Save generated content to database
       try {
+        const imageUrlsJson = result.images && result.images.length > 0 
+          ? JSON.stringify(result.images.map(img => ({
+              imageUrl: img.imageUrl,
+              prompt: img.prompt,
+              revisedPrompt: img.revisedPrompt || img.prompt
+            })))
+          : null;
+
         const [insertResult] = await pollDBPool.query(
           `INSERT INTO facebook_high_ctr_content 
-           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider, generated_images) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             articleId,
             article.title,
@@ -2909,10 +2917,14 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
             article.source_name || 'Unknown',
             result.content,
             result.processingTime,
-            result.provider || 'OpenAI'
+            result.provider || 'OpenAI',
+            imageUrlsJson
           ]
         );
         console.log(`💾 Saved generated content to database with ID: ${insertResult.insertId}`);
+        if (result.images && result.images.length > 0) {
+          console.log(`🖼️ Saved ${result.images.length} generated images`);
+        }
       } catch (dbError) {
         console.error('Error saving generated content to database:', dbError);
         // Continue even if save fails
@@ -2921,6 +2933,7 @@ app.post("/api/facebook-high-ctr/generate", async (req, res) => {
       res.json({
         success: true,
         content: result.content,
+        images: result.images || [],
         processingTime: result.processingTime,
         provider: result.provider || 'OpenAI',
         originalArticle: {
@@ -3194,10 +3207,18 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
     if (result.success) {
       // Save generated content to database
       try {
+        const imageUrlsJson = result.images && result.images.length > 0 
+          ? JSON.stringify(result.images.map(img => ({
+              imageUrl: img.imageUrl,
+              prompt: img.prompt,
+              revisedPrompt: img.revisedPrompt || img.prompt
+            })))
+          : null;
+
         const [insertResult] = await pollDBPool.query(
           `INSERT INTO facebook_high_ctr_content 
-           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider, generated_images) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             articleId,
             article.title,
@@ -3206,10 +3227,14 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
             'Cricket Addictor',
             result.content,
             result.processingTime,
-            result.provider || 'OpenAI'
+            result.provider || 'OpenAI',
+            imageUrlsJson
           ]
         );
         console.log(`💾 Saved generated content to database with ID: ${insertResult.insertId}`);
+        if (result.images && result.images.length > 0) {
+          console.log(`🖼️ Saved ${result.images.length} generated images`);
+        }
       } catch (dbError) {
         console.error('Error saving generated content to database:', dbError);
       }
@@ -3217,6 +3242,7 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
       res.json({
         success: true,
         content: result.content,
+        images: result.images || [],
         processingTime: result.processingTime,
         provider: result.provider || 'OpenAI',
         originalArticle: {

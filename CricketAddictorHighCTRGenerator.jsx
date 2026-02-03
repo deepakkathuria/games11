@@ -20,6 +20,7 @@ export default function CricketAddictorHighCTRGenerator() {
   const [error, setError] = useState(null);
   const [provider, setProvider] = useState(null);
   const [fetching, setFetching] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState([]);
 
   // Stored content tab states
   const [storedContent, setStoredContent] = useState([]);
@@ -147,6 +148,7 @@ export default function CricketAddictorHighCTRGenerator() {
     setError(null);
     setContent(null);
     setProcessingTime(null);
+    setGeneratedImages([]);
     
     try {
       const response = await axios.post(`${API}/api/cricket-addictor/generate-high-ctr`, {
@@ -158,7 +160,11 @@ export default function CricketAddictorHighCTRGenerator() {
         setSelectedArticle(response.data.originalArticle);
         setProcessingTime(response.data.processingTime);
         setProvider(response.data.provider || 'OpenAI');
+        setGeneratedImages(response.data.images || []);
         console.log("✅ HIGH-CTR Facebook content generated successfully");
+        if (response.data.images && response.data.images.length > 0) {
+          console.log(`🖼️ ${response.data.images.length} images generated`);
+        }
         alert("✅ Content generated and saved successfully! Check 'Stored Content' tab to view all saved content.");
         
         // Always refresh stored content list after generation
@@ -626,6 +632,75 @@ export default function CricketAddictorHighCTRGenerator() {
                 </div>
               </div>
 
+              {/* Generated Images Display */}
+              {generatedImages && generatedImages.length > 0 && (
+                <div style={{
+                  background: "#fff",
+                  padding: 24,
+                  borderRadius: 12,
+                  border: "2px solid #1877f2",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  marginBottom: 24
+                }}>
+                  <h3 style={{ margin: 0, marginBottom: 16, color: "#1877f2", fontSize: 20 }}>🖼️ Generated Images</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+                    {generatedImages.map((img, idx) => (
+                      <div key={idx} style={{
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        background: "#f8f9fa"
+                      }}>
+                        <img 
+                          src={img.imageUrl} 
+                          alt={`Generated Image ${idx + 1}`}
+                          style={{
+                            width: "100%",
+                            height: "auto",
+                            display: "block"
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'block';
+                          }}
+                        />
+                        <div style={{ display: "none", padding: 20, textAlign: "center", color: "#666" }}>
+                          Image failed to load
+                        </div>
+                        <div style={{ padding: 12, background: "white" }}>
+                          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+                            Image {idx + 1}
+                          </div>
+                          {img.prompt && (
+                            <div style={{ fontSize: 11, color: "#999", fontStyle: "italic" }}>
+                              {img.prompt.substring(0, 100)}...
+                            </div>
+                          )}
+                          <a 
+                            href={img.imageUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-block",
+                              marginTop: 8,
+                              padding: "6px 12px",
+                              background: "#1877f2",
+                              color: "white",
+                              textDecoration: "none",
+                              borderRadius: 4,
+                              fontSize: 12,
+                              fontWeight: 600
+                            }}
+                          >
+                            🔗 Open Full Size
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Content Display with Better Formatting */}
               <div style={{
                 background: "#fff",
@@ -862,6 +937,63 @@ export default function CricketAddictorHighCTRGenerator() {
                             borderRadius: 8,
                             border: "1px solid #e5e7eb"
                           }}>
+                            {/* Display Generated Images */}
+                            {item.generated_images && (() => {
+                              try {
+                                const images = typeof item.generated_images === 'string' 
+                                  ? JSON.parse(item.generated_images) 
+                                  : item.generated_images;
+                                
+                                if (images && images.length > 0) {
+                                  return (
+                                    <div style={{ marginBottom: 24 }}>
+                                      <h4 style={{ margin: 0, marginBottom: 12, color: "#1877f2", fontSize: 16 }}>🖼️ Generated Images</h4>
+                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
+                                        {images.map((img, idx) => (
+                                          <div key={idx} style={{
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: 8,
+                                            overflow: "hidden",
+                                            background: "white"
+                                          }}>
+                                            <img 
+                                              src={img.imageUrl} 
+                                              alt={`Generated Image ${idx + 1}`}
+                                              style={{
+                                                width: "100%",
+                                                height: "auto",
+                                                display: "block"
+                                              }}
+                                              onError={(e) => {
+                                                e.target.style.display = 'none';
+                                              }}
+                                            />
+                                            <div style={{ padding: 8, fontSize: 11, color: "#666" }}>
+                                              <a 
+                                                href={img.imageUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                  color: "#1877f2",
+                                                  textDecoration: "none",
+                                                  fontWeight: 600
+                                                }}
+                                              >
+                                                🔗 Open Full Size
+                                              </a>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              } catch (e) {
+                                console.error('Error parsing images:', e);
+                              }
+                              return null;
+                            })()}
+
                             <div style={{
                               whiteSpace: "pre-wrap",
                               fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",

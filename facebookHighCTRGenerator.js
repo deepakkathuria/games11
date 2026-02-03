@@ -1,5 +1,6 @@
 
 const axios = require('axios');
+const { generateImageWithDALLE, generateMultipleImages } = require('./imageGenerator');
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
@@ -78,6 +79,65 @@ function cleanText(text) {
     .replace(/_{2,}/g, '') // Remove multiple underscores
     .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
     .trim();
+}
+
+/**
+ * Extract image generation prompts from STEP 4
+ */
+function extractImagePrompts(content) {
+  const prompts = [];
+  
+  // Find STEP 4 section
+  const step4Match = content.match(/STEP 4[:\s]*IMAGE[^]*?(?=STEP 5|$)/i);
+  if (!step4Match) return prompts;
+  
+  const step4Content = step4Match[0];
+  
+  // Try to find prompts - look for numbered items or "Image 1", "Image 2", etc.
+  const imagePatterns = [
+    /(?:Image|IMAGE)\s*(?:1|2|3|one|two|three)[:\s]*([^\n]+(?:\n[^\n]+)*?)(?=(?:Image|IMAGE)\s*(?:[123]|one|two|three)|STEP|$)/gi,
+    /(?:Prompt|PROMPT)\s*(?:1|2|3|one|two|three)[:\s]*([^\n]+(?:\n[^\n]+)*?)(?=(?:Prompt|PROMPT)\s*(?:[123]|one|two|three)|STEP|$)/gi,
+    /(?:For|FOR)\s*(?:image|IMAGE)\s*(?:1|2|3|one|two|three)[:\s]*([^\n]+(?:\n[^\n]+)*?)(?=(?:For|FOR)\s*(?:image|IMAGE)|STEP|$)/gi
+  ];
+  
+  for (const pattern of imagePatterns) {
+    const matches = step4Content.matchAll(pattern);
+    for (const match of matches) {
+      if (match[1]) {
+        const prompt = match[1].trim();
+        // Clean up the prompt
+        const cleanedPrompt = prompt
+          .replace(/^[-•*]\s*/, '')
+          .replace(/\n+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (cleanedPrompt.length > 20) { // Minimum prompt length
+          prompts.push(cleanedPrompt);
+        }
+      }
+    }
+  }
+  
+  // If no structured prompts found, try to extract any detailed descriptions
+  if (prompts.length === 0) {
+    // Look for sentences that seem like image prompts (contain visual descriptions)
+    const sentences = step4Content.split(/[.\n]/);
+    const visualKeywords = ['image', 'photo', 'picture', 'visual', 'show', 'depict', 'display', 'illustrate', 'cricket', 'player', 'stadium', 'match'];
+    
+    for (const sentence of sentences) {
+      const lowerSentence = sentence.toLowerCase();
+      if (visualKeywords.some(keyword => lowerSentence.includes(keyword)) && sentence.length > 30) {
+        const cleaned = sentence.trim().replace(/^[-•*]\s*/, '');
+        if (cleaned.length > 20 && prompts.length < 3) {
+          prompts.push(cleaned);
+        }
+      }
+    }
+  }
+  
+  // Limit to 3 prompts
+  return prompts.slice(0, 3);
 }
 
 /**
@@ -182,9 +242,37 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
     
     console.log('✅ HIGH-CTR Facebook content generated with OpenAI');
     
+    // Extract image prompts from STEP 4
+    const imagePrompts = extractImagePrompts(cleanedResponse);
+    console.log(`📸 Found ${imagePrompts.length} image prompts to generate`);
+    
+    // Generate images if prompts found
+    let generatedImages = [];
+    if (imagePrompts.length > 0) {
+      try {
+        console.log('🎨 Starting image generation...');
+        const imageResult = await generateMultipleImages(imagePrompts, {
+          size: "1024x1024",
+          quality: "standard",
+          style: "natural"
+        });
+        
+        if (imageResult.success && imageResult.images.length > 0) {
+          generatedImages = imageResult.images;
+          console.log(`✅ Generated ${imageResult.totalGenerated} images successfully`);
+        } else {
+          console.log('⚠️ Image generation failed, but continuing with text content');
+        }
+      } catch (imageError) {
+        console.error('⚠️ Image generation error (continuing without images):', imageError.message);
+        // Continue even if image generation fails
+      }
+    }
+    
     return {
       success: true,
       content: cleanedResponse,
+      images: generatedImages,
       processingTime: Date.now() - startTime,
       originalArticle: {
         title: newsArticle.title,

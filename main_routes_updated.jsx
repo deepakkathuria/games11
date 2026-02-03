@@ -54,6 +54,7 @@ import BrandCarNewsOpenAI from './BrandCarNewsOpenAI.jsx';
 import SportsNewsOpenAI from './SportsNewsOpenAI.jsx';
 // Add HIGH-CTR Facebook Generator import
 import FacebookHighCTRGenerator from './FacebookHighCTRGenerator.jsx';
+import CricketAddictorHighCTRGenerator from './CricketAddictorHighCTRGenerator.jsx';
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -86,6 +87,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
           <Route path="viral-content-generator" element={<ViralContentGenerator />} />
           <Route path="facebook-high-ctr-generator" element={<FacebookHighCTRGenerator />} />
+          <Route path="cricket-addictor-high-ctr" element={<CricketAddictorHighCTRGenerator />} />
           <Route path="automated-all-news" element={<AutomatedAllNews />} />
           {/* Add Hindi All News route */}
           <Route path="hindi-all-news" element={<AutomatedHindiAllNews />} />
