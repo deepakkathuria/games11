@@ -775,7 +775,7 @@ export default function CricketAddictorHighCTRGenerator() {
                 </div>
               </div>
 
-              {/* Generated Images Display */}
+              {/* Generated Images Display - Grouped by Concept */}
               {generatedImages && generatedImages.length > 0 && (
                 <div style={{
                   background: "#fff",
@@ -785,62 +785,125 @@ export default function CricketAddictorHighCTRGenerator() {
                   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                   marginBottom: 24
                 }}>
-                  <h3 style={{ margin: 0, marginBottom: 16, color: "#1877f2", fontSize: 20 }}>🖼️ Generated Images</h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-                    {generatedImages.map((img, idx) => (
-                      <div key={idx} style={{
-                        border: "1px solid #e5e7eb",
-                        borderRadius: 8,
-                        overflow: "hidden",
-                        background: "#f8f9fa"
+                  <h3 style={{ margin: 0, marginBottom: 20, color: "#1877f2", fontSize: 20 }}>
+                    🖼️ Generated Images ({generatedImages.length} total - 3 Concepts × 2 Sizes)
+                  </h3>
+                  
+                  {/* Group images by concept */}
+                  {[1, 2, 3].map(conceptNum => {
+                    const conceptImages = generatedImages.filter(img => img.conceptIndex === conceptNum);
+                    if (conceptImages.length === 0) return null;
+                    
+                    return (
+                      <div key={conceptNum} style={{ 
+                        marginBottom: 32, 
+                        padding: 20, 
+                        background: '#f8f9fa', 
+                        borderRadius: 12,
+                        border: '1px solid #e5e7eb'
                       }}>
-                        <img 
-                          src={img.imageUrl} 
-                          alt={`Generated Image ${idx + 1}`}
-                          style={{
-                            width: "100%",
-                            height: "auto",
-                            display: "block"
-                          }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'block';
-                          }}
-                        />
-                        <div style={{ display: "none", padding: 20, textAlign: "center", color: "#666" }}>
-                          Image failed to load
-                        </div>
-                        <div style={{ padding: 12, background: "white" }}>
-                          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-                            Image {idx + 1}
-                          </div>
-                          {img.prompt && (
-                            <div style={{ fontSize: 11, color: "#999", fontStyle: "italic" }}>
-                              {img.prompt.substring(0, 100)}...
-                            </div>
+                        <h4 style={{ 
+                          margin: 0, 
+                          marginBottom: 16, 
+                          color: "#1877f2", 
+                          fontSize: 18,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8
+                        }}>
+                          <span style={{ 
+                            background: '#1877f2', 
+                            color: 'white', 
+                            padding: '4px 12px', 
+                            borderRadius: 20,
+                            fontSize: 14,
+                            fontWeight: 700
+                          }}>
+                            Concept {conceptNum}
+                          </span>
+                          <span style={{ fontSize: 14, color: '#666', fontWeight: 500 }}>
+                            {conceptImages[0]?.headline_overlay || 'Image Concept'}
+                          </span>
+                          {conceptImages[0]?.scene_type && (
+                            <span style={{ 
+                              fontSize: 12, 
+                              color: '#999', 
+                              fontStyle: 'italic',
+                              marginLeft: 8
+                            }}>
+                              ({conceptImages[0].scene_type})
+                            </span>
                           )}
-                          <a 
-                            href={img.imageUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            style={{
-                              display: "inline-block",
-                              marginTop: 8,
-                              padding: "6px 12px",
-                              background: "#1877f2",
-                              color: "white",
-                              textDecoration: "none",
-                              borderRadius: 4,
-                              fontSize: 12,
-                              fontWeight: 600
-                            }}
-                          >
-                            🔗 Open Full Size
-                          </a>
+                        </h4>
+                        
+                        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                          {conceptImages.map((img, idx) => (
+                            <div key={idx} style={{
+                              flex: '1 1 300px',
+                              maxWidth: '400px',
+                              border: "1px solid #e5e7eb",
+                              borderRadius: 8,
+                              overflow: "hidden",
+                              background: "white",
+                              boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                            }}>
+                              <img 
+                                src={img.imageUrl} 
+                                alt={`Concept ${conceptNum} - ${img.sizeLabel}`}
+                                style={{
+                                  width: "100%",
+                                  height: "auto",
+                                  display: "block"
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  if (e.target.nextSibling) {
+                                    e.target.nextSibling.style.display = 'block';
+                                  }
+                                }}
+                              />
+                              <div style={{ display: "none", padding: 20, textAlign: "center", color: "#666" }}>
+                                Image failed to load
+                              </div>
+                              <div style={{ padding: 12, background: "white" }}>
+                                <div style={{ fontSize: 12, color: "#666", marginBottom: 4, fontWeight: 600 }}>
+                                  Size: {img.sizeLabel || 'N/A'} ({img.dimensions || 'N/A'})
+                                </div>
+                                {img.headline_overlay && (
+                                  <div style={{ fontSize: 11, color: "#1877f2", marginBottom: 4, fontStyle: "italic" }}>
+                                    "{img.headline_overlay}"
+                                  </div>
+                                )}
+                                {img.scene_type && (
+                                  <div style={{ fontSize: 11, color: "#999", marginBottom: 8 }}>
+                                    Type: {img.scene_type}
+                                  </div>
+                                )}
+                                <a 
+                                  href={img.imageUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: "inline-block",
+                                    marginTop: 8,
+                                    padding: "6px 12px",
+                                    background: "#1877f2",
+                                    color: "white",
+                                    textDecoration: "none",
+                                    borderRadius: 4,
+                                    fontSize: 12,
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  🔗 Open Full Size
+                                </a>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -1080,7 +1143,7 @@ export default function CricketAddictorHighCTRGenerator() {
                             borderRadius: 8,
                             border: "1px solid #e5e7eb"
                           }}>
-                            {/* Display Generated Images */}
+                            {/* Display Generated Images - Grouped by Concept */}
                             {item.generated_images && (() => {
                               try {
                                 const images = typeof item.generated_images === 'string' 
@@ -1090,44 +1153,93 @@ export default function CricketAddictorHighCTRGenerator() {
                                 if (images && images.length > 0) {
                                   return (
                                     <div style={{ marginBottom: 24 }}>
-                                      <h4 style={{ margin: 0, marginBottom: 12, color: "#1877f2", fontSize: 16 }}>🖼️ Generated Images</h4>
-                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
-                                        {images.map((img, idx) => (
-                                          <div key={idx} style={{
-                                            border: "1px solid #e5e7eb",
+                                      <h4 style={{ margin: 0, marginBottom: 16, color: "#1877f2", fontSize: 16 }}>
+                                        🖼️ Generated Images ({images.length} total)
+                                      </h4>
+                                      
+                                      {/* Group images by concept */}
+                                      {[1, 2, 3].map(conceptNum => {
+                                        const conceptImages = images.filter(img => img.conceptIndex === conceptNum);
+                                        if (conceptImages.length === 0) return null;
+                                        
+                                        return (
+                                          <div key={conceptNum} style={{ 
+                                            marginBottom: 20, 
+                                            padding: 16, 
+                                            background: '#f8f9fa', 
                                             borderRadius: 8,
-                                            overflow: "hidden",
-                                            background: "white"
+                                            border: '1px solid #e5e7eb'
                                           }}>
-                                            <img 
-                                              src={img.imageUrl} 
-                                              alt={`Generated Image ${idx + 1}`}
-                                              style={{
-                                                width: "100%",
-                                                height: "auto",
-                                                display: "block"
-                                              }}
-                                              onError={(e) => {
-                                                e.target.style.display = 'none';
-                                              }}
-                                            />
-                                            <div style={{ padding: 8, fontSize: 11, color: "#666" }}>
-                                              <a 
-                                                href={img.imageUrl} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                style={{
-                                                  color: "#1877f2",
-                                                  textDecoration: "none",
-                                                  fontWeight: 600
-                                                }}
-                                              >
-                                                🔗 Open Full Size
-                                              </a>
+                                            <div style={{ 
+                                              marginBottom: 12, 
+                                              fontSize: 14, 
+                                              fontWeight: 600,
+                                              color: '#1877f2',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8
+                                            }}>
+                                              <span style={{ 
+                                                background: '#1877f2', 
+                                                color: 'white', 
+                                                padding: '2px 8px', 
+                                                borderRadius: 12,
+                                                fontSize: 12
+                                              }}>
+                                                Concept {conceptNum}
+                                              </span>
+                                              {conceptImages[0]?.headline_overlay && (
+                                                <span style={{ fontSize: 13, color: '#666' }}>
+                                                  {conceptImages[0].headline_overlay}
+                                                </span>
+                                              )}
+                                            </div>
+                                            
+                                            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                                              {conceptImages.map((img, idx) => (
+                                                <div key={idx} style={{
+                                                  flex: '1 1 200px',
+                                                  maxWidth: '250px',
+                                                  border: "1px solid #e5e7eb",
+                                                  borderRadius: 8,
+                                                  overflow: "hidden",
+                                                  background: "white"
+                                                }}>
+                                                  <img 
+                                                    src={img.imageUrl} 
+                                                    alt={`Concept ${conceptNum} - ${img.sizeLabel || idx + 1}`}
+                                                    style={{
+                                                      width: "100%",
+                                                      height: "auto",
+                                                      display: "block"
+                                                    }}
+                                                    onError={(e) => {
+                                                      e.target.style.display = 'none';
+                                                    }}
+                                                  />
+                                                  <div style={{ padding: 8, fontSize: 11, color: "#666" }}>
+                                                    <div style={{ marginBottom: 4, fontWeight: 600 }}>
+                                                      {img.sizeLabel || 'N/A'} ({img.dimensions || 'N/A'})
+                                                    </div>
+                                                    <a 
+                                                      href={img.imageUrl} 
+                                                      target="_blank" 
+                                                      rel="noopener noreferrer"
+                                                      style={{
+                                                        color: "#1877f2",
+                                                        textDecoration: "none",
+                                                        fontWeight: 600
+                                                      }}
+                                                    >
+                                                      🔗 Open Full Size
+                                                    </a>
+                                                  </div>
+                                                </div>
+                                              ))}
                                             </div>
                                           </div>
-                                        ))}
-                                      </div>
+                                        );
+                                      })}
                                     </div>
                                   );
                                 }

@@ -1,6 +1,21 @@
 
 const axios = require('axios');
-const { generateImageWithDALLE, generateMultipleImages, generateMultipleImagesWithSizes } = require('./imageGenerator');
+const { generateMultipleImagesWithSizes } = require('./imageGenerator');
+const { createVisualPlan } = require('./visualPlan');
+
+const SIZES = {
+  square: "1024x1024",
+  portrait: "1024x1536"
+};
+
+function styleLockPrompt(p) {
+  return [
+    "Breaking news cricket thumbnail, realistic photojournalism, dramatic high-contrast lighting, cinematic sports newsroom mood,",
+    "clean composition with empty space for headline text, ultra sharp,",
+    "no weapons, no blood, no injury, no hate symbols, no identifiable real person.",
+    p
+  ].join(" ");
+}
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
@@ -81,190 +96,6 @@ function cleanText(text) {
     .trim();
 }
 
-/**
- * Category detection + prompt recipes
- */
-const PROMPT_RECIPES = {
-  player: {
-    close_up: "Professional cricket player in action, sharp focus on face and expression, stadium lights, cinematic lighting, 8k quality, dramatic shadows",
-    wide: "Cricket player batting with crowd in background, dramatic stadium setting, golden hour lighting, vibrant atmosphere"
-  },
-  stadium: {
-    close_up: "Detailed cricket pitch with white lines, perfectly manicured grass, crowd in blurred background, professional sports photography",
-    wide: "Full cricket stadium packed with enthusiastic crowd, floodlights on, vibrant atmosphere, aerial view, cinematic composition"
-  },
-  action: {
-    close_up: "Close-up cricket ball in motion, bat connection, dust particles, high speed photography, dramatic action moment",
-    wide: "Wide angle of cricket match action, fielders positioned, crowd reaction visible, dynamic composition, sports journalism style"
-  },
-  celebration: {
-    close_up: "Celebrating cricket player, jubilant expression, teammates in background, emotional moment, professional photography",
-    wide: "Team celebration on field, crowd cheering, confetti effect, championship atmosphere, wide angle composition"
-  },
-  match: {
-    close_up: "Intense cricket match moment, players in focus, dramatic lighting, professional sports photography",
-    wide: "Cricket match in progress, full field view, crowd visible, stadium atmosphere, cinematic wide shot"
-  },
-  default: {
-    close_up: "Cricket-themed image, professional sports photography, dramatic lighting, high quality, realistic style",
-    wide: "Cricket scene, wide angle composition, stadium atmosphere, professional photography, cinematic style"
-  }
-};
-
-/**
- * Safety rewrite for risky words
- */
-function applySafetyRewrite(prompt) {
-  const riskyWords = {
-    "death": "dramatic moment",
-    "kill": "eliminate",
-    "attack": "aggressive play",
-    "wound": "injury",
-    "blood": "intense action",
-    "crash": "collision",
-    "destroy": "overpower",
-    "violence": "intense competition",
-    "war": "rivalry",
-    "battle": "match",
-    "fight": "competition",
-    "strike": "play",
-    "hit": "shot",
-    "beat": "defeat"
-  };
-  
-  let safePrompt = prompt;
-  for (const [word, replacement] of Object.entries(riskyWords)) {
-    const regex = new RegExp(`\\b${word}\\b`, "gi");
-    safePrompt = safePrompt.replace(regex, replacement);
-  }
-  
-  return safePrompt;
-}
-
-/**
- * Build visual brief from article (LLM JSON output)
- */
-async function buildVisualBrief(article) {
-  try {
-    console.log('📋 Building visual brief for article...');
-    
-    const articleContent = article.content || article.description || '';
-    const contentPreview = articleContent.length > 1500 ? articleContent.substring(0, 1500) : articleContent;
-    
-    const briefPrompt = `Analyze this cricket article and create a visual brief in JSON format.
-
-Article Title: ${article.title || 'No title'}
-Article Content: ${contentPreview}
-
-Return ONLY valid JSON (no markdown, no code blocks) with this structure:
-{
-  "category": "player|stadium|action|celebration|crowd|equipment|match",
-  "mood": "intense|celebratory|dramatic|heroic|tense|joyful",
-  "mainSubject": "brief description of main visual subject",
-  "setting": "brief description of setting/location",
-  "timeOfDay": "day|night|golden hour|sunset|dawn",
-  "colors": ["primary color", "secondary color"],
-  "composition": "wide angle|close-up|overhead|profile|action shot",
-  "emotion": "excitement|tension|joy|determination|surprise"
-}`;
-
-    const response = await axios.post(OPENAI_BASE_URL, {
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a visual content strategist. Return ONLY valid JSON, no additional text."
-        },
-        {
-          role: "user",
-          content: briefPrompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-      response_format: { type: "json_object" }
-    }, {
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000
-    });
-
-    if (!response.data || !response.data.choices || !response.data.choices[0]) {
-      throw new Error('Invalid response from OpenAI API');
-    }
-
-    const content = response.data.choices[0].message.content;
-    let brief;
-    
-    try {
-      // Try to parse JSON (handle if wrapped in markdown)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch ? jsonMatch[0] : content;
-      brief = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error('❌ Failed to parse visual brief JSON:', parseError);
-      // Fallback to default brief
-      brief = {
-        category: "match",
-        mood: "dramatic",
-        mainSubject: "cricket match",
-        setting: "cricket stadium",
-        timeOfDay: "day",
-        colors: ["green", "blue"],
-        composition: "wide angle",
-        emotion: "excitement"
-      };
-    }
-
-    console.log('✅ Visual brief generated:', JSON.stringify(brief, null, 2));
-    return brief;
-    
-  } catch (error) {
-    console.error('❌ Error building visual brief:', error.message);
-    // Return default brief on error
-    return {
-      category: "match",
-      mood: "dramatic",
-      mainSubject: article.title || "cricket match",
-      setting: "cricket stadium",
-      timeOfDay: "day",
-      colors: ["green", "blue"],
-      composition: "wide angle",
-      emotion: "excitement"
-    };
-  }
-}
-
-/**
- * Build image prompts from brief (strict STEP 4 format)
- */
-function buildImagePromptsFromBrief(brief) {
-  const category = brief.category || "default";
-  const recipe = PROMPT_RECIPES[category] || PROMPT_RECIPES.default;
-  
-  // Build base prompt
-  const basePrompt = `Cricket-themed image. Subject: ${brief.mainSubject || "cricket match"}. 
-Setting: ${brief.setting || "cricket stadium"}. Mood: ${brief.mood || "dramatic"}. 
-Time: ${brief.timeOfDay || "day"}. Colors: ${(brief.colors || ["green", "blue"]).join(", ")}.
-Composition: ${brief.composition || "wide angle"}. Emotion: ${brief.emotion || "excitement"}.
-Professional sports photography, high quality, realistic style, dramatic lighting.`;
-  
-  // Build prompts for both sizes
-  const prompts = {
-    "1:1": {
-      size: "1024x1024",
-      prompt: `${basePrompt} ${recipe.close_up}. Square composition (1:1 aspect ratio), optimized for social media feeds.`
-    },
-    "4:5": {
-      size: "1024x1280",
-      prompt: `${basePrompt} ${recipe.wide}. Portrait orientation (4:5 aspect ratio), optimized for mobile feeds and Facebook stories.`
-    }
-  };
-  
-  return prompts;
-}
 
 /**
  * Extract image generation prompts from STEP 4
@@ -510,68 +341,72 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
       }
     }
     
-    // Generate images using new visual brief system
+    // Generate images using 3-concept visual plan system
     let generatedImages = [];
     try {
-      console.log('🎨 Starting image generation with visual brief system...');
-      
-      // Build visual brief from article
-      const visualBrief = await buildVisualBrief(newsArticle);
-      
-      // Build image prompts from brief (returns 1:1 and 4:5 sizes)
-      const imagePromptsConfig = buildImagePromptsFromBrief(visualBrief);
-      
-      // Generate images for both sizes
-      const allImagePrompts = [];
-      const promptMetadata = [];
-      
-      for (const [sizeKey, config] of Object.entries(imagePromptsConfig)) {
-        const rawExtractedPrompt = config.prompt;
-        const finalPrompt = applySafetyRewrite(rawExtractedPrompt);
-        
-        // Log before API call
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`📐 SIZE: ${sizeKey} (${config.size})`);
-        console.log(`${'='.repeat(60)}`);
-        console.log('📋 RAW EXTRACTED PROMPT:');
-        console.log(rawExtractedPrompt);
-        console.log('\n🔒 SAFETY REWRITE APPLIED');
-        console.log('✅ FINAL PROMPT (sent to API):');
-        console.log(finalPrompt);
-        console.log(`${'='.repeat(60)}\n`);
-        
-        allImagePrompts.push(finalPrompt);
-        promptMetadata.push({
-          size: sizeKey,
-          dimensions: config.size,
-          rawPrompt: rawExtractedPrompt,
-          finalPrompt: finalPrompt
+      console.log('🎨 Starting image generation with 3-concept visual plan...');
+
+      // 1) Create 3 concepts from article
+      const plan = await createVisualPlan(newsArticle);
+      console.log('✅ Visual plan created with 3 concepts');
+
+      // 2) Build 6 prompts (3 concepts x 2 sizes)
+      const allPrompts = [];
+      const metadata = [];
+
+      plan.concepts.forEach((c, idx) => {
+        const conceptIndex = idx + 1;
+
+        const base = styleLockPrompt(c.prompt);
+
+        const promptSquare = `${base} Headline overlay text: "${c.headline_overlay}".`;
+        const promptPortrait = `${base} Vertical poster composition. Headline overlay text: "${c.headline_overlay}".`;
+
+        // square
+        allPrompts.push(promptSquare);
+        metadata.push({
+          conceptIndex,
+          sizeLabel: "1:1",
+          dimensions: SIZES.square,
+          headline_overlay: c.headline_overlay,
+          scene_type: c.scene_type,
+          rawPrompt: c.prompt,
+          finalPrompt: promptSquare
         });
-      }
-      
-      // Generate images with new system (2 sizes per prompt concept)
-      const imageResult = await generateMultipleImagesWithSizes(allImagePrompts, promptMetadata, {
-        quality: "hd",
-        style: "vivid"
+
+        // portrait
+        allPrompts.push(promptPortrait);
+        metadata.push({
+          conceptIndex,
+          sizeLabel: "4:5",
+          dimensions: SIZES.portrait,
+          headline_overlay: c.headline_overlay,
+          scene_type: c.scene_type,
+          rawPrompt: c.prompt,
+          finalPrompt: promptPortrait
+        });
       });
-      
-      if (imageResult.success && imageResult.images.length > 0) {
+
+      console.log(`📋 Generated ${allPrompts.length} prompts (3 concepts × 2 sizes)`);
+
+      // 3) Generate all images
+      const imageResult = await generateMultipleImagesWithSizes(allPrompts, metadata);
+
+      if (imageResult.success && imageResult.images.length) {
         generatedImages = imageResult.images;
         console.log(`✅ Generated ${imageResult.totalGenerated} images successfully`);
-        if (imageResult.errors && imageResult.errors.length > 0) {
-          console.log(`⚠️ ${imageResult.totalFailed} images failed to generate`);
-        }
+        if (imageResult.totalFailed) console.log(`⚠️ Failed ${imageResult.totalFailed} images`);
       } else {
-        console.log('⚠️ Image generation failed, but continuing with text content');
+        console.log('⚠️ Image generation failed; continuing with text-only');
         if (imageResult.errors) {
           imageResult.errors.forEach(err => {
             console.error(`  Error for image ${err.index}: ${err.error}`);
           });
         }
       }
-    } catch (imageError) {
-      console.error('⚠️ Image generation error (continuing without images):', imageError.message);
-      console.error('Error stack:', imageError.stack);
+    } catch (e) {
+      console.error('⚠️ Image generation error (continuing without images):', e.message);
+      console.error('Error stack:', e.stack);
       // Continue even if image generation fails
     }
     
@@ -601,8 +436,5 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
 }
 
 module.exports = {
-  generateHighCTRFacebookContent,
-  buildVisualBrief,
-  buildImagePromptsFromBrief,
-  applySafetyRewrite
+  generateHighCTRFacebookContent
 };
