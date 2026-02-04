@@ -21,6 +21,8 @@ export default function CricketAddictorHighCTRGenerator() {
   const [provider, setProvider] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
+  const [imagePolling, setImagePolling] = useState(false);
+  const [currentContentId, setCurrentContentId] = useState(null);
 
   // Stored content tab states
   const [storedContent, setStoredContent] = useState([]);
@@ -233,71 +235,137 @@ export default function CricketAddictorHighCTRGenerator() {
     setContent(null);
     setProcessingTime(null);
     setGeneratedImages([]);
+    setImagePolling(false);
+    setCurrentContentId(null);
     
     try {
-      console.log('📡 Making API call to backend...');
+      console.log('📡 Step 1: Making API call for TEXT generation...');
       const requestStartTime = Date.now();
       
+      // STEP 1: Generate TEXT ONLY (fast - 30-60s)
       const response = await axios.post(`${API}/api/cricket-addictor/generate-high-ctr`, {
         articleId: articleId
       }, {
-        timeout: 180000 // 3 minutes timeout for image generation
+        timeout: 120000 // 2 minutes for text generation
       });
 
       const requestTime = Date.now() - requestStartTime;
-      console.log(`⏱️ API Response received in ${(requestTime / 1000).toFixed(2)}s`);
+      console.log(`⏱️ TEXT Response received in ${(requestTime / 1000).toFixed(2)}s`);
       console.log('📦 Response data:', {
         success: response.data.success,
         hasContent: !!response.data.content,
-        hasImages: !!(response.data.images && response.data.images.length > 0),
-        imageCount: response.data.images ? response.data.images.length : 0,
-        processingTime: response.data.processingTime
+        contentId: response.data.contentId,
+        status: response.data.status
       });
 
-      if (response.data.success) {
-        setContent(response.data.content);
-        setSelectedArticle(response.data.originalArticle);
-        setProcessingTime(response.data.processingTime);
-        setProvider(response.data.provider || 'OpenAI');
+      if (!response.data.success) {
+        throw new Error(response.data.error || "Failed to generate content");
+      }
+
+      const { contentId, content, status } = response.data;
+      
+      // Show text immediately
+      setContent(content);
+      setSelectedArticle(response.data.originalArticle);
+      setProcessingTime(response.data.processingTime);
+      setProvider(response.data.provider || 'OpenAI');
+      setCurrentContentId(contentId);
+      
+      console.log("✅ TEXT content generated successfully");
+      console.log(`📝 Content ID: ${contentId}`);
+      console.log(`📊 Status: ${status}`);
+      console.log(`📝 Content length: ${content?.length || 0} characters`);
+      
+      // Scroll to content
+      setTimeout(() => {
+        const contentElement = document.getElementById('generated-content');
+        if (contentElement) {
+          contentElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+
+      // STEP 2: Generate images in background
+      console.log('🎨 Step 2: Starting image generation in background...');
+      setImagePolling(true);
+      
+      // Trigger image generation (fire and forget - don't wait)
+      axios.post(`${API}/api/cricket-addictor/generate-images`, {
+        contentId: contentId
+      }, {
+        timeout: 600000 // 10 minutes for image generation
+      }).then(imgResponse => {
+        console.log('✅ Image generation API call successful');
+      }).catch(err => {
+        console.error('❌ Image generation request error:', err);
+        // Don't show error to user, polling will catch it
+      });
+
+      // STEP 3: Poll for status every 3 seconds
+      let pollCount = 0;
+      const maxPolls = 200; // 200 * 3s = 10 minutes max
+      
+      const pollInterval = setInterval(async () => {
+        pollCount++;
         
-        // Handle images
-        const images = response.data.images || [];
-        setGeneratedImages(images);
-        
-        console.log("✅ HIGH-CTR Facebook content generated successfully");
-        console.log(`📝 Content length: ${response.data.content?.length || 0} characters`);
-        console.log(`🖼️ Images received: ${images.length}`);
-        
-        if (images.length > 0) {
-          console.log('🖼️ Image URLs:');
-          images.forEach((img, idx) => {
-            console.log(`  Image ${idx + 1}: ${img.imageUrl}`);
-          });
-        } else {
-          console.warn('⚠️ No images received in response');
-          console.log('📋 Full response keys:', Object.keys(response.data));
+        try {
+          const statusResponse = await axios.get(
+            `${API}/api/cricket-addictor/high-ctr-status?contentId=${contentId}&_=${Date.now()}`,
+            { 
+              timeout: 10000,
+              headers: { "Cache-Control": "no-cache" }
+            }
+          );
+
+          if (statusResponse.data.success) {
+            const { status, images, error } = statusResponse.data;
+            
+            console.log(`📊 [Poll ${pollCount}] Status: ${status}, Images: ${images.length}`);
+
+            if (status === 'done') {
+              clearInterval(pollInterval);
+              setImagePolling(false);
+              setGeneratedImages(images);
+              console.log(`✅ Image generation complete! ${images.length} images received`);
+              
+              // Refresh stored content
+              setTimeout(() => {
+                fetchStoredContent(1);
+              }, 500);
+              
+              alert(`✅ All done! Generated ${images.length} images successfully.`);
+            } else if (status === 'failed') {
+              clearInterval(pollInterval);
+              setImagePolling(false);
+              console.error('❌ Image generation failed:', error);
+              setError(`Image generation failed: ${error || 'Unknown error'}`);
+              alert(`⚠️ Image generation failed: ${error || 'Unknown error'}`);
+            }
+            // If status is 'processing_images', continue polling
+          }
+        } catch (pollError) {
+          console.error(`❌ Status poll error (attempt ${pollCount}):`, pollError);
+          // Continue polling even on error (network issues)
         }
         
-        alert("✅ Content generated and saved successfully! Check 'Stored Content' tab to view all saved content.");
-        
-        // Always refresh stored content list after generation
-        setTimeout(() => {
-          fetchStoredContent(1);
-        }, 500);
-        
-        // Scroll to content
-        setTimeout(() => {
-          const contentElement = document.getElementById('generated-content');
-          if (contentElement) {
-            contentElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
-      } else {
-        console.error('❌ API returned success: false');
-        console.error('Error from API:', response.data.error);
-        setError(response.data.error || "Failed to generate content");
-        alert("Error generating content: " + response.data.error);
-      }
+        // Stop polling after max attempts
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          setImagePolling(false);
+          console.log('⏱️ Polling stopped after max attempts');
+          setError('Image generation is taking longer than expected. Please check stored content tab later.');
+        }
+      }, 3000); // Poll every 3 seconds
+
+      // Store interval ID to clear on unmount
+      window.currentPollInterval = pollInterval;
+
+      alert("✅ Content generated! Images are being generated in the background. They will appear automatically when ready (3-5 minutes).");
+
+      // Always refresh stored content list after generation
+      setTimeout(() => {
+        fetchStoredContent(1);
+      }, 500);
+
     } catch (error) {
       console.error("❌ ========== ERROR IN GENERATE CONTENT ==========");
       console.error("Error type:", error.name);
@@ -314,6 +382,7 @@ export default function CricketAddictorHighCTRGenerator() {
       
       const errorMsg = error.response?.data?.error || error.message || "Failed to generate content";
       setError(errorMsg);
+      setImagePolling(false);
       alert("Error generating content: " + errorMsg);
     } finally {
       console.log('🏁 ========== GENERATE CONTENT FINISHED ==========');
@@ -369,8 +438,29 @@ export default function CricketAddictorHighCTRGenerator() {
     console.log('✅ Component ready');
   }, []);
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (window.currentPollInterval) {
+        clearInterval(window.currentPollInterval);
+        window.currentPollInterval = null;
+      }
+    };
+  }, []);
+
   return (
-    <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto", fontFamily: "Inter, Arial, sans-serif" }}>
+    <>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+        @keyframes slide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+      <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto", fontFamily: "Inter, Arial, sans-serif" }}>
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 32, background: "linear-gradient(135deg, #1877f2 0%, #42a5f5 100%)", padding: 32, borderRadius: 16, color: "white", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
         <h1 style={{ margin: 0, marginBottom: 8, fontSize: 32, fontWeight: 700 }}>📘 HIGH-CTR Facebook Content Generator</h1>
@@ -776,7 +866,7 @@ export default function CricketAddictorHighCTRGenerator() {
               </div>
 
               {/* Generated Images Display - Grouped by Concept */}
-              {generatedImages && generatedImages.length > 0 && (
+              {generatedImages && generatedImages.length > 0 ? (
                 <div style={{
                   background: "#fff",
                   padding: 24,
@@ -904,6 +994,40 @@ export default function CricketAddictorHighCTRGenerator() {
                       </div>
                     );
                   })}
+                </div>
+              ) : content && (
+                <div style={{
+                  background: "#fff",
+                  padding: 24,
+                  borderRadius: 12,
+                  border: "2px solid #e5e7eb",
+                  marginBottom: 24,
+                  textAlign: "center"
+                }}>
+                  <div style={{ fontSize: 16, color: "#666", marginBottom: 8 }}>
+                    {imagePolling ? "⏳ Images are being generated in the background..." : "⏳ Waiting for images..."}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#999" }}>
+                    This may take 3-5 minutes. Images will appear automatically when ready.
+                  </div>
+                  {imagePolling && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{
+                        width: "100%",
+                        height: "4px",
+                        background: "#e5e7eb",
+                        borderRadius: 2,
+                        overflow: "hidden"
+                      }}>
+                        <div style={{
+                          width: "100%",
+                          height: "100%",
+                          background: "linear-gradient(90deg, #1877f2, #42a5f5)",
+                          animation: "pulse 2s ease-in-out infinite"
+                        }}></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1396,6 +1520,7 @@ export default function CricketAddictorHighCTRGenerator() {
           <strong>💡 Note:</strong> All generated content is automatically saved. Articles are fetched from CricketAddictor.com API.
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

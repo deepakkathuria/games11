@@ -73,39 +73,8 @@ Content: ${content}
   const raw = resp?.data?.choices?.[0]?.message?.content;
   if (!raw) throw new Error("No visual plan returned");
 
-  let plan;
-  try {
-    plan = JSON.parse(raw);
-  } catch {
-    const match = raw.match(/\{[\s\S]*\}/);
-    plan = match ? JSON.parse(match[0]) : null;
-  }
-
-  // Hard fallback if malformed
-  if (!plan?.concepts || plan.concepts.length !== 3) {
-    return {
-      concepts: [
-        {
-          headline_overlay: "BREAKING CRICKET STORY",
-          scene_type: "symbolic",
-          prompt:
-            "A breaking cricket news thumbnail with a generic cricketer silhouette under stadium floodlights, dramatic clouds, social media blur in background, high contrast lighting, clean composition with headline space, realistic photojournalism look."
-        },
-        {
-          headline_overlay: "INSIDE STORY REVEALED",
-          scene_type: "institutional",
-          prompt:
-            "A newsroom-style thumbnail showing a cricket boardroom setting with microphones and press backdrop, a generic senior official (not identifiable) in soft focus, dramatic lighting, headline space, realistic sports journalism style."
-        },
-        {
-          headline_overlay: "FANS DIVIDED?",
-          scene_type: "split",
-          prompt:
-            "Split-screen thumbnail: left side a cricket stadium moment with tense crowd, right side abstract debate visuals like cracked glass texture and siren glow (no violence), high contrast cinematic lighting, clean headline space."
-        }
-      ]
-    };
-  }
+  const plan = JSON.parse(raw);
+  if (!plan.concepts || plan.concepts.length !== 3) throw new Error("Visual plan invalid");
 
   return plan;
 }

@@ -1,21 +1,5 @@
 
 const axios = require('axios');
-const { generateMultipleImagesWithSizes } = require('./imageGenerator');
-const { createVisualPlan } = require('./visualPlan');
-
-const SIZES = {
-  square: "1024x1024",
-  portrait: "1024x1536"
-};
-
-function styleLockPrompt(p) {
-  return [
-    "Breaking news cricket thumbnail, realistic photojournalism, dramatic high-contrast lighting, cinematic sports newsroom mood,",
-    "clean composition with empty space for headline text, ultra sharp,",
-    "no weapons, no blood, no injury, no hate symbols, no identifiable real person.",
-    p
-  ].join(" ");
-}
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
@@ -341,84 +325,11 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
       }
     }
     
-    // Generate images using 3-concept visual plan system
-    let generatedImages = [];
-    try {
-      console.log('🎨 Starting image generation with 3-concept visual plan...');
-
-      // 1) Create 3 concepts from article
-      const plan = await createVisualPlan(newsArticle);
-      console.log('✅ Visual plan created with 3 concepts');
-
-      // 2) Build 6 prompts (3 concepts x 2 sizes)
-      const allPrompts = [];
-      const metadata = [];
-
-      plan.concepts.forEach((c, idx) => {
-        const conceptIndex = idx + 1;
-
-        const base = styleLockPrompt(c.prompt);
-
-        const promptSquare = `${base} Headline overlay text: "${c.headline_overlay}".`;
-        const promptPortrait = `${base} Vertical poster composition. Headline overlay text: "${c.headline_overlay}".`;
-
-        // square
-        allPrompts.push(promptSquare);
-        metadata.push({
-          conceptIndex,
-          sizeLabel: "1:1",
-          dimensions: SIZES.square,
-          headline_overlay: c.headline_overlay,
-          scene_type: c.scene_type,
-          rawPrompt: c.prompt,
-          finalPrompt: promptSquare
-        });
-
-        // portrait
-        allPrompts.push(promptPortrait);
-        metadata.push({
-          conceptIndex,
-          sizeLabel: "4:5",
-          dimensions: SIZES.portrait,
-          headline_overlay: c.headline_overlay,
-          scene_type: c.scene_type,
-          rawPrompt: c.prompt,
-          finalPrompt: promptPortrait
-        });
-      });
-
-      console.log(`📋 Generated ${allPrompts.length} prompts (3 concepts × 2 sizes)`);
-
-      // 3) Generate all images
-      const imageResult = await generateMultipleImagesWithSizes(allPrompts, metadata);
-
-      if (imageResult.success && imageResult.images.length) {
-        generatedImages = imageResult.images;
-        console.log(`✅ Generated ${imageResult.totalGenerated} images successfully`);
-        if (imageResult.totalFailed) console.log(`⚠️ Failed ${imageResult.totalFailed} images`);
-      } else {
-        console.log('⚠️ Image generation failed; continuing with text-only');
-        if (imageResult.errors) {
-          imageResult.errors.forEach(err => {
-            console.error(`  Error for image ${err.index}: ${err.error}`);
-          });
-        }
-      }
-    } catch (e) {
-      console.error('⚠️ Image generation error (continuing without images):', e.message);
-      console.error('Error stack:', e.stack);
-      // Continue even if image generation fails
-    }
-    
     return {
       success: true,
       content: cleanedResponse,
-      images: generatedImages,
       processingTime: Date.now() - startTime,
-      originalArticle: {
-        title: newsArticle.title,
-        description: newsArticle.description
-      }
+      provider: "OpenAI"
     };
     
   } catch (error) {
@@ -435,6 +346,126 @@ Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
   }
 }
 
+/**
+ * Generate HIGH-CTR Facebook content TEXT ONLY (no images)
+ */
+async function generateHighCTRFacebookContent_TEXT_ONLY(newsArticle) {
+  const startTime = Date.now();
+  
+  try {
+    console.log(`🚀 Generating HIGH-CTR Facebook content (TEXT ONLY) with OpenAI for: ${newsArticle.title}`);
+    
+    // Validate required fields
+    if (!newsArticle.title) {
+      throw new Error('Article title is required');
+    }
+    
+    if (!newsArticle.description && !newsArticle.content) {
+      throw new Error('Article description or content is required');
+    }
+    
+    // Safely get content
+    const articleContent = newsArticle.content || newsArticle.description || '';
+    const contentPreview = articleContent.length > 2000 ? articleContent.substring(0, 2000) : articleContent;
+    
+    const prompt = `You are a senior social media growth editor for a large cricket news brand.
+Your goal is to generate Facebook posts that can achieve 10,000+ clicks organically.
+
+I will give you ONE article.
+Your task is to:
+
+STEP 1: ANALYZE THE ARTICLE
+- Identify the strongest CLICK TRIGGERS:
+  - Shock / controversy
+  - Fear / uncertainty
+  - Authority action (ban, suspension, ICC decision)
+  - World Cup / big event angle
+  - Emotion (anger, betrayal, disbelief)
+- Identify:
+  - 1 main hook
+  - 3 secondary hooks
+  - 1 debate angle
+
+STEP 2: CREATE FACEBOOK POST COPY
+Generate:
+- 5 HIGH-CTR Facebook link post captions
+Each caption must:
+- Start with a powerful hook in the first 8–12 words
+- Use curiosity, urgency, or controversy
+- Avoid revealing the full answer (force the click)
+- Include a clear CTA
+- End with a comment-bait question
+
+Tone:
+- Fan-first
+- Breaking-news urgency
+- Conversational (not robotic)
+- Slightly dramatic but factual
+
+STEP 3: CREATE IMAGE IDEAS
+Suggest:
+- 3 IMAGE CONCEPTS optimized for Facebook feed
+For each image:
+- Visual idea (what should be shown)
+- Text overlay (max 6–8 words, bold & emotional)
+- Emotion to trigger (shock, anger, curiosity)
+
+STEP 4: IMAGE GENERATION PROMPTS (AI-READY)
+For each image, write:
+- A detailed AI image generation prompt
+- Style: realistic, dramatic sports journalism
+- Aspect ratio: 1:1 and 4:5
+- High contrast, bold lighting, news-style composition
+
+STEP 5: HASHTAGS & POSTING TIPS
+Provide:
+- 5–7 hashtags (high-reach + topical)
+- Best posting time for Facebook
+- First comment strategy to boost reach
+
+IMPORTANT RULES:
+- No emojis overload (max 2 per caption)
+- No clickbait lies
+- Focus on emotional curiosity
+- Assume audience = hardcore + casual cricket fans
+
+Now analyze the article below and execute all steps.
+
+ARTICLE:
+TITLE: ${newsArticle.title || 'No title'}
+DESCRIPTION: ${newsArticle.description || 'No description'}
+CONTENT: ${contentPreview}
+
+Format your response clearly with STEP 1, STEP 2, STEP 3, STEP 4, STEP 5 sections.
+Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
+
+    const response = await generateWithOpenAI(prompt, {
+      temperature: 0.9,
+      max_tokens: 4000
+    });
+    
+    const cleanedResponse = cleanText(response);
+    
+    console.log('✅ HIGH-CTR Facebook content (TEXT ONLY) generated with OpenAI');
+    
+    return {
+      success: true,
+      content: cleanedResponse,
+      processingTime: Date.now() - startTime,
+      provider: "OpenAI"
+    };
+    
+  } catch (error) {
+    console.error('HIGH-CTR Facebook content generation error (OpenAI):', error);
+    return {
+      success: false,
+      error: error.message,
+      processingTime: Date.now() - startTime
+    };
+  }
+}
+
 module.exports = {
-  generateHighCTRFacebookContent
+  generateHighCTRFacebookContent,
+  generateHighCTRFacebookContent_TEXT_ONLY
 };

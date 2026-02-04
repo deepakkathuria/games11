@@ -49,9 +49,10 @@ app.set("trust proxy", 1); // even for cross-origin frontend/backend
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`✅ Server is running on http://localhost:${PORT}`);
 });
+server.setTimeout(10 * 60 * 1000); // 10 minutes for image generation
 
 const cron = require("node-cron");
 const sendTelegramMessage = require("./utils/sendTelegramMessage");
@@ -151,7 +152,9 @@ allNewsScheduler.startScheduler(30); //
 
 // Add this import at the top
 const { generateViralContent } = require('./viralContentGenerator');
-const { generateHighCTRFacebookContent } = require('./facebookHighCTRGenerator');
+const { generateHighCTRFacebookContent, generateHighCTRFacebookContent_TEXT_ONLY } = require('./facebookHighCTRGenerator');
+const { generateMultipleImagesWithSizes } = require('./imageGenerator');
+const { createVisualPlan } = require('./visualPlan');
 const { fetchHindiAllNews, filterHindiAllNewsArticles, getHindiAllNewsArticleSummary, validateHindiAllNewsArticleForProcessing } = require('./hindiAllNewsFetcher');
 const HindiAllNewsScheduler = require('./hindiAllNewsScheduler');
 const { processHindiAllNewsManualInput, generateHindiAllNewsHeadline, generateHindiAllNewsMetaDescription } = require('./hindiAllManualInputProcessor');
@@ -3156,16 +3159,12 @@ app.get("/api/cricket-addictor/stored-articles", async (req, res) => {
   }
 });
 
-// Generate HIGH-CTR Facebook content from CricketAddictor article
+// Generate HIGH-CTR Facebook content from CricketAddictor article (TEXT ONLY - FAST)
 app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
   try {
     const { articleId } = req.body;
-
     if (!articleId) {
-      return res.status(400).json({
-        success: false,
-        error: "Article ID is required"
-      });
+      return res.status(400).json({ success: false, error: "Article ID is required" });
     }
 
     // Get article from database
@@ -3175,10 +3174,7 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Article not found"
-      });
+      return res.status(404).json({ success: false, error: "Article not found" });
     }
 
     const article = rows[0];
@@ -3190,7 +3186,7 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
     const newsArticle = {
       title: article.title,
       description: article.description || textContent.substring(0, 200),
-      content: textContent, // Use text content for AI
+      content: textContent,
       url: article.url,
       publishedAt: article.published_at,
       source: {
@@ -3199,66 +3195,55 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
       }
     };
 
-    console.log(`🚀 Generating HIGH-CTR Facebook content for: ${article.title}`);
+    console.log(`🚀 TEXT ONLY generation for: ${article.title}`);
 
-    // Generate HIGH-CTR Facebook content
-    const result = await generateHighCTRFacebookContent(newsArticle);
+    // Generate HIGH-CTR Facebook content (TEXT ONLY)
+    const result = await generateHighCTRFacebookContent_TEXT_ONLY(newsArticle);
 
-    if (result.success) {
-      // Save generated content to database
-      try {
-        const imageUrlsJson = result.images && result.images.length > 0 
-          ? JSON.stringify(result.images.map(img => ({
-              imageUrl: img.imageUrl,
-              prompt: img.prompt,
-              revisedPrompt: img.revisedPrompt || img.prompt
-            })))
-          : null;
-
-        const [insertResult] = await pollDBPool.query(
-          `INSERT INTO facebook_high_ctr_content 
-           (article_id, article_title, article_description, gnews_url, source_name, generated_content, processing_time, provider, generated_images) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            articleId,
-            article.title,
-            article.description || '',
-            article.url, // CricketAddictor URL
-            'Cricket Addictor',
-            result.content,
-            result.processingTime,
-            result.provider || 'OpenAI',
-            imageUrlsJson
-          ]
-        );
-        console.log(`💾 Saved generated content to database with ID: ${insertResult.insertId}`);
-        if (result.images && result.images.length > 0) {
-          console.log(`🖼️ Saved ${result.images.length} generated images`);
-        }
-      } catch (dbError) {
-        console.error('Error saving generated content to database:', dbError);
-      }
-
-      res.json({
-        success: true,
-        content: result.content,
-        images: result.images || [],
-        processingTime: result.processingTime,
-        provider: result.provider || 'OpenAI',
-        originalArticle: {
-          title: article.title,
-          description: article.description,
-          source_url: article.url,
-          source_name: 'Cricket Addictor'
-        }
-      });
-    } else {
-      console.error("HIGH-CTR generation failed:", result.error);
-      res.status(500).json({
+    if (!result.success) {
+      return res.status(500).json({
         success: false,
         error: result.error || "Failed to generate HIGH-CTR Facebook content"
       });
     }
+
+    // Save generated content to database with status='processing_images'
+    const [insertResult] = await pollDBPool.query(
+      `INSERT INTO facebook_high_ctr_content 
+       (article_id, article_title, article_description, gnews_url, source_name, 
+        generated_content, processing_time, provider, generated_images, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        articleId,
+        article.title,
+        article.description || '',
+        article.url,
+        'Cricket Addictor',
+        result.content,
+        result.processingTime,
+        'OpenAI',
+        null,
+        'processing_images'
+      ]
+    );
+
+    console.log(`💾 Saved generated content to database with ID: ${insertResult.insertId}, status: processing_images`);
+
+    res.json({
+      success: true,
+      contentId: insertResult.insertId,
+      content: result.content,
+      images: [],
+      status: "processing_images",
+      processingTime: result.processingTime,
+      provider: result.provider || 'OpenAI',
+      originalArticle: {
+        title: article.title,
+        description: article.description,
+        source_url: article.url,
+        source_name: 'Cricket Addictor'
+      }
+    });
 
   } catch (error) {
     console.error("Generate HIGH-CTR Facebook content error:", error);
@@ -3266,6 +3251,176 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
       success: false,
       error: error.message || "Failed to generate HIGH-CTR Facebook content"
     });
+  }
+});
+
+// Generate images for existing HIGH-CTR content (separate endpoint)
+app.post("/api/cricket-addictor/generate-images", async (req, res) => {
+  try {
+    const { contentId } = req.body;
+    if (!contentId) {
+      return res.status(400).json({ success: false, error: "contentId required" });
+    }
+
+    // Get content row from database
+    const [contentRows] = await pollDBPool.query(
+      'SELECT * FROM facebook_high_ctr_content WHERE id = ?',
+      [contentId]
+    );
+
+    if (contentRows.length === 0) {
+      return res.status(404).json({ success: false, error: "content row not found" });
+    }
+
+    const contentRow = contentRows[0];
+
+    // Fetch article
+    const [articleRows] = await pollDBPool.query(
+      'SELECT * FROM cricketaddictor_articles WHERE id = ?',
+      [contentRow.article_id]
+    );
+
+    if (articleRows.length === 0) {
+      return res.status(404).json({ success: false, error: "article not found" });
+    }
+
+    const article = articleRows[0];
+    const textContent = article.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const newsArticle = {
+      title: article.title,
+      description: article.description || textContent.substring(0, 200),
+      content: textContent,
+      url: article.url
+    };
+
+    // Mark as processing
+    await pollDBPool.query(
+      "UPDATE facebook_high_ctr_content SET status='processing_images', error_message=NULL WHERE id=?",
+      [contentId]
+    );
+
+    console.log(`🎨 Starting image generation for contentId: ${contentId}`);
+
+    // 1) Create 3 concepts
+    const plan = await createVisualPlan(newsArticle);
+
+    // 2) Build 6 prompts (3 concepts x 2 sizes)
+    const SIZES = { square: "1024x1024", portrait: "1024x1536" };
+
+    const styleLockPrompt = (p) =>
+      [
+        "Breaking news cricket thumbnail, realistic photojournalism, dramatic high-contrast lighting, cinematic sports newsroom mood,",
+        "clean composition with empty space for headline text, ultra sharp,",
+        "no weapons, no blood, no injury, no hate symbols, no identifiable real person.",
+        p
+      ].join(" ");
+
+    const prompts = [];
+    const meta = [];
+
+    plan.concepts.forEach((c, idx) => {
+      const conceptIndex = idx + 1;
+      const base = styleLockPrompt(c.prompt);
+
+      // 1:1 square
+      const sq = `${base} Headline overlay text: "${c.headline_overlay}".`;
+      prompts.push(sq);
+      meta.push({
+        conceptIndex,
+        sizeLabel: "1:1",
+        dimensions: SIZES.square,
+        headline_overlay: c.headline_overlay,
+        scene_type: c.scene_type
+      });
+
+      // 4:5 portrait (OpenAI valid)
+      const pt = `${base} Vertical poster composition. Headline overlay text: "${c.headline_overlay}".`;
+      prompts.push(pt);
+      meta.push({
+        conceptIndex,
+        sizeLabel: "4:5",
+        dimensions: SIZES.portrait,
+        headline_overlay: c.headline_overlay,
+        scene_type: c.scene_type
+      });
+    });
+
+    // 3) Generate images
+    const imageResult = await generateMultipleImagesWithSizes(prompts, meta);
+
+    if (!imageResult.success) {
+      await pollDBPool.query(
+        "UPDATE facebook_high_ctr_content SET status='failed', error_message=? WHERE id=?",
+        ["Image generation failed", contentId]
+      );
+      return res.status(500).json({ 
+        success: false, 
+        error: "Image generation failed", 
+        details: imageResult.errors 
+      });
+    }
+
+    // Update database with images and status='done'
+    await pollDBPool.query(
+      "UPDATE facebook_high_ctr_content SET generated_images=?, status='done', updated_at=NOW() WHERE id=?",
+      [JSON.stringify(imageResult.images), contentId]
+    );
+
+    console.log(`✅ Generated ${imageResult.totalGenerated} images for contentId: ${contentId}`);
+
+    res.json({ 
+      success: true, 
+      images: imageResult.images, 
+      status: "done",
+      totalGenerated: imageResult.totalGenerated
+    });
+
+  } catch (error) {
+    console.error("generate-images error:", error);
+    try {
+      if (req.body?.contentId) {
+        await pollDBPool.query(
+          "UPDATE facebook_high_ctr_content SET status='failed', error_message=? WHERE id=?",
+          [error.message, req.body.contentId]
+        );
+      }
+    } catch (dbError) {
+      console.error("Error updating status to failed:", dbError);
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get status of HIGH-CTR content generation (for polling)
+app.get("/api/cricket-addictor/high-ctr-status", async (req, res) => {
+  try {
+    const contentId = req.query.contentId;
+    if (!contentId) {
+      return res.status(400).json({ success: false, error: "contentId required" });
+    }
+
+    const [rows] = await pollDBPool.query(
+      'SELECT id, status, generated_images, error_message, updated_at FROM facebook_high_ctr_content WHERE id=?',
+      [contentId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Not found" });
+    }
+
+    const row = rows[0];
+    res.json({
+      success: true,
+      status: row.status,
+      images: row.generated_images ? JSON.parse(row.generated_images) : [],
+      error: row.error_message || null,
+      updatedAt: row.updated_at
+    });
+
+  } catch (error) {
+    console.error("high-ctr-status error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
