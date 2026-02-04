@@ -24,13 +24,24 @@ async function generateImageWithDALLE(prompt, options = {}) {
       prompt = prompt.substring(0, 4000);
     }
 
+    // Use DALL-E 3 with best quality settings
+    const model = options.model || "dall-e-3";
+    const size = options.size || "1024x1024"; // 1024x1024, 1792x1024, or 1024x1792
+    const quality = options.quality || "hd"; // Use "hd" for better quality (standard or hd)
+    const style = options.style || "vivid"; // Use "vivid" for more dramatic images (natural or vivid)
+    
+    console.log('🎨 Model:', model);
+    console.log('📐 Size:', size);
+    console.log('✨ Quality:', quality);
+    console.log('🎭 Style:', style);
+    
     const response = await axios.post(DALL_E_API_URL, {
-      model: options.model || "dall-e-3",
+      model: model,
       prompt: prompt,
       n: 1, // Number of images
-      size: options.size || "1024x1024", // 1024x1024, 1792x1024, or 1024x1792
-      quality: options.quality || "standard", // standard or hd
-      style: options.style || "natural" // natural or vivid
+      size: size,
+      quality: quality, // hd for better quality
+      style: style // vivid for more dramatic
     }, {
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -78,8 +89,8 @@ async function generateMultipleImages(prompts, options = {}) {
       console.log(`\n🎨 Generating image ${i + 1}/${prompts.length}...`);
       const result = await generateImageWithDALLE(prompts[i], {
         size: options.size || "1024x1024",
-        quality: options.quality || "standard",
-        style: options.style || "natural"
+        quality: options.quality || "hd", // Use HD for better quality
+        style: options.style || "vivid" // Use vivid for dramatic sports images
       });
       results.push({
         index: i + 1,
