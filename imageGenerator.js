@@ -24,34 +24,66 @@ async function generateImageWithDALLE(prompt, options = {}) {
       prompt = prompt.substring(0, 4000);
     }
 
-    // Use DALL-E 3 with best quality settings
-    const model = options.model || "dall-e-3";
+    // Try gpt-image-1 first, fallback to dall-e-3
+    const preferredModel = options.model || "gpt-image-1";
+    const fallbackModel = "dall-e-3";
     const size = options.size || "1024x1024"; // 1024x1024, 1792x1024, or 1024x1792
     const quality = options.quality || "hd"; // Use "hd" for better quality (standard or hd)
     const style = options.style || "vivid"; // Use "vivid" for more dramatic images (natural or vivid)
     
-    console.log('🎨 Model:', model);
+    console.log('🎨 Preferred Model:', preferredModel);
+    console.log('🔄 Fallback Model:', fallbackModel);
     console.log('📐 Size:', size);
     console.log('✨ Quality:', quality);
     console.log('🎭 Style:', style);
     
-    const response = await axios.post(DALL_E_API_URL, {
-      model: model,
-      prompt: prompt,
-      n: 1, // Number of images
-      size: size,
-      quality: quality, // hd for better quality
-      style: style // vivid for more dramatic
-    }, {
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 60000 // 60 seconds timeout
-    });
-
-    if (!response.data || !response.data.data || !response.data.data[0]) {
-      throw new Error('Invalid response from DALL-E API');
+    let model = preferredModel;
+    let response;
+    
+    try {
+      // Try gpt-image-1 first
+      response = await axios.post(DALL_E_API_URL, {
+        model: model,
+        prompt: prompt,
+        n: 1, // Number of images
+        size: size,
+        quality: quality,
+        style: style
+      }, {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000 // 60 seconds timeout
+      });
+    } catch (firstError) {
+      // If gpt-image-1 fails, try dall-e-3
+      if (firstError.response && firstError.response.status === 400) {
+        console.log(`⚠️ ${preferredModel} not available, falling back to ${fallbackModel}`);
+        model = fallbackModel;
+        
+        response = await axios.post(DALL_E_API_URL, {
+          model: model,
+          prompt: prompt,
+          n: 1,
+          size: size,
+          quality: quality,
+          style: style
+        }, {
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000
+        });
+      } else {
+        throw firstError;
+      }
+    }
+    
+    // Validate response
+    if (!response || !response.data || !response.data.data || !response.data.data[0]) {
+      throw new Error('Invalid response from image generation API');
     }
 
     const imageUrl = response.data.data[0].url;
@@ -120,7 +152,63 @@ async function generateMultipleImages(prompts, options = {}) {
   };
 }
 
+/**
+ * Generate multiple images with different sizes (1:1 and 4:5)
+ */
+async function generateMultipleImagesWithSizes(prompts, metadata = [], options = {}) {
+  const results = [];
+  const errors = [];
+
+  for (let i = 0; i < prompts.length; i++) {
+    try {
+      const meta = metadata[i] || {};
+      const size = meta.dimensions || options.size || "1024x1024";
+      
+      console.log(`\n🎨 Generating image ${i + 1}/${prompts.length}...`);
+      console.log(`📐 Size: ${meta.size || 'default'} (${size})`);
+      
+      const result = await generateImageWithDALLE(prompts[i], {
+        size: size,
+        quality: options.quality || "hd",
+        style: options.style || "vivid",
+        model: options.model || "gpt-image-1"
+      });
+      
+      results.push({
+        index: i + 1,
+        size: meta.size || 'default',
+        dimensions: size,
+        rawPrompt: meta.rawPrompt || prompts[i],
+        finalPrompt: meta.finalPrompt || prompts[i],
+        prompt: prompts[i],
+        ...result
+      });
+      
+      // Add delay between requests to avoid rate limiting
+      if (i < prompts.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      }
+    } catch (error) {
+      console.error(`❌ Failed to generate image ${i + 1}:`, error.message);
+      errors.push({
+        index: i + 1,
+        prompt: prompts[i],
+        error: error.message
+      });
+    }
+  }
+
+  return {
+    success: results.length > 0,
+    images: results,
+    errors: errors,
+    totalGenerated: results.length,
+    totalFailed: errors.length
+  };
+}
+
 module.exports = {
   generateImageWithDALLE,
-  generateMultipleImages
+  generateMultipleImages,
+  generateMultipleImagesWithSizes
 };
