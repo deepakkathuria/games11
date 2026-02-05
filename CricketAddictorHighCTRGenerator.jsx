@@ -302,8 +302,39 @@ export default function CricketAddictorHighCTRGenerator() {
         const imageGenTime = Date.now() - imageGenStartTime;
         console.log(`✅ Image generation API call successful in ${(imageGenTime / 1000).toFixed(2)}s`);
         console.log('📦 Response:', imgResponse.data);
-        if (imgResponse.data.success) {
-          console.log(`🖼️ Images received: ${imgResponse.data.images?.length || 0}`);
+        if (imgResponse.data.success && imgResponse.data.images && imgResponse.data.images.length > 0) {
+          console.log(`🖼️ Images received directly: ${imgResponse.data.images.length}`);
+          // Set images immediately if received directly
+          setGeneratedImages(imgResponse.data.images);
+          setImagePolling(false);
+          setImageCompleteNotification(true);
+          
+          // Clear polling interval since we got images directly
+          if (window.currentPollInterval) {
+            clearInterval(window.currentPollInterval);
+            window.currentPollInterval = null;
+          }
+          
+          // Refresh stored content
+          setTimeout(() => {
+            fetchStoredContent(1);
+          }, 500);
+          
+          // Show notification
+          alert(`🎉 IMAGES READY!\n\n✅ Successfully generated ${imgResponse.data.images.length} images!\n\nImages are now displayed below the content.`);
+          
+          // Auto-hide notification after 10 seconds
+          setTimeout(() => {
+            setImageCompleteNotification(false);
+          }, 10000);
+          
+          // Scroll to images
+          setTimeout(() => {
+            const imagesElement = document.getElementById('generated-images-section');
+            if (imagesElement) {
+              imagesElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 500);
         }
       }).catch(err => {
         const imageGenTime = Date.now() - imageGenStartTime;
@@ -314,8 +345,8 @@ export default function CricketAddictorHighCTRGenerator() {
           response: err.response?.data,
           status: err.response?.status
         });
-        // Update status to show error
-        setError(`Image generation request failed: ${err.message || 'Network error'}. Polling will continue to check status.`);
+        // Don't set error - polling will catch it
+        console.log('⚠️ Image generation request failed, but polling will continue to check status');
       });
 
       // STEP 3: Poll for status every 3 seconds

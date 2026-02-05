@@ -3446,16 +3446,37 @@ app.get("/api/cricket-addictor/high-ctr-status", async (req, res) => {
     }
 
     const row = rows[0];
+    
+    // Safe JSON parsing for generated_images
+    let images = [];
+    try {
+      if (row.generated_images) {
+        if (typeof row.generated_images === 'string') {
+          images = JSON.parse(row.generated_images);
+        } else if (Array.isArray(row.generated_images)) {
+          images = row.generated_images;
+        } else if (typeof row.generated_images === 'object') {
+          images = [row.generated_images];
+        }
+      }
+    } catch (parseError) {
+      console.error(`❌ Error parsing generated_images for contentId ${contentId}:`, parseError.message);
+      console.error(`📦 Raw generated_images type:`, typeof row.generated_images);
+      console.error(`📦 Raw generated_images value:`, row.generated_images);
+      images = [];
+    }
+
     res.json({
       success: true,
-      status: row.status,
-      images: row.generated_images ? JSON.parse(row.generated_images) : [],
+      status: row.status || 'processing_images',
+      images: images,
       error: row.error_message || null,
       updatedAt: row.updated_at
     });
 
   } catch (error) {
-    console.error("high-ctr-status error:", error);
+    console.error("❌ high-ctr-status error:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ success: false, error: error.message });
   }
 });
