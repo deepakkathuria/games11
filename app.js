@@ -3256,35 +3256,48 @@ app.post("/api/cricket-addictor/generate-high-ctr", async (req, res) => {
 
 // Generate images for existing HIGH-CTR content (separate endpoint)
 app.post("/api/cricket-addictor/generate-images", async (req, res) => {
+  console.log('🎨 ========== GENERATE IMAGES ENDPOINT CALLED ==========');
+  console.log('📦 Request body:', req.body);
+  console.log('⏰ Start time:', new Date().toISOString());
+  
   try {
     const { contentId } = req.body;
     if (!contentId) {
+      console.error('❌ Missing contentId in request');
       return res.status(400).json({ success: false, error: "contentId required" });
     }
+    
+    console.log(`📝 Processing contentId: ${contentId}`);
 
     // Get content row from database
+    console.log('📊 Fetching content row from database...');
     const [contentRows] = await pollDBPool.query(
       'SELECT * FROM facebook_high_ctr_content WHERE id = ?',
       [contentId]
     );
 
     if (contentRows.length === 0) {
+      console.error(`❌ Content row not found for contentId: ${contentId}`);
       return res.status(404).json({ success: false, error: "content row not found" });
     }
 
     const contentRow = contentRows[0];
+    console.log(`✅ Found content row. Article ID: ${contentRow.article_id}, Title: ${contentRow.article_title}`);
 
     // Fetch article
+    console.log(`📰 Fetching article ID: ${contentRow.article_id}...`);
     const [articleRows] = await pollDBPool.query(
       'SELECT * FROM cricketaddictor_articles WHERE id = ?',
       [contentRow.article_id]
     );
 
     if (articleRows.length === 0) {
+      console.error(`❌ Article not found for article_id: ${contentRow.article_id}`);
       return res.status(404).json({ success: false, error: "article not found" });
     }
 
     const article = articleRows[0];
+    console.log(`✅ Found article. Title: ${article.title}`);
     const textContent = article.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
     const newsArticle = {
@@ -3295,15 +3308,22 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
     };
 
     // Mark as processing
+    console.log('🔄 Updating status to processing_images...');
     await pollDBPool.query(
       "UPDATE facebook_high_ctr_content SET status='processing_images', error_message=NULL WHERE id=?",
       [contentId]
     );
+    console.log('✅ Status updated to processing_images');
 
     console.log(`🎨 Starting image generation for contentId: ${contentId}`);
 
     // 1) Create 3 concepts
+    console.log('📐 Step 1: Creating visual plan (3 concepts)...');
+    const planStartTime = Date.now();
     const plan = await createVisualPlan(newsArticle);
+    const planTime = Date.now() - planStartTime;
+    console.log(`✅ Visual plan created in ${(planTime / 1000).toFixed(2)}s`);
+    console.log(`📋 Concepts: ${plan.concepts?.length || 0}`);
 
     // 2) Build 6 prompts (3 concepts x 2 sizes)
     const SIZES = { square: "1024x1024", portrait: "1024x1536" };
@@ -3347,9 +3367,16 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
     });
 
     // 3) Generate images
+    console.log(`🖼️ Step 3: Generating ${prompts.length} images (3 concepts × 2 sizes)...`);
+    const imageGenStartTime = Date.now();
     const imageResult = await generateMultipleImagesWithSizes(prompts, meta);
+    const imageGenTime = Date.now() - imageGenStartTime;
+    console.log(`⏱️ Image generation completed in ${(imageGenTime / 1000).toFixed(2)}s`);
+    console.log(`📊 Results: ${imageResult.totalGenerated} generated, ${imageResult.totalFailed} failed`);
 
     if (!imageResult.success) {
+      console.error('❌ Image generation failed!');
+      console.error('Errors:', imageResult.errors);
       await pollDBPool.query(
         "UPDATE facebook_high_ctr_content SET status='failed', error_message=? WHERE id=?",
         ["Image generation failed", contentId]
@@ -3362,12 +3389,17 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
     }
 
     // Update database with images and status='done'
+    console.log('💾 Saving images to database...');
     await pollDBPool.query(
       "UPDATE facebook_high_ctr_content SET generated_images=?, status='done', updated_at=NOW() WHERE id=?",
       [JSON.stringify(imageResult.images), contentId]
     );
+    console.log('✅ Images saved to database');
 
-    console.log(`✅ Generated ${imageResult.totalGenerated} images for contentId: ${contentId}`);
+    const totalTime = Date.now() - imageGenStartTime;
+    console.log(`✅ ========== IMAGE GENERATION COMPLETE ==========`);
+    console.log(`📊 Total time: ${(totalTime / 1000).toFixed(2)}s`);
+    console.log(`🖼️ Images generated: ${imageResult.totalGenerated}`);
 
     res.json({ 
       success: true, 
@@ -3377,16 +3409,20 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("generate-images error:", error);
+    console.error("❌ ========== GENERATE IMAGES ERROR ==========");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
     try {
       if (req.body?.contentId) {
+        console.log(`🔄 Updating status to 'failed' for contentId: ${req.body.contentId}`);
         await pollDBPool.query(
           "UPDATE facebook_high_ctr_content SET status='failed', error_message=? WHERE id=?",
           [error.message, req.body.contentId]
         );
+        console.log('✅ Status updated to failed');
       }
     } catch (dbError) {
-      console.error("Error updating status to failed:", dbError);
+      console.error("❌ Error updating status to failed:", dbError);
     }
     res.status(500).json({ success: false, error: error.message });
   }

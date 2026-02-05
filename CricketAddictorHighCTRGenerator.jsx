@@ -23,6 +23,7 @@ export default function CricketAddictorHighCTRGenerator() {
   const [generatedImages, setGeneratedImages] = useState([]);
   const [imagePolling, setImagePolling] = useState(false);
   const [currentContentId, setCurrentContentId] = useState(null);
+  const [imageCompleteNotification, setImageCompleteNotification] = useState(false);
 
   // Stored content tab states
   const [storedContent, setStoredContent] = useState([]);
@@ -237,6 +238,7 @@ export default function CricketAddictorHighCTRGenerator() {
     setGeneratedImages([]);
     setImagePolling(false);
     setCurrentContentId(null);
+    setImageCompleteNotification(false);
     
     try {
       console.log('📡 Step 1: Making API call for TEXT generation...');
@@ -286,18 +288,34 @@ export default function CricketAddictorHighCTRGenerator() {
 
       // STEP 2: Generate images in background
       console.log('🎨 Step 2: Starting image generation in background...');
+      console.log(`📡 Making POST request to: ${API}/api/cricket-addictor/generate-images`);
+      console.log(`📦 Request body: { contentId: ${contentId} }`);
       setImagePolling(true);
       
       // Trigger image generation (fire and forget - don't wait)
+      const imageGenStartTime = Date.now();
       axios.post(`${API}/api/cricket-addictor/generate-images`, {
         contentId: contentId
       }, {
         timeout: 600000 // 10 minutes for image generation
       }).then(imgResponse => {
-        console.log('✅ Image generation API call successful');
+        const imageGenTime = Date.now() - imageGenStartTime;
+        console.log(`✅ Image generation API call successful in ${(imageGenTime / 1000).toFixed(2)}s`);
+        console.log('📦 Response:', imgResponse.data);
+        if (imgResponse.data.success) {
+          console.log(`🖼️ Images received: ${imgResponse.data.images?.length || 0}`);
+        }
       }).catch(err => {
-        console.error('❌ Image generation request error:', err);
-        // Don't show error to user, polling will catch it
+        const imageGenTime = Date.now() - imageGenStartTime;
+        console.error(`❌ Image generation request error after ${(imageGenTime / 1000).toFixed(2)}s:`);
+        console.error('Error details:', {
+          message: err.message,
+          code: err.code,
+          response: err.response?.data,
+          status: err.response?.status
+        });
+        // Update status to show error
+        setError(`Image generation request failed: ${err.message || 'Network error'}. Polling will continue to check status.`);
       });
 
       // STEP 3: Poll for status every 3 seconds
@@ -319,12 +337,14 @@ export default function CricketAddictorHighCTRGenerator() {
           if (statusResponse.data.success) {
             const { status, images, error } = statusResponse.data;
             
-            console.log(`📊 [Poll ${pollCount}] Status: ${status}, Images: ${images.length}`);
+            const elapsedTime = Math.floor(pollCount * 3); // seconds
+            console.log(`📊 [Poll ${pollCount}] Status: ${status}, Images: ${images.length}, Elapsed: ${elapsedTime}s`);
 
             if (status === 'done') {
               clearInterval(pollInterval);
               setImagePolling(false);
               setGeneratedImages(images);
+              setImageCompleteNotification(true);
               console.log(`✅ Image generation complete! ${images.length} images received`);
               
               // Refresh stored content
@@ -332,7 +352,21 @@ export default function CricketAddictorHighCTRGenerator() {
                 fetchStoredContent(1);
               }, 500);
               
-              alert(`✅ All done! Generated ${images.length} images successfully.`);
+              // Show prominent notification
+              alert(`🎉 IMAGES READY!\n\n✅ Successfully generated ${images.length} images!\n\nImages are now displayed below the content.`);
+              
+              // Auto-hide notification after 10 seconds
+              setTimeout(() => {
+                setImageCompleteNotification(false);
+              }, 10000);
+              
+              // Scroll to images
+              setTimeout(() => {
+                const imagesElement = document.getElementById('generated-images-section');
+                if (imagesElement) {
+                  imagesElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 500);
             } else if (status === 'failed') {
               clearInterval(pollInterval);
               setImagePolling(false);
@@ -459,6 +493,20 @@ export default function CricketAddictorHighCTRGenerator() {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
+        @keyframes slideDown {
+          from {
+            transform: translateY(-20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
       `}</style>
       <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto", fontFamily: "Inter, Arial, sans-serif" }}>
       {/* Header */}
@@ -522,6 +570,48 @@ export default function CricketAddictorHighCTRGenerator() {
           border: "1px solid #ef5350"
         }}>
           <strong>❌ Error:</strong> {error}
+        </div>
+      )}
+
+      {/* Image Complete Notification */}
+      {imageCompleteNotification && (
+        <div style={{ 
+          background: "linear-gradient(135deg, #28a745 0%, #20c997 100%)", 
+          color: "white", 
+          padding: 20, 
+          borderRadius: 12, 
+          marginBottom: 20,
+          border: "2px solid #28a745",
+          boxShadow: "0 4px 12px rgba(40,167,69,0.3)",
+          animation: "slideDown 0.5s ease-out",
+          position: "relative"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 32 }}>🎉</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+                ✅ Images Generated Successfully!
+              </div>
+              <div style={{ fontSize: 14, opacity: 0.95 }}>
+                {generatedImages.length} images are now displayed below. Scroll down to view them!
+              </div>
+            </div>
+            <button
+              onClick={() => setImageCompleteNotification(false)}
+              style={{
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                color: "white",
+                padding: "8px 16px",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 14
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
         </div>
       )}
 
@@ -867,16 +957,31 @@ export default function CricketAddictorHighCTRGenerator() {
 
               {/* Generated Images Display - Grouped by Concept */}
               {generatedImages && generatedImages.length > 0 ? (
-                <div style={{
+                <div id="generated-images-section" style={{
                   background: "#fff",
                   padding: 24,
                   borderRadius: 12,
                   border: "2px solid #1877f2",
                   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  marginBottom: 24
+                  marginBottom: 24,
+                  animation: imageCompleteNotification ? "bounce 0.6s ease-out" : "none"
                 }}>
-                  <h3 style={{ margin: 0, marginBottom: 20, color: "#1877f2", fontSize: 20 }}>
-                    🖼️ Generated Images ({generatedImages.length} total - 3 Concepts × 2 Sizes)
+                  <h3 style={{ margin: 0, marginBottom: 20, color: "#1877f2", fontSize: 20, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>🖼️</span>
+                    <span>Generated Images ({generatedImages.length} total - 3 Concepts × 2 Sizes)</span>
+                    {imageCompleteNotification && (
+                      <span style={{ 
+                        background: "#28a745", 
+                        color: "white", 
+                        padding: "4px 12px", 
+                        borderRadius: 12,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        animation: "pulse 2s infinite"
+                      }}>
+                        ✅ NEW!
+                      </span>
+                    )}
                   </h3>
                   
                   {/* Group images by concept */}
@@ -1007,9 +1112,14 @@ export default function CricketAddictorHighCTRGenerator() {
                   <div style={{ fontSize: 16, color: "#666", marginBottom: 8 }}>
                     {imagePolling ? "⏳ Images are being generated in the background..." : "⏳ Waiting for images..."}
                   </div>
-                  <div style={{ fontSize: 12, color: "#999" }}>
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>
                     This may take 3-5 minutes. Images will appear automatically when ready.
                   </div>
+                  {imagePolling && (
+                    <div style={{ fontSize: 11, color: "#1877f2", fontStyle: "italic" }}>
+                      💡 Check browser console (F12) for detailed progress logs
+                    </div>
+                  )}
                   {imagePolling && (
                     <div style={{ marginTop: 12 }}>
                       <div style={{

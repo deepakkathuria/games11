@@ -10,19 +10,65 @@ async function generateImage(prompt, { size = "1024x1024" } = {}) {
   if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
   if (!ALLOWED_SIZES.has(size)) size = "1024x1536";
 
-  const resp = await axios.post(
-    IMAGE_API_URL,
-    { model: "gpt-image-1", prompt, n: 1, size },
-    {
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-      timeout: 90000
+  console.log(`📡 Calling OpenAI Image API with model: gpt-image-1, size: ${size}`);
+  
+  try {
+    const resp = await axios.post(
+      IMAGE_API_URL,
+      { model: "gpt-image-1", prompt, n: 1, size },
+      {
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        timeout: 90000
+      }
+    );
+
+    console.log(`📦 OpenAI API Response Status: ${resp.status}`);
+    console.log(`📦 Response keys:`, Object.keys(resp.data || {}));
+    
+    // Check response structure
+    if (resp.data?.error) {
+      console.error(`❌ OpenAI API Error:`, resp.data.error);
+      throw new Error(`OpenAI API Error: ${JSON.stringify(resp.data.error)}`);
     }
-  );
 
-  const img = resp?.data?.data?.[0];
-  if (!img?.url) throw new Error("No image url returned");
+    // Try different response structures
+    let img = null;
+    if (resp.data?.data && Array.isArray(resp.data.data) && resp.data.data.length > 0) {
+      img = resp.data.data[0];
+    } else if (resp.data?.images && Array.isArray(resp.data.images) && resp.data.images.length > 0) {
+      img = resp.data.images[0];
+    } else if (resp.data?.url) {
+      img = resp.data;
+    }
 
-  return { imageUrl: img.url, revisedPrompt: img.revised_prompt || prompt };
+    console.log(`📦 Image data found:`, img ? "Yes" : "No");
+    console.log(`📦 Image data structure:`, img ? Object.keys(img) : "N/A");
+
+    if (!img) {
+      console.error(`❌ Unexpected response structure:`, JSON.stringify(resp.data, null, 2));
+      throw new Error("No image data in response. Response structure: " + JSON.stringify(resp.data));
+    }
+
+    if (!img.url && !img.b64_json) {
+      console.error(`❌ No URL or base64 in image data:`, img);
+      throw new Error("No image url or base64 returned. Image data: " + JSON.stringify(img));
+    }
+
+    const imageUrl = img.url || `data:image/png;base64,${img.b64_json}`;
+    console.log(`✅ Image generated successfully. URL length: ${imageUrl.length}`);
+
+    return { 
+      imageUrl: imageUrl, 
+      revisedPrompt: img.revised_prompt || prompt 
+    };
+  } catch (error) {
+    console.error(`❌ Image generation error:`, error.message);
+    if (error.response) {
+      console.error(`❌ Response status:`, error.response.status);
+      console.error(`❌ Response data:`, error.response.data);
+    }
+    throw error;
+  }
 }
 
 async function generateMultipleImagesWithSizes(prompts, metadata = []) {
