@@ -9,8 +9,15 @@ function applyThumbnailStyle(scenePrompt) {
   return `
 Photorealistic sports NEWS photography (not illustration, not poster).
 Cinematic contrast, shallow depth of field, dramatic lighting.
+VIBRANT colors, high saturation, rich tones - NOT dull or monochrome.
 Must have ONE sharp foreground hero object + ONE midground silhouette action.
 Background setting should match the article context (stadium/press room/office/training ground/etc).
+
+COLOR REQUIREMENTS:
+- Use VIBRANT, CONTRASTING colors (green, blue, saffron, maroon, yellow, red)
+- High saturation, rich tones
+- Avoid dull gray/monochrome/bland shades
+- Use team/country colors if mentioned in article context
 
 STRICT:
 - No faces, no real person likeness

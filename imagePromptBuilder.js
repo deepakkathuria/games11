@@ -20,11 +20,14 @@ function buildImagePromptsFromStory(plan) {
       const template = c.scene_template;
       // Use article-specific background from template (not forced stadium)
       const background = template.background || "appropriate setting based on article context, cinematic lighting, no readable text";
+      // Add colors if specified
+      const colors = c.colors ? `Colors: ${c.colors}` : "Vibrant, high saturation colors, rich tones";
       scene = `
 Foreground (sharp, close): ${template.foreground || ""}
 Midground (silhouette, back view): ${template.midground || ""}
 Background: ${background}
 Mood: ${c.mood || "hype"}
+${colors}
 `.trim();
     } else {
       // Fallback to old format

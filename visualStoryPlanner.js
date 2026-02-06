@@ -92,11 +92,19 @@ async function createVisualStoryPlan(article) {
 You are a senior sports news thumbnail strategist.
 Create 3 COMPLETELY DIFFERENT HIGH CTR visual concepts that are SPECIFIC to this article.
 
-FIRST: Analyze the article and identify the ACTUAL story:
-- What is the main event? (viral video / match / press conference / injury / controversy / record / decision)
-- What is the key emotion? (humor / controversy / tension / celebration / shock)
-- What is the setting? (social media / stadium / press room / training / office)
-- Who are the key people mentioned? (players, officials, teams)
+FIRST: READ THE ARTICLE COMPLETELY and identify the EXACT story:
+- What is the MAIN event? (viral video / match boycott / press conference / injury / controversy / record / decision / economy impact)
+- What is the SPECIFIC situation? (Pakistan refusing to play / India-Pakistan match / Sri Lanka economy / government decision / ICC decision)
+- What are the KEY entities? (Pakistan, India, Sri Lanka, PCB, ICC, SLC, Mohsin Naqvi, etc.)
+- What is the key emotion? (humor / controversy / tension / celebration / shock / anger)
+- What is the setting? (social media / stadium / press room / training / office / government building)
+
+CRITICAL: Extract SPECIFIC details from article:
+- Team names mentioned (Pakistan, India, Sri Lanka)
+- Specific events (boycott, refusal, economy impact, World Cup)
+- Key people (Mohsin Naqvi, officials, players)
+- Specific locations (Sri Lanka, Pakistan, India)
+- Specific emotions (anger, tension, crisis, hope)
 
 CRITICAL DIVERSITY RULES - Each concept MUST be visually unique:
 - Concept 1: CLOSE-UP angle - Focus on ONE specific prop/object from article (phone showing video / bat/ball/helmet/trophy/microphone). Extreme close-up, dramatic lighting on single object.
@@ -146,11 +154,12 @@ Return ONLY valid JSON:
       "angle":"specific angle from article (e.g., 'batting collapse', 'bowler celebration', 'press conference tension')",
       "overlay":"MAX 4 words (for frontend overlay only)",
       "scene_template":{
-        "foreground":"For Concept 1: ONE specific prop (extreme close-up). For Concept 2: Different prop or empty. For Concept 3: Symbolic prop. Choose DIFFERENT props for each concept (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone). If player mentioned, use their signature prop/style. Be specific and UNIQUE per concept.",
-        "midground":"For Concept 1: Minimal or empty (close-up focus). For Concept 2: Full silhouette action. For Concept 3: Symbolic/metaphorical silhouette. Choose DIFFERENT actions for each concept (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground). If player mentioned, use their signature pose/style. Must be DIFFERENT per concept.",
-        "background":"For Concept 1: Simple/bokeh background. For Concept 2: Full atmospheric setting. For Concept 3: Contrasting/symbolic background. Vary the setting (stadium/press room/office/training ground/hospital/outdoor/indoor). If player mentioned, use their team colors subtly. MUST be DIFFERENT per concept."
+        "foreground":"For Concept 1: ONE specific prop related to ACTUAL article story (extreme close-up). For Concept 2: Different prop or empty. For Concept 3: Symbolic prop. Choose DIFFERENT props based on article (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone/map/flag). If article mentions specific countries/teams, use their colors. Be specific to article story.",
+        "midground":"For Concept 1: Minimal or empty (close-up focus). For Concept 2: Full silhouette action related to article story. For Concept 3: Symbolic/metaphorical silhouette. Choose DIFFERENT actions based on article (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground / handshake / refusal gesture / split screen). Must match article story.",
+        "background":"For Concept 1: Simple/bokeh background with article-specific colors. For Concept 2: Full atmospheric setting matching article location. For Concept 3: Contrasting/symbolic background. Use VIBRANT colors based on article (Pakistan=green, India=saffron/blue, Sri Lanka=maroon/yellow). Vary the setting (stadium/press room/office/training ground/hospital/outdoor/indoor). MUST be DIFFERENT and COLORFUL per concept."
       },
-      "mood":"one of [tense, hype, controversy, celebration, pressure, dramatic, suspenseful] - must match article emotion",
+      "mood":"one of [tense, hype, controversy, celebration, pressure, dramatic, suspenseful, crisis, conflict] - must match article emotion",
+      "colors":"Extract specific colors from article (team colors, country flags: Pakistan=green, India=saffron/blue, Sri Lanka=maroon/yellow). Use VIBRANT, CONTRASTING colors, not dull shades.",
       "keywords":["extract actual team names or colors","extract venue if specific","tournament","specific emotion from article"]
     }
   ]
