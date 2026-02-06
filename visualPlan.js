@@ -49,17 +49,19 @@ Concept 3: EMOTIONAL/DEBATE ANGLE
 - Example: If article is about "fans divided" → show divided opinion visual related to THIS specific issue
 
 RULES:
-- Each concept MUST reference THIS article's specific story elements
-- Avoid real-person likeness: use "generic cricketer", "silhouette", "senior official (not identifiable)"
+- Each concept MUST reference THIS article's specific story elements (team names, player names as "Player X", specific events, exact controversy)
+- Include specific details from the article: team colors, stadium settings, specific situations mentioned
+- Avoid real-person likeness: use "generic cricketer", "silhouette", "senior official (not identifiable)", "Player X"
 - No weapons, blood, injury, gore, hate symbols
-- Each prompt should be 60-100 words, describing the EXACT scene related to THIS article
+- Each prompt should be 80-120 words, VERY DETAILED, describing the EXACT scene with specific article context
+- Mention specific teams, situations, controversies from THIS article
 
 Return JSON EXACTLY in this format:
 {
   "concepts": [
-    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "60-100 words describing scene SPECIFIC to this article's story" },
-    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "60-100 words describing scene SPECIFIC to this article's story" },
-    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "60-100 words describing scene SPECIFIC to this article's story" }
+    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "80-120 words VERY DETAILED prompt with specific article context: mention exact teams, players (as generic), situations, controversies from THIS article. Describe the exact scene, setting, emotions, and story elements." },
+    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "80-120 words VERY DETAILED prompt with specific article context: mention exact teams, players (as generic), situations, controversies from THIS article. Describe the exact scene, setting, emotions, and story elements." },
+    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "80-120 words VERY DETAILED prompt with specific article context: mention exact teams, players (as generic), situations, controversies from THIS article. Describe the exact scene, setting, emotions, and story elements." }
   ]
 }
 
@@ -79,8 +81,8 @@ Remember: Each image concept MUST be story-specific to THIS article, NOT generic
         { role: "system", content: "Return ONLY valid JSON. No extra text." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.7,
-      max_tokens: 1200,
+      temperature: 0.8,
+      max_tokens: 1800,
       response_format: { type: "json_object" }
     },
     {

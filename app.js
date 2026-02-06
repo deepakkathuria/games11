@@ -154,7 +154,8 @@ allNewsScheduler.startScheduler(30); //
 const { generateViralContent } = require('./viralContentGenerator');
 const { generateHighCTRFacebookContent, generateHighCTRFacebookContent_TEXT_ONLY } = require('./facebookHighCTRGenerator');
 const { generateMultipleImagesWithSizes } = require('./imageGenerator');
-const { createVisualPlan } = require('./visualPlan');
+const { createVisualStoryPlan } = require('./visualStoryPlanner');
+const { buildImagePromptsFromStory } = require('./imagePromptBuilder');
 const { fetchHindiAllNews, filterHindiAllNewsArticles, getHindiAllNewsArticleSummary, validateHindiAllNewsArticleForProcessing } = require('./hindiAllNewsFetcher');
 const HindiAllNewsScheduler = require('./hindiAllNewsScheduler');
 const { processHindiAllNewsManualInput, generateHindiAllNewsHeadline, generateHindiAllNewsMetaDescription } = require('./hindiAllManualInputProcessor');
@@ -3317,44 +3318,21 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
 
     console.log(`🎨 Starting image generation for contentId: ${contentId}`);
 
-    // 1) Create 3 concepts
-    console.log('📐 Step 1: Creating visual plan (3 concepts)...');
+    // 1) Create visual story plan (3 concepts)
+    console.log('📐 Step 1: Creating visual story plan (3 concepts)...');
     const planStartTime = Date.now();
-    const plan = await createVisualPlan(newsArticle);
+    const plan = await createVisualStoryPlan(newsArticle);
     const planTime = Date.now() - planStartTime;
-    console.log(`✅ Visual plan created in ${(planTime / 1000).toFixed(2)}s`);
+    console.log(`✅ Visual story plan created in ${(planTime / 1000).toFixed(2)}s`);
     console.log(`📋 Concepts: ${plan.concepts?.length || 0}`);
 
-    // 2) Build 3 prompts (1 best image per concept - 1:1 square for Facebook)
-    const styleLockPrompt = (p) =>
-      [
-        "Breaking news cricket thumbnail, realistic photojournalism, dramatic high-contrast lighting, cinematic sports newsroom mood,",
-        "clean composition with empty space for headline text, ultra sharp,",
-        "no weapons, no blood, no injury, no hate symbols, no identifiable real person.",
-        p
-      ].join(" ");
-
-    const prompts = [];
-    const meta = [];
-
-    plan.concepts.forEach((c, idx) => {
-      const conceptIndex = idx + 1;
-      const base = styleLockPrompt(c.prompt);
-
-      // Only 1:1 square (best for Facebook)
-      const prompt = `${base} Headline overlay text: "${c.headline_overlay}".`;
-      prompts.push(prompt);
-      meta.push({
-        conceptIndex,
-        sizeLabel: "1:1",
-        dimensions: "1024x1024",
-        headline_overlay: c.headline_overlay,
-        scene_type: c.scene_type
-      });
-    });
+    // 2) Build image prompts from story plan (3 concepts × 2 sizes = 6 prompts)
+    console.log('🔨 Step 2: Building image prompts from story plan...');
+    const { prompts, meta } = buildImagePromptsFromStory(plan);
+    console.log(`✅ Built ${prompts.length} prompts (3 concepts × 2 sizes)`);
 
     // 3) Generate images
-    console.log(`🖼️ Step 3: Generating ${prompts.length} images (3 best-match concepts)...`);
+    console.log(`🖼️ Step 3: Generating ${prompts.length} images using gpt-image-1...`);
     const imageGenStartTime = Date.now();
     const imageResult = await generateMultipleImagesWithSizes(prompts, meta);
     const imageGenTime = Date.now() - imageGenStartTime;
