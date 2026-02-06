@@ -121,10 +121,22 @@ function extractSignals(article) {
   const lower = t.toLowerCase();
 
   const trigger =
+    lower.includes("viral") || lower.includes("breaks internet") || lower.includes("trending") || lower.includes("social media") ? "viral" :
+    lower.includes("mock") || lower.includes("mockery") || lower.includes("troll") || lower.includes("funny") || lower.includes("humor") ? "humor" :
     lower.includes("prediction") || lower.includes("who will win") ? "prediction" :
     lower.includes("injury") || lower.includes("ruled out") ? "injury" :
     lower.includes("ban") || lower.includes("suspension") || lower.includes("controversy") ? "controversy" :
     lower.includes("record") || lower.includes("milestone") ? "record" :
+    "general";
+  
+  // Extract story type
+  const storyType =
+    lower.includes("viral video") || lower.includes("video goes viral") || lower.includes("video breaks") ? "viral_video" :
+    lower.includes("press conference") || lower.includes("press meet") ? "press_conference" :
+    lower.includes("match") || lower.includes("vs") || lower.includes("versus") ? "match" :
+    lower.includes("injury") || lower.includes("ruled out") ? "injury" :
+    lower.includes("decision") || lower.includes("announcement") ? "decision" :
+    lower.includes("training") || lower.includes("practice") ? "training" :
     "general";
 
   const tournament =
@@ -166,7 +178,7 @@ function extractSignals(article) {
     }
   });
 
-  return { trigger, tournament, venue, players };
+  return { trigger, tournament, venue, players, storyType };
 }
 
 async function createVisualStoryPlan(article) {
@@ -181,10 +193,16 @@ async function createVisualStoryPlan(article) {
 
   const prompt = `
 You are a senior sports news thumbnail strategist.
-Create 3 DISTINCT HIGH CTR visual concepts that are SPECIFIC to this article.
+Create 3 COMPLETELY DIFFERENT HIGH CTR visual concepts that are SPECIFIC to this article.
+
+FIRST: Analyze the article and identify the ACTUAL story:
+- What is the main event? (viral video / match / press conference / injury / controversy / record / decision)
+- What is the key emotion? (humor / controversy / tension / celebration / shock)
+- What is the setting? (social media / stadium / press room / training / office)
+- Who are the key people mentioned? (players, officials, teams)
 
 CRITICAL DIVERSITY RULES - Each concept MUST be visually unique:
-- Concept 1: CLOSE-UP angle - Focus on ONE specific prop/object from article (bat/ball/helmet/trophy/microphone). Extreme close-up, dramatic lighting on single object.
+- Concept 1: CLOSE-UP angle - Focus on ONE specific prop/object from article (phone showing video / bat/ball/helmet/trophy/microphone). Extreme close-up, dramatic lighting on single object.
 - Concept 2: WIDE-ANGLE angle - Focus on silhouette action in midground with atmospheric background. Show full body silhouette, not close-up.
 - Concept 3: SYMBOLIC angle - Abstract/metaphorical representation (split screen, contrast, symbolic props like broken stumps/trophy/scoreboard). Creative composition.
 
@@ -195,20 +213,28 @@ MANDATORY: Each concept must have:
 - DIFFERENT mood/emotion (tense vs hype vs controversy)
 
 Output must be symbolic & generic (NO real player faces).
-Use silhouettes, props, appropriate settings based on article context (stadium ONLY if match-related, otherwise press room/office/training ground/hospital/etc).
+Use silhouettes, props, appropriate settings based on article context (stadium ONLY if match-related, otherwise press room/office/training ground/hospital/social media/etc).
 
 Signals:
 Trigger: ${signals.trigger}
+Story Type: ${signals.storyType}
 Tournament: ${signals.tournament}
 Venue: ${signals.venue}
 Players mentioned: ${signals.players.length > 0 ? signals.players.join(", ") : "None"}
 
 IMPORTANT: Read the article CAREFULLY and extract DIFFERENT elements for each concept:
-- Concept 1: Extract ONE specific moment/prop/object from article
-- Concept 2: Extract a DIFFERENT moment/action/emotion from article
-- Concept 3: Extract a DIFFERENT symbolic/metaphorical element from article
+- Concept 1: Extract ONE specific moment/prop/object from article (e.g., if article is about viral video → phone/screen showing video moment, NOT generic press conference)
+- Concept 2: Extract a DIFFERENT moment/action/emotion from article (e.g., if article is about mockery → laughing gesture/split screen contrast, NOT generic action)
+- Concept 3: Extract a DIFFERENT symbolic/metaphorical element from article (e.g., if article is about controversy → split screen/tension, NOT generic symbol)
 
-DO NOT repeat the same visual elements across concepts!
+CRITICAL: Match the ACTUAL article story:
+- If article is about "viral video" → use phone/screen/mobile device, NOT press conference
+- If article is about "mockery/humor" → use laughing gesture/contrast/split screen, NOT generic cricket action
+- If article is about "controversy" → use tension/split screen/contrast, NOT celebration
+- If article is about "match" → use stadium/cricket props, NOT office/press room
+- If article is about "injury" → use hospital/training ground, NOT stadium
+
+DO NOT create generic concepts! Match the EXACT article context!
 
 Article context to consider:
 - Match/press conference/injury/controversy/office decision/training
