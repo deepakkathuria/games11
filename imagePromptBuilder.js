@@ -18,10 +18,12 @@ function buildImagePromptsFromStory(plan) {
     if (c.scene_template) {
       // Structured template format - clear composition lines
       const template = c.scene_template;
+      // Use article-specific background from template (not forced stadium)
+      const background = template.background || "appropriate setting based on article context, cinematic lighting, no readable text";
       scene = `
 Foreground (sharp, close): ${template.foreground || ""}
 Midground (silhouette, back view): ${template.midground || ""}
-Background (stadium, blurred crowd, bokeh, smoke): ${template.background || ""}
+Background: ${background}
 Mood: ${c.mood || "hype"}
 `.trim();
     } else {

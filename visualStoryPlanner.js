@@ -55,7 +55,12 @@ async function createVisualStoryPlan(article) {
 
   const prompt = `
 You are a senior sports news thumbnail strategist.
-Create 3 HIGH CTR visual concepts that are SPECIFIC to the article.
+Create 3 DISTINCT HIGH CTR visual concepts that are SPECIFIC to this article.
+
+CRITICAL: Each concept must be DIFFERENT:
+- Concept 1: Focus on a specific moment/action from the article
+- Concept 2: Focus on a different angle (controversy/emotion/impact)
+- Concept 3: Focus on a symbolic/metaphorical representation
 
 Output must be symbolic & generic (NO real player faces).
 Use only silhouettes, props, stadium, scoreboard glow, crowd blur, dramatic lighting.
@@ -64,6 +69,11 @@ Signals:
 Trigger: ${signals.trigger}
 Tournament: ${signals.tournament}
 Venue: ${signals.venue}
+
+IMPORTANT: Read the article carefully and extract:
+- Specific match situation (batting/bowling/fielding/press conference)
+- Key emotions (tension/excitement/controversy/celebration)
+- Unique story elements (injury/record/decision/clash)
 
 STRICT:
 - NO real person likeness or recognizable players
@@ -75,15 +85,15 @@ Return ONLY valid JSON:
 {
   "concepts":[
     {
-      "angle":"short angle name",
+      "angle":"specific angle from article (e.g., 'batting collapse', 'bowler celebration', 'press conference tension')",
       "overlay":"MAX 4 words (for frontend overlay only)",
       "scene_template":{
-        "foreground":"ONE clear prop (bat/ball/stumps/helmet/gloves/microphone)",
-        "midground":"ONE generic silhouette action (batting shot / bowler run-up / fielding dive / press conference pose)",
-        "background":"stadium at night under floodlights, blurred crowd, smoky atmosphere, bokeh lights, no readable text"
+        "foreground":"ONE specific prop related to article (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone). Be specific based on article context.",
+        "midground":"ONE specific silhouette action from article (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground). Must match article story location.",
+        "background":"Appropriate setting based on article (stadium ONLY if match-related, otherwise: press room / office / training ground / hospital / outdoor field / indoor hall / conference room). Match the actual article context."
       },
-      "mood":"one of [tense, hype, controversy, celebration, pressure]",
-      "keywords":["team1","team2","venue","tournament","emotion"]
+      "mood":"one of [tense, hype, controversy, celebration, pressure, dramatic, suspenseful] - must match article emotion",
+      "keywords":["extract actual team names or colors","extract venue if specific","tournament","specific emotion from article"]
     }
   ]
 }
@@ -92,6 +102,8 @@ Article:
 Title: ${title}
 Description: ${description}
 Content: ${content}
+
+Remember: Each concept must be UNIQUE and article-specific. Don't repeat the same composition.
 `.trim();
 
   const resp = await axios.post(
@@ -102,8 +114,8 @@ Content: ${content}
         { role: "system", content: "Return ONLY valid JSON." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.7,
-      max_tokens: 900,
+      temperature: 0.85,
+      max_tokens: 1200,
       response_format: { type: "json_object" }
     },
     {

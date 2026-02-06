@@ -8,9 +8,9 @@ function applyThumbnailStyle(scenePrompt) {
   
   return `
 Photorealistic sports NEWS photography (not illustration, not poster).
-Cricket stadium at night under floodlights, cinematic contrast, shallow depth of field.
+Cinematic contrast, shallow depth of field, dramatic lighting.
 Must have ONE sharp foreground hero object + ONE midground silhouette action.
-Background: blurred crowd + bokeh stadium lights + smoky atmosphere.
+Background setting should match the article context (stadium/press room/office/training ground/etc).
 
 STRICT:
 - No faces, no real person likeness
