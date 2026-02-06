@@ -303,8 +303,51 @@ If you create similar concepts, the system will reject them. Be creative and div
   const raw = resp?.data?.choices?.[0]?.message?.content;
   if (!raw) throw new Error("No visual plan returned");
 
-  const plan = JSON.parse(raw);
-  if (!plan.concepts || plan.concepts.length !== 3) throw new Error("Visual plan invalid");
+  // Clean and parse JSON with error handling
+  let cleanedRaw = raw.trim();
+  
+  // Remove markdown code blocks if present
+  if (cleanedRaw.startsWith("```json")) {
+    cleanedRaw = cleanedRaw.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+  } else if (cleanedRaw.startsWith("```")) {
+    cleanedRaw = cleanedRaw.replace(/^```\s*/, "").replace(/\s*```$/, "");
+  }
+  
+  // Try to extract JSON if there's extra text
+  const jsonMatch = cleanedRaw.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleanedRaw = jsonMatch[0];
+  }
+
+  let plan;
+  try {
+    plan = JSON.parse(cleanedRaw);
+  } catch (parseError) {
+    console.error("❌ JSON Parse Error:");
+    console.error("Raw response:", raw);
+    console.error("Cleaned response:", cleanedRaw);
+    console.error("Parse error:", parseError.message);
+    console.error("Position:", parseError.message.match(/position (\d+)/)?.[1] || "unknown");
+    
+    // Try to fix common JSON issues
+    try {
+      // Fix trailing commas
+      cleanedRaw = cleanedRaw.replace(/,(\s*[}\]])/g, '$1');
+      // Fix missing quotes on keys
+      cleanedRaw = cleanedRaw.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+      plan = JSON.parse(cleanedRaw);
+      console.log("✅ JSON fixed and parsed successfully");
+    } catch (fixError) {
+      console.error("❌ JSON fix failed:", fixError.message);
+      throw new Error(`Invalid JSON from LLM: ${parseError.message}. Raw: ${raw.substring(0, 200)}...`);
+    }
+  }
+
+  if (!plan.concepts || plan.concepts.length !== 3) {
+    console.error("❌ Invalid plan structure:");
+    console.error("Plan:", JSON.stringify(plan, null, 2));
+    throw new Error(`Visual plan invalid: expected 3 concepts, got ${plan.concepts?.length || 0}`);
+  }
 
   // Log plan for debugging
   console.log("PLAN_JSON:", JSON.stringify(plan, null, 2));
