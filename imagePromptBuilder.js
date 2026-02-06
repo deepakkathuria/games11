@@ -2,42 +2,30 @@ const { applyThumbnailStyle } = require("./thumbnailStyleLock");
 
 /**
  * Convert 3 visual story concepts into image generation prompts
- * Returns: 6 prompts (3 concepts × 2 sizes: 1024x1024 and 1024x1536)
+ * Returns: 3 prompts (1 per concept, 1:1 size only)
+ * Overlay text is NOT injected into prompt - only in metadata for frontend
  */
 function buildImagePromptsFromStory(plan) {
   const prompts = [];
   const meta = [];
 
-  plan.concepts.forEach((concept, idx) => {
+  plan.concepts.forEach((c, idx) => {
     const conceptIndex = idx + 1;
-    const scenePrompt = concept.scene_prompt || concept.prompt || "";
-    const headlineOverlay = concept.headline_overlay || "";
+    const scene = (c.scene || c.scene_prompt || "").trim();
+    const overlay = (c.overlay || c.headline_overlay || "").trim();
 
-    // 1:1 Square (1024x1024) - Best for Facebook feed
-    const squarePrompt = applyThumbnailStyle(scenePrompt, headlineOverlay);
-    prompts.push(squarePrompt);
+    // Build prompt from scene ONLY (no overlay text in prompt)
+    const finalPrompt = applyThumbnailStyle(scene);
+
+    prompts.push(finalPrompt);
     meta.push({
       conceptIndex,
-      sizeLabel: "1:1",
       dimensions: "1024x1024",
-      headline_overlay: headlineOverlay,
-      scene_type: concept.angle || "action",
-      angle: concept.angle
-    });
-
-    // 4:5 Portrait (1024x1536) - Vertical format
-    const portraitPrompt = applyThumbnailStyle(
-      `${scenePrompt} Vertical portrait composition, tall format.`,
-      headlineOverlay
-    );
-    prompts.push(portraitPrompt);
-    meta.push({
-      conceptIndex,
-      sizeLabel: "4:5",
-      dimensions: "1024x1536",
-      headline_overlay: headlineOverlay,
-      scene_type: concept.angle || "action",
-      angle: concept.angle
+      sizeLabel: "1:1",
+      overlay,          // ✅ frontend will use this (NOT in prompt)
+      angle: c.angle || "",
+      keywords: c.keywords || [],
+      scene_type: c.angle || "action"
     });
   });
 

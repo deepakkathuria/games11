@@ -11,6 +11,10 @@ async function generateImage(prompt, { size = "1024x1024" } = {}) {
   if (!ALLOWED_SIZES.has(size)) size = "1024x1536";
 
   console.log(`📡 Calling OpenAI Image API with model: gpt-image-1, size: ${size}`);
+  console.log(`📝 FINAL PROMPT (full):`);
+  console.log(`─────────────────────────────────────────────────────────`);
+  console.log(prompt);
+  console.log(`─────────────────────────────────────────────────────────`);
   
   try {
     const resp = await axios.post(
@@ -24,6 +28,7 @@ async function generateImage(prompt, { size = "1024x1024" } = {}) {
 
     console.log(`📦 OpenAI API Response Status: ${resp.status}`);
     console.log(`📦 Response keys:`, Object.keys(resp.data || {}));
+    console.log(`📦 Response data structure:`, JSON.stringify(Object.keys(resp.data || {}), null, 2));
     
     // Check response structure
     if (resp.data?.error) {
@@ -81,8 +86,8 @@ async function generateMultipleImagesWithSizes(prompts, metadata = []) {
       const size = meta.dimensions || "1024x1024";
 
       console.log(`\n🎨 [${i + 1}/${prompts.length}] concept=${meta.conceptIndex} size=${meta.sizeLabel} (${size})`);
-      console.log(`📰 overlay="${meta.headline_overlay || ""}"`);
-      console.log(`📝 prompt: ${prompts[i].slice(0, 160)}...`);
+      console.log(`📰 overlay="${meta.overlay || ""}" (for frontend only, NOT in prompt)`);
+      console.log(`📝 prompt preview: ${prompts[i].slice(0, 200)}...`);
 
       const r = await generateImage(prompts[i], { size });
 
@@ -91,7 +96,9 @@ async function generateMultipleImagesWithSizes(prompts, metadata = []) {
         conceptIndex: meta.conceptIndex,
         sizeLabel: meta.sizeLabel,
         dimensions: size,
-        headline_overlay: meta.headline_overlay,
+        overlay: meta.overlay || "",      // ✅ FRONTEND THIS
+        angle: meta.angle || "",
+        keywords: meta.keywords || [],
         scene_type: meta.scene_type,
         prompt: prompts[i],
         imageUrl: r.imageUrl,

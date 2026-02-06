@@ -260,22 +260,7 @@ Tone:
 - Conversational (not robotic)
 - Slightly dramatic but factual
 
-STEP 3: CREATE IMAGE IDEAS
-Suggest:
-- 3 IMAGE CONCEPTS optimized for Facebook feed
-For each image:
-- Visual idea (what should be shown)
-- Text overlay (max 6–8 words, bold & emotional)
-- Emotion to trigger (shock, anger, curiosity)
-
-STEP 4: IMAGE GENERATION PROMPTS (AI-READY)
-For each image, write:
-- A detailed AI image generation prompt
-- Style: realistic, dramatic sports journalism
-- Aspect ratio: 1:1 and 4:5
-- High contrast, bold lighting, news-style composition
-
-STEP 5: HASHTAGS & POSTING TIPS
+STEP 3: HASHTAGS & POSTING TIPS
 Provide:
 - 5–7 hashtags (high-reach + topical)
 - Best posting time for Facebook
@@ -294,7 +279,7 @@ TITLE: ${newsArticle.title || 'No title'}
 DESCRIPTION: ${newsArticle.description || 'No description'}
 CONTENT: ${contentPreview}
 
-Format your response clearly with STEP 1, STEP 2, STEP 3, STEP 4, STEP 5 sections.
+Format your response clearly with STEP 1, STEP 2, STEP 3 sections.
 Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
 
     const response = await generateWithOpenAI(prompt, {
@@ -402,22 +387,7 @@ Tone:
 - Conversational (not robotic)
 - Slightly dramatic but factual
 
-STEP 3: CREATE IMAGE IDEAS
-Suggest:
-- 3 IMAGE CONCEPTS optimized for Facebook feed
-For each image:
-- Visual idea (what should be shown)
-- Text overlay (max 6–8 words, bold & emotional)
-- Emotion to trigger (shock, anger, curiosity)
-
-STEP 4: IMAGE GENERATION PROMPTS (AI-READY)
-For each image, write:
-- A detailed AI image generation prompt
-- Style: realistic, dramatic sports journalism
-- Aspect ratio: 1:1 and 4:5
-- High contrast, bold lighting, news-style composition
-
-STEP 5: HASHTAGS & POSTING TIPS
+STEP 3: HASHTAGS & POSTING TIPS
 Provide:
 - 5–7 hashtags (high-reach + topical)
 - Best posting time for Facebook
@@ -436,7 +406,7 @@ TITLE: ${newsArticle.title || 'No title'}
 DESCRIPTION: ${newsArticle.description || 'No description'}
 CONTENT: ${contentPreview}
 
-Format your response clearly with STEP 1, STEP 2, STEP 3, STEP 4, STEP 5 sections.
+Format your response clearly with STEP 1, STEP 2, STEP 3 sections.
 Use clean text format - NO asterisks, NO markdown formatting, NO code blocks.`;
 
     const response = await generateWithOpenAI(prompt, {

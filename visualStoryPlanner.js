@@ -4,44 +4,71 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
 /**
+ * Extract signals from article (trigger type, tournament)
+ */
+function extractSignals(article) {
+  const t = (article.title || "") + " " + (article.description || "") + " " + (article.content || "");
+  const lower = t.toLowerCase();
+
+  const trigger =
+    lower.includes("prediction") || lower.includes("who will win") ? "prediction" :
+    lower.includes("injury") || lower.includes("ruled out") ? "injury" :
+    lower.includes("ban") || lower.includes("suspension") || lower.includes("controversy") ? "controversy" :
+    lower.includes("record") || lower.includes("milestone") ? "record" :
+    "general";
+
+  const tournament =
+    lower.includes("t20 world cup") ? "T20 World Cup" :
+    lower.includes("ipl") ? "IPL" :
+    lower.includes("odi") ? "ODI" :
+    lower.includes("test") ? "Test" :
+    "Cricket";
+
+  return { trigger, tournament };
+}
+
+/**
  * CHATGPT STYLE VISUAL STORY ENGINE
  * 
  * Output:
  * - 3 high CTR thumbnail concepts
- * - Marketing + emotional + story angle optimized
+ * - Symbolic & article-specific (NO real person likeness, NO logos, NO text)
  */
 async function createVisualStoryPlan(article) {
   if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
 
-  const title = article.title || "";
-  const description = (article.description || "").slice(0, 400);
+  const title = (article.title || "").slice(0, 180);
+  const description = (article.description || "").slice(0, 500);
   const content = (article.content || "").slice(0, 1800);
+  
+  // Extract signals for better context
+  const signals = extractSignals(article);
 
   const prompt = `
 You are a senior sports news thumbnail strategist.
+Create 3 HIGH CTR visual concepts that are SPECIFIC to the article.
 
-Your job:
-Create 3 HIGH CTR visual story concepts for cricket news thumbnails.
+Output must be symbolic & generic (NO real player faces).
+Use only silhouettes, props, stadium, scoreboard glow, crowd blur, dramatic lighting.
 
-Focus on:
-- Emotional trigger
-- Controversy or tension
-- Breaking news visual language
-- Facebook click psychology
+Signals:
+Trigger: ${signals.trigger}
+Tournament: ${signals.tournament}
 
-CRITICAL RULES:
-- No real person likeness
-- Use generic cricketer silhouettes or symbolic visuals
-- Avoid weapons, blood, injury, hate content
+STRICT:
+- NO real person likeness or recognizable players
+- NO team logos, NO jersey brands, NO sponsor marks
+- NO readable text/letters/numbers inside the image (we add text later in frontend)
+- No violence, no gore
 
 Return ONLY valid JSON:
-
 {
-  "concepts": [
+  "concepts":[
     {
-      "angle": "emotional moment | controversy reveal | debate angle",
-      "headline_overlay": "max 6 words",
-      "scene_prompt": "Highly detailed 60-90 word cinematic thumbnail description"
+      "angle":"short angle name",
+      "overlay":"MAX 4 words (for frontend overlay only)",
+      "scene":"60-90 words. Describe ONLY the background scene (no text). Mention teams via colors/props only, not logos.",
+      "keywords":["team1","team2","venue","tournament","emotion"]
     }
   ]
 }
@@ -52,7 +79,7 @@ Description: ${description}
 Content: ${content}
 `.trim();
 
-  const response = await axios.post(
+  const resp = await axios.post(
     OPENAI_CHAT_URL,
     {
       model: "gpt-4o-mini",
@@ -61,25 +88,20 @@ Content: ${content}
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 800,
+      max_tokens: 900,
       response_format: { type: "json_object" }
     },
     {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      timeout: 40000
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      timeout: 45000
     }
   );
 
-  const raw = response?.data?.choices?.[0]?.message?.content;
+  const raw = resp?.data?.choices?.[0]?.message?.content;
   if (!raw) throw new Error("No visual plan returned");
 
   const plan = JSON.parse(raw);
-
-  if (!plan.concepts || plan.concepts.length !== 3)
-    throw new Error("Visual plan invalid");
+  if (!plan.concepts || plan.concepts.length !== 3) throw new Error("Visual plan invalid");
 
   return plan;
 }
