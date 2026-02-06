@@ -33,7 +33,30 @@ function extractSignals(article) {
     lower.includes("arun jaitley") ? "Arun Jaitley Stadium, Delhi" :
     "cricket stadium";
 
-  return { trigger, tournament, venue };
+  // Extract player names (common cricket players)
+  const players = [];
+  const playerKeywords = [
+    { name: "Rohit Sharma", keywords: ["rohit", "rohit sharma", "hitman"] },
+    { name: "Suryakumar Yadav", keywords: ["surya", "suryakumar", "sky", "suryakumar yadav"] },
+    { name: "Virat Kohli", keywords: ["virat", "kohli", "virat kohli", "king"] },
+    { name: "Jasprit Bumrah", keywords: ["bumrah", "jasprit", "jasprit bumrah"] },
+    { name: "Hardik Pandya", keywords: ["hardik", "pandya", "hardik pandya"] },
+    { name: "Rishabh Pant", keywords: ["pant", "rishabh", "rishabh pant"] },
+    { name: "KL Rahul", keywords: ["kl rahul", "rahul", "kl"] },
+    { name: "Ravindra Jadeja", keywords: ["jadeja", "ravindra jadeja", "jaddu"] },
+    { name: "MS Dhoni", keywords: ["dhoni", "ms dhoni", "mahi"] },
+    { name: "Shubman Gill", keywords: ["gill", "shubman", "shubman gill"] },
+    { name: "Yashasvi Jaiswal", keywords: ["yashasvi", "jaiswal", "yashasvi jaiswal"] },
+    { name: "Ishan Kishan", keywords: ["ishan", "kishan", "ishan kishan"] }
+  ];
+
+  playerKeywords.forEach(({ name, keywords }) => {
+    if (keywords.some(k => lower.includes(k))) {
+      players.push(name);
+    }
+  });
+
+  return { trigger, tournament, venue, players };
 }
 
 /**
@@ -69,6 +92,7 @@ Signals:
 Trigger: ${signals.trigger}
 Tournament: ${signals.tournament}
 Venue: ${signals.venue}
+Players mentioned: ${signals.players.length > 0 ? signals.players.join(", ") : "None"}
 
 IMPORTANT: Read the article carefully and extract:
 - Specific match situation (batting/bowling/fielding/press conference)
@@ -88,9 +112,9 @@ Return ONLY valid JSON:
       "angle":"specific angle from article (e.g., 'batting collapse', 'bowler celebration', 'press conference tension')",
       "overlay":"MAX 4 words (for frontend overlay only)",
       "scene_template":{
-        "foreground":"ONE specific prop related to article (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone). Be specific based on article context.",
-        "midground":"ONE specific silhouette action from article (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground). Must match article story location.",
-        "background":"Appropriate setting based on article (stadium ONLY if match-related, otherwise: press room / office / training ground / hospital / outdoor field / indoor hall / conference room). Match the actual article context."
+        "foreground":"For Concept 1: ONE specific prop (extreme close-up). For Concept 2: Different prop or empty. For Concept 3: Symbolic prop. Choose DIFFERENT props for each concept (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone). If player mentioned, use their signature prop/style. Be specific and UNIQUE per concept.",
+        "midground":"For Concept 1: Minimal or empty (close-up focus). For Concept 2: Full silhouette action. For Concept 3: Symbolic/metaphorical silhouette. Choose DIFFERENT actions for each concept (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground). If player mentioned, use their signature pose/style. Must be DIFFERENT per concept.",
+        "background":"For Concept 1: Simple/bokeh background. For Concept 2: Full atmospheric setting. For Concept 3: Contrasting/symbolic background. Vary the setting (stadium/press room/office/training ground/hospital/outdoor/indoor). If player mentioned, use their team colors subtly. MUST be DIFFERENT per concept."
       },
       "mood":"one of [tense, hype, controversy, celebration, pressure, dramatic, suspenseful] - must match article emotion",
       "keywords":["extract actual team names or colors","extract venue if specific","tournament","specific emotion from article"]
@@ -103,7 +127,14 @@ Title: ${title}
 Description: ${description}
 Content: ${content}
 
-Remember: Each concept must be UNIQUE and article-specific. Don't repeat the same composition.
+CRITICAL: Read the article and create 3 VISUALLY DISTINCT concepts:
+- Different camera angles (close-up / wide / symbolic)
+- Different props (don't repeat)
+- Different backgrounds (vary locations)
+- Different moods (vary emotions)
+- Different compositions (don't copy same structure)
+
+If you create similar concepts, the system will reject them. Be creative and diverse!
 `.trim();
 
   const resp = await axios.post(

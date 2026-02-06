@@ -143,7 +143,30 @@ function extractSignals(article) {
     lower.includes("arun jaitley") ? "Arun Jaitley Stadium, Delhi" :
     "cricket stadium";
 
-  return { trigger, tournament, venue };
+  // Extract player names (common cricket players)
+  const players = [];
+  const playerKeywords = [
+    { name: "Rohit Sharma", keywords: ["rohit", "rohit sharma", "hitman"] },
+    { name: "Suryakumar Yadav", keywords: ["surya", "suryakumar", "sky", "suryakumar yadav"] },
+    { name: "Virat Kohli", keywords: ["virat", "kohli", "virat kohli", "king"] },
+    { name: "Jasprit Bumrah", keywords: ["bumrah", "jasprit", "jasprit bumrah"] },
+    { name: "Hardik Pandya", keywords: ["hardik", "pandya", "hardik pandya"] },
+    { name: "Rishabh Pant", keywords: ["pant", "rishabh", "rishabh pant"] },
+    { name: "KL Rahul", keywords: ["kl rahul", "rahul", "kl"] },
+    { name: "Ravindra Jadeja", keywords: ["jadeja", "ravindra jadeja", "jaddu"] },
+    { name: "MS Dhoni", keywords: ["dhoni", "ms dhoni", "mahi"] },
+    { name: "Shubman Gill", keywords: ["gill", "shubman", "shubman gill"] },
+    { name: "Yashasvi Jaiswal", keywords: ["yashasvi", "jaiswal", "yashasvi jaiswal"] },
+    { name: "Ishan Kishan", keywords: ["ishan", "kishan", "ishan kishan"] }
+  ];
+
+  playerKeywords.forEach(({ name, keywords }) => {
+    if (keywords.some(k => lower.includes(k))) {
+      players.push(name);
+    }
+  });
+
+  return { trigger, tournament, venue, players };
 }
 
 async function createVisualStoryPlan(article) {
@@ -160,10 +183,16 @@ async function createVisualStoryPlan(article) {
 You are a senior sports news thumbnail strategist.
 Create 3 DISTINCT HIGH CTR visual concepts that are SPECIFIC to this article.
 
-CRITICAL: Each concept must be DIFFERENT:
-- Concept 1: Focus on a specific moment/action from the article
-- Concept 2: Focus on a different angle (controversy/emotion/impact)
-- Concept 3: Focus on a symbolic/metaphorical representation
+CRITICAL DIVERSITY RULES - Each concept MUST be visually unique:
+- Concept 1: CLOSE-UP angle - Focus on ONE specific prop/object from article (bat/ball/helmet/trophy/microphone). Extreme close-up, dramatic lighting on single object.
+- Concept 2: WIDE-ANGLE angle - Focus on silhouette action in midground with atmospheric background. Show full body silhouette, not close-up.
+- Concept 3: SYMBOLIC angle - Abstract/metaphorical representation (split screen, contrast, symbolic props like broken stumps/trophy/scoreboard). Creative composition.
+
+MANDATORY: Each concept must have:
+- DIFFERENT camera angle (close-up vs wide vs symbolic)
+- DIFFERENT foreground prop (don't repeat same prop)
+- DIFFERENT background setting (vary the location/atmosphere)
+- DIFFERENT mood/emotion (tense vs hype vs controversy)
 
 Output must be symbolic & generic (NO real player faces).
 Use silhouettes, props, appropriate settings based on article context (stadium ONLY if match-related, otherwise press room/office/training ground/hospital/etc).
@@ -172,13 +201,22 @@ Signals:
 Trigger: ${signals.trigger}
 Tournament: ${signals.tournament}
 Venue: ${signals.venue}
+Players mentioned: ${signals.players.length > 0 ? signals.players.join(", ") : "None"}
 
-IMPORTANT: Read the article carefully and extract:
-- Article context (match/press conference/injury/controversy/office decision/training)
+IMPORTANT: Read the article CAREFULLY and extract DIFFERENT elements for each concept:
+- Concept 1: Extract ONE specific moment/prop/object from article
+- Concept 2: Extract a DIFFERENT moment/action/emotion from article
+- Concept 3: Extract a DIFFERENT symbolic/metaphorical element from article
+
+DO NOT repeat the same visual elements across concepts!
+
+Article context to consider:
+- Match/press conference/injury/controversy/office decision/training
 - Specific situation (batting/bowling/fielding/press conference/meeting/hospital)
 - Key emotions (tension/excitement/controversy/celebration)
 - Unique story elements (injury/record/decision/clash)
 - Appropriate setting (stadium ONLY if match-related, otherwise use relevant location)
+- Player-specific elements: If specific players mentioned, use their signature props/colors/positions (e.g., Rohit = opening bat stance/pull shot, Surya = 360-degree shot style, Virat = cover drive pose, Bumrah = yorker delivery)
 
 STRICT:
 - NO real person likeness or recognizable players
@@ -193,9 +231,9 @@ Return ONLY valid JSON:
       "angle":"specific angle from article (e.g., 'batting collapse', 'bowler celebration', 'press conference tension')",
       "overlay":"MAX 4 words (for frontend overlay only)",
       "scene_template":{
-        "foreground":"ONE specific prop related to article (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone). Be specific based on article context.",
-        "midground":"ONE specific silhouette action from article (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground). Must match article story location.",
-        "background":"Appropriate setting based on article (stadium ONLY if match-related, otherwise: press room / office / training ground / hospital / outdoor field / indoor hall / conference room). Match the actual article context."
+        "foreground":"For Concept 1: ONE specific prop (extreme close-up). For Concept 2: Different prop or empty. For Concept 3: Symbolic prop. Choose DIFFERENT props for each concept (bat/ball/stumps/helmet/gloves/microphone/trophy/scoreboard/document/phone). If player mentioned, use their signature prop/style. Be specific and UNIQUE per concept.",
+        "midground":"For Concept 1: Minimal or empty (close-up focus). For Concept 2: Full silhouette action. For Concept 3: Symbolic/metaphorical silhouette. Choose DIFFERENT actions for each concept (batting shot / bowler delivery / fielding / press conference / office meeting / hospital / training ground). If player mentioned, use their signature pose/style. Must be DIFFERENT per concept.",
+        "background":"For Concept 1: Simple/bokeh background. For Concept 2: Full atmospheric setting. For Concept 3: Contrasting/symbolic background. Vary the setting (stadium/press room/office/training ground/hospital/outdoor/indoor). If player mentioned, use their team colors subtly. MUST be DIFFERENT per concept."
       },
       "mood":"one of [tense, hype, controversy, celebration, pressure, dramatic, suspenseful] - must match article emotion",
       "keywords":["extract actual team names or colors","extract venue if specific","tournament","specific emotion from article"]
@@ -208,7 +246,14 @@ Title: ${title}
 Description: ${description}
 Content: ${content}
 
-Remember: Each concept must be UNIQUE and article-specific. Don't repeat the same composition.
+CRITICAL: Read the article and create 3 VISUALLY DISTINCT concepts:
+- Different camera angles (close-up / wide / symbolic)
+- Different props (don't repeat)
+- Different backgrounds (vary locations)
+- Different moods (vary emotions)
+- Different compositions (don't copy same structure)
+
+If you create similar concepts, the system will reject them. Be creative and diverse!
 `.trim();
 
   const resp = await axios.post(
@@ -251,7 +296,8 @@ module.exports = { createVisualStoryPlan };
 - ✅ Returns `keywords` array for metadata
 - ✅ STRICT rules: NO logos, NO text, NO faces
 - ✅ Symbolic visuals only (silhouettes, props, stadium atmosphere)
-- ✅ **Entity extraction** (`extractSignals()`) - passes trigger type, tournament, and venue for better context
+- ✅ **Entity extraction** (`extractSignals()`) - passes trigger type, tournament, venue, and player names for better context
+- ✅ **Player-specific elements:** Detects players (Rohit, Surya, Virat, Bumrah, etc.) and uses their signature props/poses/team colors
 - ✅ **Debug logging:** `PLAN_JSON` logged for verification
 - ✅ **Diversity enforcement:** Explicit instructions to create 3 DISTINCT concepts
 - ✅ **Article-specific extraction:** Forces LLM to read article and extract specific moments/emotions
