@@ -24,7 +24,16 @@ function extractSignals(article) {
     lower.includes("test") ? "Test" :
     "Cricket";
 
-  return { trigger, tournament };
+  const venue =
+    lower.includes("wankhede") ? "Wankhede Stadium, Mumbai" :
+    lower.includes("eden gardens") ? "Eden Gardens, Kolkata" :
+    lower.includes("narendra modi stadium") ? "Narendra Modi Stadium, Ahmedabad" :
+    lower.includes("chinnaswamy") ? "M. Chinnaswamy Stadium, Bangalore" :
+    lower.includes("chepauk") ? "MA Chidambaram Stadium, Chennai" :
+    lower.includes("arun jaitley") ? "Arun Jaitley Stadium, Delhi" :
+    "cricket stadium";
+
+  return { trigger, tournament, venue };
 }
 
 /**
@@ -54,6 +63,7 @@ Use only silhouettes, props, stadium, scoreboard glow, crowd blur, dramatic ligh
 Signals:
 Trigger: ${signals.trigger}
 Tournament: ${signals.tournament}
+Venue: ${signals.venue}
 
 STRICT:
 - NO real person likeness or recognizable players
@@ -67,7 +77,12 @@ Return ONLY valid JSON:
     {
       "angle":"short angle name",
       "overlay":"MAX 4 words (for frontend overlay only)",
-      "scene":"60-90 words. Describe ONLY the background scene (no text). Mention teams via colors/props only, not logos.",
+      "scene_template":{
+        "foreground":"ONE clear prop (bat/ball/stumps/helmet/gloves/microphone)",
+        "midground":"ONE generic silhouette action (batting shot / bowler run-up / fielding dive / press conference pose)",
+        "background":"stadium at night under floodlights, blurred crowd, smoky atmosphere, bokeh lights, no readable text"
+      },
+      "mood":"one of [tense, hype, controversy, celebration, pressure]",
       "keywords":["team1","team2","venue","tournament","emotion"]
     }
   ]
@@ -102,6 +117,9 @@ Content: ${content}
 
   const plan = JSON.parse(raw);
   if (!plan.concepts || plan.concepts.length !== 3) throw new Error("Visual plan invalid");
+
+  // Log plan for debugging
+  console.log("PLAN_JSON:", JSON.stringify(plan, null, 2));
 
   return plan;
 }

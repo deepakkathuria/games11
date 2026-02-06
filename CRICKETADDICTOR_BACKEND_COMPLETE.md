@@ -134,7 +134,16 @@ function extractSignals(article) {
     lower.includes("test") ? "Test" :
     "Cricket";
 
-  return { trigger, tournament };
+  const venue =
+    lower.includes("wankhede") ? "Wankhede Stadium, Mumbai" :
+    lower.includes("eden gardens") ? "Eden Gardens, Kolkata" :
+    lower.includes("narendra modi stadium") ? "Narendra Modi Stadium, Ahmedabad" :
+    lower.includes("chinnaswamy") ? "M. Chinnaswamy Stadium, Bangalore" :
+    lower.includes("chepauk") ? "MA Chidambaram Stadium, Chennai" :
+    lower.includes("arun jaitley") ? "Arun Jaitley Stadium, Delhi" :
+    "cricket stadium";
+
+  return { trigger, tournament, venue };
 }
 
 async function createVisualStoryPlan(article) {
@@ -157,6 +166,7 @@ Use only silhouettes, props, stadium, scoreboard glow, crowd blur, dramatic ligh
 Signals:
 Trigger: ${signals.trigger}
 Tournament: ${signals.tournament}
+Venue: ${signals.venue}
 
 STRICT:
 - NO real person likeness or recognizable players
@@ -170,7 +180,12 @@ Return ONLY valid JSON:
     {
       "angle":"short angle name",
       "overlay":"MAX 4 words (for frontend overlay only)",
-      "scene":"60-90 words. Describe ONLY the background scene (no text). Mention teams via colors/props only, not logos.",
+      "scene_template":{
+        "foreground":"ONE clear prop (bat/ball/stumps/helmet/gloves/microphone)",
+        "midground":"ONE generic silhouette action (batting shot / bowler run-up / fielding dive / press conference pose)",
+        "background":"stadium at night under floodlights, blurred crowd, smoky atmosphere, bokeh lights, no readable text"
+      },
+      "mood":"one of [tense, hype, controversy, celebration, pressure]",
       "keywords":["team1","team2","venue","tournament","emotion"]
     }
   ]
@@ -206,6 +221,9 @@ Content: ${content}
   const plan = JSON.parse(raw);
   if (!plan.concepts || plan.concepts.length !== 3) throw new Error("Visual plan invalid");
 
+  // Log plan for debugging
+  console.log("PLAN_JSON:", JSON.stringify(plan, null, 2));
+
   return plan;
 }
 
@@ -214,11 +232,13 @@ module.exports = { createVisualStoryPlan };
 
 **Key Changes:**
 - ✅ Returns `overlay` (max 4 words) for frontend only
-- ✅ Returns `scene` (60-90 words) - background description only
+- ✅ Returns `scene_template` (structured: foreground, midground, background) - predictable format
+- ✅ Returns `mood` (tense/hype/controversy/celebration/pressure)
 - ✅ Returns `keywords` array for metadata
 - ✅ STRICT rules: NO logos, NO text, NO faces
 - ✅ Symbolic visuals only (silhouettes, props, stadium atmosphere)
-- ✅ **Entity extraction** (`extractSignals()`) - passes trigger type and tournament for better context
+- ✅ **Entity extraction** (`extractSignals()`) - passes trigger type, tournament, and venue for better context
+- ✅ **Debug logging:** `PLAN_JSON` logged for verification
 
 ---
 
@@ -232,25 +252,23 @@ Applies consistent breaking news thumbnail style to prompts. **UPDATED: BACKGROU
  * BACKGROUND ONLY - no text, no logos, no faces
  */
 function applyThumbnailStyle(scenePrompt) {
+  console.log("STYLELOCK_VERSION=2026-02-06-01");
+  
   return `
-High-CTR cricket breaking news thumbnail BACKGROUND ONLY.
-Photorealistic sports journalism look, cinematic stadium lighting, high contrast, dramatic shadows.
-Composition: clean center subject with negative space for text overlay (we add text later).
-Subject must be GENERIC: athlete silhouettes or back-view figures only.
+Photorealistic sports NEWS photography (not illustration, not poster).
+Cricket stadium at night under floodlights, cinematic contrast, shallow depth of field.
+Must have ONE sharp foreground hero object + ONE midground silhouette action.
+Background: blurred crowd + bokeh stadium lights + smoky atmosphere.
 
-STRICT RULES:
-- NO real person likeness, no celebrity faces, no recognizable players
-- NO team logos, NO jersey brand marks, NO sponsor logos
-- NO readable text, NO letters, NO numbers, NO watermark
-- NO flags or political symbols
-- NO signage, NO banners, NO jersey numbers, NO scoreboard digits
-- If any text appears, it must be blurred/unreadable
-- Avoid messy typography entirely
+STRICT:
+- No faces, no real person likeness
+- No logos, no readable text/letters/numbers
+- No flags, no political symbols
+- No jersey numbers, no sponsor marks
+- If any text appears anywhere, it must be fully blurred and unreadable
 
 Scene:
 ${scenePrompt}
-
-Camera: shallow depth of field, crisp subject edges, cinematic color grading.
 `.trim();
 }
 
@@ -262,6 +280,9 @@ module.exports = { applyThumbnailStyle };
 - ✅ Added STRICT rules: NO text, NO logos, NO faces
 - ✅ **Hard-block for random text:** "If any text appears, it must be blurred/unreadable"
 - ✅ **No signage, banners, jersey numbers, scoreboard digits**
+- ✅ **"ONE sharp foreground hero object + ONE midground silhouette action"** - structured composition
+- ✅ **"Photorealistic sports NEWS photography"** - strong anchor for real news photo look
+- ✅ **Debug logging:** `STYLELOCK_VERSION=2026-02-06-01` logged for verification
 - ✅ Forces "BACKGROUND ONLY" composition
 - ✅ Generic athlete silhouettes only
 - ✅ Negative space for frontend text overlay
@@ -285,8 +306,25 @@ function buildImagePromptsFromStory(plan) {
 
   plan.concepts.forEach((c, idx) => {
     const conceptIndex = idx + 1;
-    const scene = (c.scene || c.scene_prompt || "").trim();
     const overlay = (c.overlay || c.headline_overlay || "").trim();
+
+    // Build scene from template if available, otherwise fallback to old format
+    let scene = "";
+    if (c.scene_template) {
+      // Structured template format - clear composition lines
+      const template = c.scene_template;
+      scene = `
+Foreground (sharp, close): ${template.foreground || ""}
+Midground (silhouette, back view): ${template.midground || ""}
+Background (stadium, blurred crowd, bokeh, smoke): ${template.background || ""}
+Mood: ${c.mood || "hype"}
+`.trim();
+    } else {
+      // Fallback to old format
+      scene = (c.scene || c.scene_prompt || "").trim();
+    }
+
+    console.log("SCENE_USED:", scene);
 
     // Build prompt from scene ONLY (no overlay text in prompt)
     const finalPrompt = applyThumbnailStyle(scene);
@@ -312,9 +350,10 @@ module.exports = { buildImagePromptsFromStory };
 **Key Changes:**
 - ✅ Overlay text NOT injected into prompt
 - ✅ Overlay text stored in metadata only (for frontend use)
-- ✅ Prompt built from `scene` only
-- ✅ Supports both `scene` and `scene_prompt` field names
-- ✅ Includes `keywords` in metadata
+- ✅ **Supports structured `scene_template` format** (foreground, midground, background)
+- ✅ **Falls back to old `scene`/`scene_prompt` format** for backward compatibility
+- ✅ **Debug logging:** `SCENE_USED` logged for verification
+- ✅ Includes `keywords` and `mood` in metadata
 - ✅ **Consistent naming:** Uses `overlay` (not `headline_overlay`) in metadata
 
 ---

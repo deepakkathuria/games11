@@ -4,25 +4,23 @@
  * BACKGROUND ONLY - no text, no logos, no faces
  */
 function applyThumbnailStyle(scenePrompt) {
+  console.log("STYLELOCK_VERSION=2026-02-06-01");
+  
   return `
-High-CTR cricket breaking news thumbnail BACKGROUND ONLY.
-Photorealistic sports journalism look, cinematic stadium lighting, high contrast, dramatic shadows.
-Composition: clean center subject with negative space for text overlay (we add text later).
-Subject must be GENERIC: athlete silhouettes or back-view figures only.
+Photorealistic sports NEWS photography (not illustration, not poster).
+Cricket stadium at night under floodlights, cinematic contrast, shallow depth of field.
+Must have ONE sharp foreground hero object + ONE midground silhouette action.
+Background: blurred crowd + bokeh stadium lights + smoky atmosphere.
 
-STRICT RULES:
-- NO real person likeness, no celebrity faces, no recognizable players
-- NO team logos, NO jersey brand marks, NO sponsor logos
-- NO readable text, NO letters, NO numbers, NO watermark
-- NO flags or political symbols
-- NO signage, NO banners, NO jersey numbers, NO scoreboard digits
-- If any text appears, it must be blurred/unreadable
-- Avoid messy typography entirely
+STRICT:
+- No faces, no real person likeness
+- No logos, no readable text/letters/numbers
+- No flags, no political symbols
+- No jersey numbers, no sponsor marks
+- If any text appears anywhere, it must be fully blurred and unreadable
 
 Scene:
 ${scenePrompt}
-
-Camera: shallow depth of field, crisp subject edges, cinematic color grading.
 `.trim();
 }
 

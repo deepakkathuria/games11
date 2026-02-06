@@ -11,8 +11,25 @@ function buildImagePromptsFromStory(plan) {
 
   plan.concepts.forEach((c, idx) => {
     const conceptIndex = idx + 1;
-    const scene = (c.scene || c.scene_prompt || "").trim();
     const overlay = (c.overlay || c.headline_overlay || "").trim();
+
+    // Build scene from template if available, otherwise fallback to old format
+    let scene = "";
+    if (c.scene_template) {
+      // Structured template format - clear composition lines
+      const template = c.scene_template;
+      scene = `
+Foreground (sharp, close): ${template.foreground || ""}
+Midground (silhouette, back view): ${template.midground || ""}
+Background (stadium, blurred crowd, bokeh, smoke): ${template.background || ""}
+Mood: ${c.mood || "hype"}
+`.trim();
+    } else {
+      // Fallback to old format
+      scene = (c.scene || c.scene_prompt || "").trim();
+    }
+
+    console.log("SCENE_USED:", scene);
 
     // Build prompt from scene ONLY (no overlay text in prompt)
     const finalPrompt = applyThumbnailStyle(scene);
