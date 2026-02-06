@@ -21,32 +21,54 @@ async function createVisualPlan(article) {
   const content = safeSlice(article.content || "", 1800);
 
   const prompt = `
-You are a sports news thumbnail art director.
+You are a sports news thumbnail art director. Analyze this cricket article and create EXACTLY 3 story-specific image concepts.
 
-Create EXACTLY 3 distinct image concepts for this article as VALID JSON ONLY.
+CRITICAL: Each image MUST be directly related to THIS SPECIFIC ARTICLE'S story, characters, events, or themes. NO generic cricket images.
 
-Rules:
-- Must be directly tied to the story (NOT generic cricket).
-- Avoid real-person likeness: use silhouettes, generic cricketer, symbolic visuals, or "senior official (not identifiable)".
-- No violence depiction: no weapons, blood, injury, gore, hate symbols.
-- Each concept should be a different angle:
-  1) Primary story moment
-  2) Authority/decision/inside story vibe
-  3) Debate/split-screen or symbolic contrast
+ANALYZE THE ARTICLE FIRST:
+- What is the MAIN story/event?
+- Who are the key people/teams mentioned?
+- What is the controversy/decision/action?
+- What emotions/themes are present?
+
+CREATE 3 DISTINCT CONCEPTS (each must reflect different aspect of THIS article):
+
+Concept 1: PRIMARY STORY MOMENT
+- Visualize the main event/action from the article
+- Must reference specific story elements (team names, situation, context)
+- Example: If article is about "Pakistan boycotting India match" → show boycott/protest scene, NOT generic cricket
+
+Concept 2: KEY DECISION/AUTHORITY ANGLE  
+- Show the decision-making, authority, or inside story aspect
+- Reference specific organizations/people mentioned (as silhouettes/generic)
+- Example: If article mentions "ICC decision" → show boardroom/decision scene related to THIS story
+
+Concept 3: EMOTIONAL/DEBATE ANGLE
+- Capture the debate, conflict, or emotional impact
+- Show split-screen, contrast, or symbolic representation of THIS story's conflict
+- Example: If article is about "fans divided" → show divided opinion visual related to THIS specific issue
+
+RULES:
+- Each concept MUST reference THIS article's specific story elements
+- Avoid real-person likeness: use "generic cricketer", "silhouette", "senior official (not identifiable)"
+- No weapons, blood, injury, gore, hate symbols
+- Each prompt should be 60-100 words, describing the EXACT scene related to THIS article
 
 Return JSON EXACTLY in this format:
 {
   "concepts": [
-    { "headline_overlay": "max 6 words", "scene_type": "institutional|portrait|symbolic|action|split", "prompt": "50-90 words detailed prompt" },
-    { "headline_overlay": "max 6 words", "scene_type": "institutional|portrait|symbolic|action|split", "prompt": "50-90 words detailed prompt" },
-    { "headline_overlay": "max 6 words", "scene_type": "institutional|portrait|symbolic|action|split", "prompt": "50-90 words detailed prompt" }
+    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "60-100 words describing scene SPECIFIC to this article's story" },
+    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "60-100 words describing scene SPECIFIC to this article's story" },
+    { "headline_overlay": "max 6 words related to THIS story", "scene_type": "action|institutional|portrait|symbolic|split", "prompt": "60-100 words describing scene SPECIFIC to this article's story" }
   ]
 }
 
-Article:
+ARTICLE TO ANALYZE:
 Title: ${title}
 Description: ${description}
-Content: ${content}
+Full Content: ${content}
+
+Remember: Each image concept MUST be story-specific to THIS article, NOT generic cricket.
 `.trim();
 
   const resp = await axios.post(
@@ -57,8 +79,8 @@ Content: ${content}
         { role: "system", content: "Return ONLY valid JSON. No extra text." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.6,
-      max_tokens: 900,
+      temperature: 0.7,
+      max_tokens: 1200,
       response_format: { type: "json_object" }
     },
     {

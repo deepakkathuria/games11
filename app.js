@@ -3325,9 +3325,7 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
     console.log(`✅ Visual plan created in ${(planTime / 1000).toFixed(2)}s`);
     console.log(`📋 Concepts: ${plan.concepts?.length || 0}`);
 
-    // 2) Build 6 prompts (3 concepts x 2 sizes)
-    const SIZES = { square: "1024x1024", portrait: "1024x1536" };
-
+    // 2) Build 3 prompts (1 best image per concept - 1:1 square for Facebook)
     const styleLockPrompt = (p) =>
       [
         "Breaking news cricket thumbnail, realistic photojournalism, dramatic high-contrast lighting, cinematic sports newsroom mood,",
@@ -3343,31 +3341,20 @@ app.post("/api/cricket-addictor/generate-images", async (req, res) => {
       const conceptIndex = idx + 1;
       const base = styleLockPrompt(c.prompt);
 
-      // 1:1 square
-      const sq = `${base} Headline overlay text: "${c.headline_overlay}".`;
-      prompts.push(sq);
+      // Only 1:1 square (best for Facebook)
+      const prompt = `${base} Headline overlay text: "${c.headline_overlay}".`;
+      prompts.push(prompt);
       meta.push({
         conceptIndex,
         sizeLabel: "1:1",
-        dimensions: SIZES.square,
-        headline_overlay: c.headline_overlay,
-        scene_type: c.scene_type
-      });
-
-      // 4:5 portrait (OpenAI valid)
-      const pt = `${base} Vertical poster composition. Headline overlay text: "${c.headline_overlay}".`;
-      prompts.push(pt);
-      meta.push({
-        conceptIndex,
-        sizeLabel: "4:5",
-        dimensions: SIZES.portrait,
+        dimensions: "1024x1024",
         headline_overlay: c.headline_overlay,
         scene_type: c.scene_type
       });
     });
 
     // 3) Generate images
-    console.log(`🖼️ Step 3: Generating ${prompts.length} images (3 concepts × 2 sizes)...`);
+    console.log(`🖼️ Step 3: Generating ${prompts.length} images (3 best-match concepts)...`);
     const imageGenStartTime = Date.now();
     const imageResult = await generateMultipleImagesWithSizes(prompts, meta);
     const imageGenTime = Date.now() - imageGenStartTime;

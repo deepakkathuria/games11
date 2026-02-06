@@ -999,7 +999,7 @@ export default function CricketAddictorHighCTRGenerator() {
                 }}>
                   <h3 style={{ margin: 0, marginBottom: 20, color: "#1877f2", fontSize: 20, display: "flex", alignItems: "center", gap: 8 }}>
                     <span>🖼️</span>
-                    <span>Generated Images ({generatedImages.length} total - 3 Concepts × 2 Sizes)</span>
+                    <span>Generated Images ({generatedImages.length} total - 3 Best-Match Concepts)</span>
                     {imageCompleteNotification && (
                       <span style={{ 
                         background: "#28a745", 
