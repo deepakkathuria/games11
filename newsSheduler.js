@@ -182,6 +182,7 @@ class NewsScheduler {
     const articles = await this.fetchNewsFromAPI();
     await this.storeNewsInDB(articles);
     console.log(`Fetched and stored ${articles.length} articles`);
+    return { count: articles.length };
   }
 
   // Get stored news from database using your existing pollDBPool

@@ -130,7 +130,8 @@ const {
 
 // Initialize news scheduler
 const newsScheduler = new NewsScheduler();
-newsScheduler.startScheduler(1); // Fetch every 30 minutes
+// GNews automatic sync disabled — use POST /api/manual-fetch-news or /api/cricket-openai/manual-fetch-news
+// newsScheduler.startScheduler(1); // Fetch every 30 minutes
 
 // Add these imports at the top
 const HindiNewsScheduler = require('./hindiNewsScheduler');
@@ -143,11 +144,13 @@ const { processAllNewsOpenAI, generateOpenAIHeadline, generateOpenAIMetaDescript
 
 // Initialize Hindi news scheduler
 const hindiNewsScheduler = new HindiNewsScheduler();
-hindiNewsScheduler.startScheduler(1); // Fetch every 30 minutes
+// GNews automatic sync disabled — use manual-fetch-news APIs
+// hindiNewsScheduler.startScheduler(1); // Fetch every 30 minutes
 
 // Initialize All News scheduler
 const allNewsScheduler = new AllNewsScheduler();
-allNewsScheduler.startScheduler(30); //
+// GNews automatic sync disabled — use manual-fetch-news APIs
+// allNewsScheduler.startScheduler(30); //
 
 
 // Add this import at the top
@@ -163,7 +166,8 @@ const { processHindiAllNewsManualInput, generateHindiAllNewsHeadline, generateHi
 // ✅ Add this initialization (around line 130-140)
 // Initialize Hindi All News scheduler
 const hindiAllNewsScheduler = new HindiAllNewsScheduler();
-hindiAllNewsScheduler.startScheduler(30); // Fetch every 30 minutes
+// GNews automatic sync disabled — use manual-fetch-news APIs
+// hindiAllNewsScheduler.startScheduler(30); // Fetch every 30 minutes
 
 
 const PakistanNewsScheduler = require('./pakistanNewsScheduler');
@@ -219,19 +223,20 @@ const cricketAddictorScheduler = new CricketAddictorScheduler();
 
 
 
-pakistanNewsScheduler.startScheduler(30); // Every 10 minutes
+// GNews automatic sync disabled — use manual-fetch-news APIs
+// pakistanNewsScheduler.startScheduler(30); // Every 10 minutes
 
 // Start Automobile News Scheduler
-automobileScheduler.startScheduler(10); // Every 30 minutes
+// automobileScheduler.startScheduler(10); // Every 30 minutes
 
 // Start Car News Scheduler
 // carScheduler.startScheduler(10); // Every 10 minutes
 
 // Start Brand Car News Scheduler (Hyundai, Tata, Maruti, Mahindra)
-brandCarScheduler.startScheduler(10); // Every 10 minutes
+// brandCarScheduler.startScheduler(10); // Every 10 minutes
 
 // Start Sports News Scheduler
-sportsScheduler.startScheduler(10); // Every 10 minutes
+// sportsScheduler.startScheduler(10); // Every 10 minutes
 
 
 
@@ -4226,8 +4231,12 @@ app.post('/api/cricket-openai/articles/:id/generate', async (req, res) => {
 // Manual fetch cricket news for OpenAI
 app.post('/api/cricket-openai/manual-fetch-news', async (req, res) => {
   try {
-    await newsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'Cricket news fetched and stored successfully for OpenAI processing' });
+    const result = await newsScheduler.fetchAndStoreNews();
+    res.json({
+      success: true,
+      message: `GNews: ${result.count} cricket articles fetched and stored for OpenAI processing`,
+      count: result.count,
+    });
   } catch (error) {
     console.error('Error manually fetching cricket news for OpenAI:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -5423,8 +5432,12 @@ app.post('/api/process-article/:id', async (req, res) => {
 
 app.post('/api/manual-fetch-news', async (req, res) => {
   try {
-    await newsScheduler.fetchAndStoreNews();
-    res.json({ success: true, message: 'News fetched and stored successfully' });
+    const result = await newsScheduler.fetchAndStoreNews();
+    res.json({
+      success: true,
+      message: `GNews: ${result.count} cricket articles fetched and stored successfully`,
+      count: result.count,
+    });
   } catch (error) {
     console.error('Error manually fetching news:', error);
     res.status(500).json({ success: false, error: error.message });

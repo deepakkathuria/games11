@@ -20,6 +20,7 @@ export default function CricketAddictorHighCTRGenerator() {
   const [error, setError] = useState(null);
   const [provider, setProvider] = useState(null);
   const [fetching, setFetching] = useState(false);
+  const [gnewsFetching, setGnewsFetching] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [imagePolling, setImagePolling] = useState(false);
   const [currentContentId, setCurrentContentId] = useState(null);
@@ -176,6 +177,39 @@ export default function CricketAddictorHighCTRGenerator() {
     } finally {
       console.log('🏁 ========== FETCH STORED CONTENT FINISHED ==========');
       setStoredLoading(false);
+    }
+  };
+
+  // Manual fetch latest cricket news from GNews (no automatic sync)
+  const manualGNewsFetch = async () => {
+    console.log('📰 ========== MANUAL GNEWS FETCH STARTED ==========');
+    console.log('🌐 API URL:', `${API}/api/manual-fetch-news`);
+
+    setGnewsFetching(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${API}/api/manual-fetch-news`, {}, {
+        timeout: 120000,
+      });
+
+      console.log('✅ GNews API Response:', response.data);
+
+      if (response.data.success) {
+        const count = response.data.count ?? 0;
+        alert(`✅ ${response.data.message || `GNews: ${count} articles fetched successfully!`}`);
+      } else {
+        const errMsg = response.data.error || "Failed to fetch from GNews";
+        setError(errMsg);
+        alert("Error: " + errMsg);
+      }
+    } catch (e) {
+      console.error("❌ GNews fetch error:", e);
+      const errorMsg = e.response?.data?.error || e.message;
+      setError(errorMsg);
+      alert("GNews fetch error: " + errorMsg);
+    } finally {
+      setGnewsFetching(false);
+      console.log('🏁 ========== MANUAL GNEWS FETCH FINISHED ==========');
     }
   };
 
@@ -546,6 +580,29 @@ export default function CricketAddictorHighCTRGenerator() {
         <p style={{ margin: 0, fontSize: 16, opacity: 0.95 }}>Generate Facebook posts from CricketAddictor articles targeting 10,000+ organic clicks</p>
         <div style={{ fontSize: '12px', marginTop: '12px', opacity: 0.9 }}>
           🕒 {new Date().toLocaleString("en-IN")} | 🌐 API: {API} | 🤖 Powered by OpenAI GPT-4o-mini
+        </div>
+        <div style={{ marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={manualGNewsFetch}
+            disabled={gnewsFetching}
+            style={{
+              padding: "12px 28px",
+              background: gnewsFetching ? "rgba(255,255,255,0.4)" : "#ff6f00",
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.5)",
+              borderRadius: 10,
+              cursor: gnewsFetching ? "not-allowed" : "pointer",
+              fontWeight: 700,
+              fontSize: 15,
+              boxShadow: gnewsFetching ? "none" : "0 4px 12px rgba(0,0,0,0.2)",
+              transition: "all 0.2s",
+            }}
+          >
+            {gnewsFetching ? "⏳ Fetching from GNews..." : "📰 Fetch Latest from GNews"}
+          </button>
+          <span style={{ fontSize: 11, opacity: 0.85 }}>
+            Manual only — click to sync cricket news from GNews (no auto sync)
+          </span>
         </div>
       </div>
 

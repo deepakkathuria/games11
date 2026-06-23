@@ -147,7 +147,9 @@ STRICT:
 - NO readable text/letters/numbers inside the image (we add text later in frontend)
 - No violence, no gore
 
-Return ONLY valid JSON:
+CRITICAL: You MUST return EXACTLY 3 concepts. No more, no less.
+
+Return ONLY valid JSON with EXACTLY 3 concepts:
 {
   "concepts":[
     {
@@ -161,9 +163,35 @@ Return ONLY valid JSON:
       "mood":"one of [tense, hype, controversy, celebration, pressure, dramatic, suspenseful, crisis, conflict] - must match article emotion",
       "colors":"Extract specific colors from article (team colors, country flags: Pakistan=green, India=saffron/blue, Sri Lanka=maroon/yellow). Use VIBRANT, CONTRASTING colors, not dull shades.",
       "keywords":["extract actual team names or colors","extract venue if specific","tournament","specific emotion from article"]
+    },
+    {
+      "angle":"DIFFERENT angle from Concept 1",
+      "overlay":"MAX 4 words",
+      "scene_template":{
+        "foreground":"DIFFERENT prop from Concept 1",
+        "midground":"DIFFERENT action from Concept 1",
+        "background":"DIFFERENT setting from Concept 1 with VIBRANT colors"
+      },
+      "mood":"DIFFERENT mood from Concept 1",
+      "colors":"VIBRANT colors matching article",
+      "keywords":["team names","venue","tournament","emotion"]
+    },
+    {
+      "angle":"DIFFERENT angle from Concept 1 and 2",
+      "overlay":"MAX 4 words",
+      "scene_template":{
+        "foreground":"DIFFERENT prop from Concept 1 and 2",
+        "midground":"DIFFERENT action from Concept 1 and 2",
+        "background":"DIFFERENT setting from Concept 1 and 2 with VIBRANT colors"
+      },
+      "mood":"DIFFERENT mood from Concept 1 and 2",
+      "colors":"VIBRANT colors matching article",
+      "keywords":["team names","venue","tournament","emotion"]
     }
   ]
 }
+
+REMEMBER: You MUST return EXACTLY 3 concepts in the JSON array. Count them before returning.
 
 Article:
 Title: ${title}
@@ -185,11 +213,11 @@ If you create similar concepts, the system will reject them. Be creative and div
     {
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Return ONLY valid JSON." },
+        { role: "system", content: "Return ONLY valid JSON with EXACTLY 3 concepts in the concepts array. Count them: [concept1, concept2, concept3]. No more, no less." },
         { role: "user", content: prompt }
       ],
       temperature: 0.85,
-      max_tokens: 1200,
+      max_tokens: 1500, // Increased tokens to ensure all 3 concepts are generated
       response_format: { type: "json_object" }
     },
     {
@@ -241,10 +269,43 @@ If you create similar concepts, the system will reject them. Be creative and div
     }
   }
 
-  if (!plan.concepts || plan.concepts.length !== 3) {
-    console.error("❌ Invalid plan structure:");
+  // Validate plan structure
+  if (!plan.concepts) {
+    console.error("❌ No concepts array in plan:");
     console.error("Plan:", JSON.stringify(plan, null, 2));
-    throw new Error(`Visual plan invalid: expected 3 concepts, got ${plan.concepts?.length || 0}`);
+    throw new Error("Visual plan invalid: no concepts array found");
+  }
+
+  if (plan.concepts.length !== 3) {
+    console.error(`❌ Invalid plan structure: expected 3 concepts, got ${plan.concepts.length}`);
+    console.error("Plan:", JSON.stringify(plan, null, 2));
+    
+    // If we have less than 3, try to generate missing ones or retry
+    if (plan.concepts.length < 3) {
+      console.log("⚠️ Attempting to fix: generating missing concepts...");
+      // Try to add missing concepts based on existing ones
+      const missing = 3 - plan.concepts.length;
+      for (let i = 0; i < missing; i++) {
+        // Create a generic fallback concept
+        plan.concepts.push({
+          angle: `symbolic concept ${plan.concepts.length + 1}`,
+          overlay: "Breaking News",
+          scene_template: {
+            foreground: "Generic cricket prop (bat/ball/stumps)",
+            midground: "Generic cricket silhouette action",
+            background: "Stadium atmosphere with vibrant colors"
+          },
+          mood: "dramatic",
+          colors: "Vibrant, high saturation colors",
+          keywords: ["cricket", "news", "breaking"]
+        });
+      }
+      console.log(`✅ Added ${missing} fallback concept(s). Total: ${plan.concepts.length}`);
+    } else {
+      // If more than 3, take first 3
+      console.log("⚠️ More than 3 concepts found, taking first 3");
+      plan.concepts = plan.concepts.slice(0, 3);
+    }
   }
 
   // Log plan for debugging
