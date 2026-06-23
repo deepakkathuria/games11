@@ -40,6 +40,37 @@ async function getWithRetry(url, opts = {}, tries = 3) {
   throw lastErr;
 }
 
+function buildGNewsError(error) {
+  const status = error.response?.status;
+  const data = error.response?.data;
+  const bodyMsg =
+    (Array.isArray(data?.errors) && data.errors[0]) ||
+    data?.message ||
+    data?.error ||
+    error.message ||
+    "Failed to fetch from GNews";
+
+  const lower = String(bodyMsg).toLowerCase();
+  const isLimit =
+    status === 429 ||
+    status === 402 ||
+    (status === 403 &&
+      (lower.includes("limit") ||
+        lower.includes("quota") ||
+        lower.includes("maximum") ||
+        lower.includes("exceeded") ||
+        lower.includes("requests allowed")));
+
+  const err = new Error(
+    isLimit
+      ? "GNews API limit exceeded. Please try again later or upgrade your GNews plan."
+      : bodyMsg
+  );
+  err.code = isLimit ? "GNEWS_LIMIT_EXCEEDED" : "GNEWS_FETCH_ERROR";
+  err.httpStatus = isLimit ? 429 : status || 500;
+  return err;
+}
+
 // GNews API Configuration
 const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
@@ -134,8 +165,8 @@ class NewsScheduler {
       }
       return [];
     } catch (error) {
-      console.error('Error fetching news from API:', error);
-      return [];
+      console.error("Error fetching news from API:", error.response?.data || error.message);
+      throw buildGNewsError(error);
     }
   }
 

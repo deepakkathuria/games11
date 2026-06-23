@@ -4234,12 +4234,20 @@ app.post('/api/cricket-openai/manual-fetch-news', async (req, res) => {
     const result = await newsScheduler.fetchAndStoreNews();
     res.json({
       success: true,
-      message: `GNews: ${result.count} cricket articles fetched and stored for OpenAI processing`,
+      message:
+        result.count > 0
+          ? `✅ GNews: ${result.count} cricket articles fetched and stored successfully`
+          : "✅ GNews fetch OK — no new articles matched filters",
       count: result.count,
     });
   } catch (error) {
     console.error('Error manually fetching cricket news for OpenAI:', error);
-    res.status(500).json({ success: false, error: error.message });
+    const status = error.httpStatus || (error.code === "GNEWS_LIMIT_EXCEEDED" ? 429 : 500);
+    res.status(status).json({
+      success: false,
+      code: error.code || "GNEWS_FETCH_ERROR",
+      error: error.message,
+    });
   }
 });
 
@@ -5435,12 +5443,20 @@ app.post('/api/manual-fetch-news', async (req, res) => {
     const result = await newsScheduler.fetchAndStoreNews();
     res.json({
       success: true,
-      message: `GNews: ${result.count} cricket articles fetched and stored successfully`,
+      message:
+        result.count > 0
+          ? `✅ GNews: ${result.count} cricket articles fetched and stored successfully`
+          : "✅ GNews fetch OK — no new articles matched filters",
       count: result.count,
     });
   } catch (error) {
     console.error('Error manually fetching news:', error);
-    res.status(500).json({ success: false, error: error.message });
+    const status = error.httpStatus || (error.code === "GNEWS_LIMIT_EXCEEDED" ? 429 : 500);
+    res.status(status).json({
+      success: false,
+      code: error.code || "GNEWS_FETCH_ERROR",
+      error: error.message,
+    });
   }
 });
 
