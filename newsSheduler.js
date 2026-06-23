@@ -71,6 +71,29 @@ function buildGNewsError(error) {
   return err;
 }
 
+/** Use content + description (no minimum length) */
+function getArticleBody(article) {
+  const content = (article.content || "").trim();
+  const description = (article.description || "").trim();
+  if (content && description) return `${description}\n\n${content}`.trim();
+  return content || description || article.title || "";
+}
+
+function passesArticleFilter(article, today) {
+  if (!article.title || !String(article.title).trim()) return false;
+
+  const titleLower = article.title.toLowerCase();
+  if (titleLower.includes("betting") || titleLower.includes("gambling")) return false;
+
+  if (article.publishedAt) {
+    const articleDate = new Date(article.publishedAt);
+    const daysDiff = (today.getTime() - articleDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysDiff > 7) return false;
+  }
+
+  return true;
+}
+
 // GNews API Configuration
 const GNEWS_API_KEY = process.env.GNEWS_API_KEY || "10221c352c3324d296732745fffffe4c";
 const GNEWS_BASE_URL = "https://gnews.io/api/v4/search";
@@ -147,25 +170,10 @@ class NewsScheduler {
 
       // GNews: { totalArticles, articles: [...] }
       if (response.data && response.data.articles) {
-        const filtered = response.data.articles.filter(article => {
-          // Check content quality
-          if (!article.content || article.content.length < 300) return false;
-          if (!article.title || article.title.length < 10) return false;
-          if (article.title.toLowerCase().includes('betting')) return false;
-          if (article.title.toLowerCase().includes('gambling')) return false;
-          
-          // Check if article is recent (within last 7 days)
-          if (article.publishedAt) {
-            const articleDate = new Date(article.publishedAt);
-            const daysDiff = (today.getTime() - articleDate.getTime()) / (1000 * 60 * 60 * 24);
-            if (daysDiff > 7) {
-              console.log(`⏭️ Skipping old article: ${article.title.substring(0, 50)} (${Math.floor(daysDiff)} days old)`);
-              return false;
-            }
-          }
-          
-          return true;
-        });
+        const filtered = response.data.articles.filter((article) => passesArticleFilter(article, today)).map((article) => ({
+          ...article,
+          content: getArticleBody(article),
+        }));
         
         console.log(`✅ Filtered ${filtered.length} fresh articles from ${response.data.articles.length} total`);
         return {
@@ -236,7 +244,7 @@ class NewsScheduler {
       return `✅ GNews OK — ${afterFilter} article${afterFilter === 1 ? "" : "s"} found, all already in database (0 new)`;
     }
     if (totalFromApi > 0 && afterFilter === 0) {
-      return `⚠️ GNews returned ${totalFromApi} articles but none passed filters (need 300+ char content, last 7 days, no betting/gambling)`;
+      return `⚠️ GNews returned ${totalFromApi} articles but none passed filters (last 7 days, no betting/gambling in title)`;
     }
     return "⚠️ No cricket articles found on GNews for the last 7 days";
   }
