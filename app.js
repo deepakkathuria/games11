@@ -4109,7 +4109,7 @@ app.get('/api/cricket-openai/stored-news', async (req, res) => {
     const [rows] = await pollDBPool.query(
       `SELECT * FROM cricket_news
        WHERE is_valid = true
-       ORDER BY fetched_at DESC
+       ORDER BY published_at DESC, id DESC
        LIMIT ? OFFSET ?`,
       [parseInt(limit), parseInt(offset)]
     );
@@ -4234,19 +4234,20 @@ app.post('/api/cricket-openai/manual-fetch-news', async (req, res) => {
     const result = await newsScheduler.fetchAndStoreNews();
     res.json({
       success: true,
-      message:
-        result.count > 0
-          ? `✅ GNews: ${result.count} cricket articles fetched and stored successfully`
-          : "✅ GNews fetch OK — no new articles matched filters",
-      count: result.count,
+      message: newsScheduler.buildFetchMessage(result),
+      count: result.count, // new inserts only; 0 when all duplicates
+      totalFromApi: result.totalFromApi,
+      afterFilter: result.afterFilter,
+      skippedDuplicates: result.skippedDuplicates,
     });
   } catch (error) {
     console.error('Error manually fetching cricket news for OpenAI:', error);
-    const status = error.httpStatus || (error.code === "GNEWS_LIMIT_EXCEEDED" ? 429 : 500);
-    res.status(status).json({
+    const isLimit = error.code === "GNEWS_LIMIT_EXCEEDED";
+    res.status(isLimit ? 429 : (error.httpStatus || 500)).json({
       success: false,
-      code: error.code || "GNEWS_FETCH_ERROR",
+      code: isLimit ? "GNEWS_LIMIT_EXCEEDED" : (error.code || "GNEWS_FETCH_ERROR"),
       error: error.message,
+      count: 0,
     });
   }
 });
@@ -5443,19 +5444,20 @@ app.post('/api/manual-fetch-news', async (req, res) => {
     const result = await newsScheduler.fetchAndStoreNews();
     res.json({
       success: true,
-      message:
-        result.count > 0
-          ? `✅ GNews: ${result.count} cricket articles fetched and stored successfully`
-          : "✅ GNews fetch OK — no new articles matched filters",
+      message: newsScheduler.buildFetchMessage(result),
       count: result.count,
+      totalFromApi: result.totalFromApi,
+      afterFilter: result.afterFilter,
+      skippedDuplicates: result.skippedDuplicates,
     });
   } catch (error) {
     console.error('Error manually fetching news:', error);
-    const status = error.httpStatus || (error.code === "GNEWS_LIMIT_EXCEEDED" ? 429 : 500);
-    res.status(status).json({
+    const isLimit = error.code === "GNEWS_LIMIT_EXCEEDED";
+    res.status(isLimit ? 429 : (error.httpStatus || 500)).json({
       success: false,
-      code: error.code || "GNEWS_FETCH_ERROR",
+      code: isLimit ? "GNEWS_LIMIT_EXCEEDED" : (error.code || "GNEWS_FETCH_ERROR"),
       error: error.message,
+      count: 0,
     });
   }
 });

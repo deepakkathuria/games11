@@ -138,6 +138,13 @@ class NewsScheduler {
         headers: { Accept: 'application/json' },
       });
 
+      // GNews error in body (e.g. API limit / quota)
+      if (response.data?.errors?.length) {
+        throw buildGNewsError({
+          response: { status: response.status || 403, data: response.data },
+        });
+      }
+
       // GNews: { totalArticles, articles: [...] }
       if (response.data && response.data.articles) {
         const filtered = response.data.articles.filter(article => {
@@ -161,9 +168,13 @@ class NewsScheduler {
         });
         
         console.log(`✅ Filtered ${filtered.length} fresh articles from ${response.data.articles.length} total`);
-        return filtered;
+        return {
+          articles: filtered,
+          totalFromApi: response.data.articles.length,
+          afterFilter: filtered.length,
+        };
       }
-      return [];
+      return { articles: [], totalFromApi: 0, afterFilter: 0 };
     } catch (error) {
       console.error("Error fetching news from API:", error.response?.data || error.message);
       throw buildGNewsError(error);
@@ -172,7 +183,10 @@ class NewsScheduler {
 
   // Store news in database using your existing pollDBPool
   async storeNewsInDB(articles) {
-    if (articles.length === 0) return;
+    if (articles.length === 0) return { inserted: 0, skipped: 0 };
+
+    let inserted = 0;
+    let skipped = 0;
 
     try {
       for (const article of articles) {
@@ -199,21 +213,47 @@ class NewsScheduler {
               true
             ]
           );
+          inserted++;
           console.log(`Stored: ${article.title.substring(0, 50)}...`);
+        } else {
+          skipped++;
         }
       }
     } catch (error) {
       console.error('Error storing news in database:', error);
     }
+
+    return { inserted, skipped };
+  }
+
+  buildFetchMessage(result) {
+    const { count, totalFromApi, afterFilter, skippedDuplicates } = result;
+
+    if (count > 0) {
+      return `✅ ${count} new cricket article${count === 1 ? "" : "s"} saved from GNews`;
+    }
+    if (skippedDuplicates > 0) {
+      return `✅ GNews OK — ${afterFilter} article${afterFilter === 1 ? "" : "s"} found, all already in database (0 new)`;
+    }
+    if (totalFromApi > 0 && afterFilter === 0) {
+      return `⚠️ GNews returned ${totalFromApi} articles but none passed filters (need 300+ char content, last 7 days, no betting/gambling)`;
+    }
+    return "⚠️ No cricket articles found on GNews for the last 7 days";
   }
 
   // Main function to fetch and store news
   async fetchAndStoreNews() {
     console.log('Fetching latest cricket news...');
-    const articles = await this.fetchNewsFromAPI();
-    await this.storeNewsInDB(articles);
-    console.log(`Fetched and stored ${articles.length} articles`);
-    return { count: articles.length };
+    const { articles, totalFromApi, afterFilter } = await this.fetchNewsFromAPI();
+    const { inserted, skipped } = await this.storeNewsInDB(articles);
+    console.log(`GNews: api=${totalFromApi}, filtered=${afterFilter}, new=${inserted}, duplicates=${skipped}`);
+    return {
+      count: inserted,
+      totalFromApi,
+      afterFilter,
+      skippedDuplicates: skipped,
+      message: null, // filled by caller via buildFetchMessage
+    };
   }
 
   // Get stored news from database using your existing pollDBPool
